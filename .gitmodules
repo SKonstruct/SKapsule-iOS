@@ -1,0 +1,18 @@
+[submodule "gl4es"]
+	path = gl4es
+	url = https://github.com/SKonstruct/gl4es.git
+[submodule "openal-soft"]
+	path = openal-soft
+	url = https://github.com/SKonstruct/openal-soft.git
+[submodule "lwjgl3"]
+	path = lwjgl3
+	url = https://github.com/SKonstruct/lwjgl3.git
+[submodule "caciocavallo17"]
+	path = caciocavallo17
+	url = https://github.com/SKonstruct/caciocavallo17.git
+[submodule "frenchpress"]
+	path = frenchpress
+	url = https://github.com/SKonstruct/frenchpress.git
+[submodule "Natives/external/fishhook"]
+	path = Natives/external/fishhook
+	url = https://github.com/SKonstruct/fishhook.git
