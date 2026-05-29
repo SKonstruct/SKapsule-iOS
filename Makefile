@@ -11,6 +11,7 @@ COMMIT      := $(shell git log --oneline -1 2>/dev/null | cut -b 1-7 || echo unk
 
 RELEASE ?= 0
 TROLLSTORE_JIT_ENT ?= 0
+DEVICE_ID ?= 00008110-001a71422246801e
 
 ifeq (,$(BRANCH))
 BRANCH := unknown
@@ -58,11 +59,13 @@ help:
 	echo '    make payload          Assemble SKapsule.app'
 	echo '    make package          Create .ipa/.tipa'
 	echo '    make clean            Clean build dirs'
+	echo '    make deploy           Install to device'
 	echo '    make check            Dump variables'
 	echo ''
 	echo 'Variables:'
 	echo '    RELEASE=1             Release build'
 	echo '    TROLLSTORE_JIT_ENT=1  TrollStore entitlements'
+	echo '    DEVICE_ID=...         Target device UDID'
 	echo '    VERBOSE=1             Print commands'
 
 check:
@@ -119,10 +122,15 @@ package: payload
 	$(call METHOD_PACKAGE)
 	echo '[SKapsule v$(VERSION)] package - end'
 
+deploy: payload
+	echo '[SKapsule v$(VERSION)] deploy - start'
+	xcrun devicectl device install app --device $(DEVICE_ID) $(OUTPUTDIR)/Payload/SKapsule.app
+	echo '[SKapsule v$(VERSION)] deploy - end'
+
 clean:
 	echo '[SKapsule v$(VERSION)] clean - start'
 	rm -rf $(WORKINGDIR)
 	rm -rf $(OUTPUTDIR)
 	echo '[SKapsule v$(VERSION)] clean - end'
 
-.PHONY: all clean check native payload package help
+.PHONY: all clean check native payload package deploy help

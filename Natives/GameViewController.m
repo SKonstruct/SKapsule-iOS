@@ -1,14 +1,18 @@
 #import "GameViewController.h"
 #import "JavaLauncher.h"
+#import "NativeBridge.h"
 #import "SKInstaller.h"
 #import "utils.h"
 
 #import <QuartzCore/QuartzCore.h>
 
+typedef NS_ENUM(NSInteger, SKLoginMode);
+
 @interface GameViewController ()
 @property (nonatomic, strong) UIView *surfaceView;
 @property (nonatomic, strong) UILabel *bootStatus;
 @property (nonatomic, strong) UIView *bootOverlay;
+@property (nonatomic, strong) UIActivityIndicatorView *spinner;
 @property (nonatomic, assign) BOOL jvmKicked;
 @end
 
@@ -39,21 +43,85 @@
     self.bootStatus.translatesAutoresizingMaskIntoConstraints = NO;
     [self.bootOverlay addSubview:self.bootStatus];
 
-    UIActivityIndicatorView *spinner = [[UIActivityIndicatorView alloc]
+    self.spinner = [[UIActivityIndicatorView alloc]
         initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleLarge];
-    spinner.color = UIColor.whiteColor;
-    spinner.translatesAutoresizingMaskIntoConstraints = NO;
-    [spinner startAnimating];
-    [self.bootOverlay addSubview:spinner];
+    self.spinner.color = UIColor.whiteColor;
+    self.spinner.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.spinner startAnimating];
+    [self.bootOverlay addSubview:self.spinner];
 
     [NSLayoutConstraint activateConstraints:@[
-        [spinner.centerXAnchor constraintEqualToAnchor:self.bootOverlay.centerXAnchor],
-        [spinner.centerYAnchor constraintEqualToAnchor:self.bootOverlay.centerYAnchor constant:-20],
+        [self.spinner.centerXAnchor constraintEqualToAnchor:self.bootOverlay.centerXAnchor],
+        [self.spinner.centerYAnchor constraintEqualToAnchor:self.bootOverlay.centerYAnchor constant:-20],
         [self.bootStatus.centerXAnchor constraintEqualToAnchor:self.bootOverlay.centerXAnchor],
-        [self.bootStatus.topAnchor constraintEqualToAnchor:spinner.bottomAnchor constant:16],
+        [self.bootStatus.topAnchor constraintEqualToAnchor:self.spinner.bottomAnchor constant:16],
         [self.bootStatus.leadingAnchor constraintEqualToAnchor:self.bootOverlay.leadingAnchor constant:32],
         [self.bootStatus.trailingAnchor constraintEqualToAnchor:self.bootOverlay.trailingAnchor constant:-32],
     ]];
+
+    // Register NativeBridge callbacks
+    __weak typeof(self) weakSelf = self;
+
+    [SKNativeBridge setBootStatusHandler:^(NSString *message) {
+        weakSelf.bootStatus.text = message;
+    }];
+
+    [SKNativeBridge setRenderReadyHandler:^{
+        [UIView animateWithDuration:0.3 animations:^{
+            weakSelf.bootOverlay.alpha = 0;
+        } completion:^(BOOL finished) {
+            [weakSelf.bootOverlay removeFromSuperview];
+        }];
+    }];
+
+    [SKNativeBridge setPromptDeviceCodeHandler:^NSString *(BOOL prevWrong) {
+        return [weakSelf showSteamGuardPromptWithTitle:@"Steam Guard"
+            message:prevWrong
+                ? @"Incorrect code. Enter your Steam Guard authenticator code:"
+                : @"Enter your Steam Guard authenticator code:"];
+    }];
+
+    [SKNativeBridge setPromptEmailCodeHandler:^NSString *(NSString *email, BOOL prevWrong) {
+        NSString *msg = prevWrong
+            ? [NSString stringWithFormat:@"Incorrect code. Enter the code sent to %@:", email]
+            : [NSString stringWithFormat:@"Enter the Steam Guard code sent to %@:", email];
+        return [weakSelf showSteamGuardPromptWithTitle:@"Steam Guard (Email)" message:msg];
+    }];
+}
+
+// Blocking Steam Guard prompt: dispatches to main thread, parks caller via semaphore
+- (NSString *)showSteamGuardPromptWithTitle:(NSString *)title message:(NSString *)message {
+    __block NSString *result = @"";
+    dispatch_semaphore_t sem = dispatch_semaphore_create(0);
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIAlertController *alert = [UIAlertController
+            alertControllerWithTitle:title message:message
+            preferredStyle:UIAlertControllerStyleAlert];
+
+        [alert addTextFieldWithConfigurationHandler:^(UITextField *tf) {
+            tf.placeholder = @"Code";
+            tf.keyboardType = UIKeyboardTypeNumberPad;
+            tf.autocorrectionType = UITextAutocorrectionTypeNo;
+        }];
+
+        [alert addAction:[UIAlertAction actionWithTitle:@"Submit" style:UIAlertActionStyleDefault
+            handler:^(UIAlertAction *action) {
+                result = alert.textFields.firstObject.text ?: @"";
+                dispatch_semaphore_signal(sem);
+            }]];
+
+        [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel
+            handler:^(UIAlertAction *action) {
+                result = @"";
+                dispatch_semaphore_signal(sem);
+            }]];
+
+        [self presentViewController:alert animated:YES completion:nil];
+    });
+
+    dispatch_semaphore_wait(sem, DISPATCH_TIME_FOREVER);
+    return result;
 }
 
 - (void)viewDidAppear:(BOOL)animated {
@@ -65,11 +133,22 @@
 }
 
 - (void)startJVM {
-    // Placeholder: in Phase 1 this will call launchJVM() with full args.
-    // For Phase 0 we just show the boot overlay.
-    NSLog(@"[GameVC] JVM launch stub (Phase 0). loginMode=%ld", (long)self.loginMode);
-    self.bootStatus.text = @"JVM launch not yet implemented (Phase 0).\n"
-        "Runtime is installed. Waiting for Phase 1.";
+    BOOL isSteam = (self.loginMode == 1); // SKLoginModeSteam
+    CGSize screenSize = self.view.bounds.size;
+    CGFloat scale = UIScreen.mainScreen.scale;
+    int w = (int)(screenSize.width * scale);
+    int h = (int)(screenSize.height * scale);
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        int ret = launchJVM(self.steamUser ?: @"",
+                            self.steamPass ?: @"",
+                            isSteam, w, h);
+        NSLog(@"[GameVC] JVM exited with code %d", ret);
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.bootStatus.text = [NSString stringWithFormat:@"JVM exited (code %d)", ret];
+            [self.spinner stopAnimating];
+        });
+    });
 }
 
 - (BOOL)prefersStatusBarHidden {

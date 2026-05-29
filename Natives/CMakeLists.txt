@@ -3,7 +3,7 @@ project(SKapsule)
 
 configure_file(${CMAKE_CURRENT_LIST_DIR}/config.h.in ${CMAKE_CURRENT_LIST_DIR}/config.h)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -target arm64-apple-ios -fcommon -fobjc-arc -ObjC")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fcommon -fobjc-arc -ObjC")
 set(CMAKE_C_FLAGS_DEBUG "-funwind-tables -g")
 
 if("${CMAKE_HOST_SYSTEM_NAME}" MATCHES "Linux|^GNU$|Android")
@@ -43,8 +43,10 @@ add_executable(SKapsule
   LauncherViewController.m
   GameViewController.m
   JavaLauncher.m
+  NativeBridge.m
   SKInstaller.m
   utils.m
+  dyld_bypass_validation.m
   external/fishhook/fishhook.c
 )
 
@@ -55,6 +57,8 @@ target_link_libraries(SKapsule
   "-framework UIKit"
   "-framework GameController"
   "-framework IOKit"
+  "-framework Security"
+  "-ldl"
 )
 
 set_target_properties(SKapsule PROPERTIES

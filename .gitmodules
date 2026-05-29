@@ -16,3 +16,6 @@
 [submodule "Natives/external/fishhook"]
 	path = Natives/external/fishhook
 	url = https://github.com/SKonstruct/fishhook.git
+[submodule "bootstrap"]
+	path = bootstrap
+	url = https://github.com/SKonstruct/skapsule-bootstrap.git
