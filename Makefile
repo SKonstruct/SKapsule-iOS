@@ -11,7 +11,7 @@ COMMIT      := $(shell git log --oneline -1 2>/dev/null | cut -b 1-7 || echo unk
 
 RELEASE ?= 0
 TROLLSTORE_JIT_ENT ?= 0
-DEVICE_ID ?= 00008110-001a71422246801e
+DEVICE_ID ?= 72FB4F78-56C5-592F-951B-58275C0F82AC
 
 ifeq (,$(BRANCH))
 BRANCH := unknown

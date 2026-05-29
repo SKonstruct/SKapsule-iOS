@@ -2,7 +2,7 @@
 #define CONFIG_H
 
 #define CONFIG_BRANCH "main"
-#define CONFIG_COMMIT "00bb50f"
+#define CONFIG_COMMIT "bf86402"
 
 /* #undef CONFIG_RELEASE */
 #ifdef CONFIG_RELEASE

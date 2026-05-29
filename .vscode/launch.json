@@ -4,7 +4,24 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-        
-
+        {
+            "name": "Build & Deploy (Device)",
+            "type": "lldb",
+            "request": "custom",
+            "targetCreateCommands": [
+                "target create ${workspaceFolder}/Natives/build/SKapsule.app/SKapsule"
+            ],
+            "processCreateCommands": [
+                "script lldb.debugger.HandleCommand('device select 00008110-001a71422246801e')"
+            ],
+            "preLaunchTask": "Deploy to Device"
+        },
+        {
+            "name": "Attach to SKapsule (Device)",
+            "type": "lldb",
+            "request": "attach",
+            "program": "${workspaceFolder}/Natives/build/SKapsule.app/SKapsule",
+            "waitFor": true
+        }
     ]
 }
