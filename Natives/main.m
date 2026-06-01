@@ -126,6 +126,17 @@ static void init_setupGameDirs(void) {
 }
 
 int main(int argc, char *argv[]) {
+    // Intercept libjli's macOS/iOS thread hijacking!
+    // When JLI_Launch is called, it spawns the JVM on a new thread and calls main() AGAIN
+    // on the calling thread, expecting us to start a UI runloop. If we let it proceed,
+    // it will call UIApplicationMain a second time and crash. If we return, it calls exit()!
+    if (argc > 0 && strstr(argv[0], "bin/java") != NULL) {
+        NSLog(@"[Pre-init] Intercepted libjli main() callback. Parking thread.");
+        // Block forever so libjli doesn't call exit().
+        while(1) { sleep(UINT32_MAX); }
+        return 0;
+    }
+
     if (argc == 2 && strlen(argv[1]) == 0) {
         // Child process for JIT enablement via PT_TRACE_ME
         int ret = ptrace(PT_TRACE_ME, 0, 0, 0);

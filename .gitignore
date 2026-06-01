@@ -24,3 +24,4 @@ playground.xcworkspace
 bootstrap/build/
 /.cache
 /build
+/Natives/build_xcode

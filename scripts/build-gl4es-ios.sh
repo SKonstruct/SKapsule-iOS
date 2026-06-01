@@ -6,7 +6,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-GL4ES_SRC="${GL4ES_SRC:-$REPO_ROOT/gl4es}"
+GL4ES_SRC="${GL4ES_SRC:-$REPO_ROOT/external/gl4es}"
 OUT_DIR="${OUT_DIR:-$REPO_ROOT/out/gl4es}"
 BUILD_DIR="${BUILD_DIR:-$OUT_DIR/build}"
 BUILD_TYPE="${BUILD_TYPE:-Release}"

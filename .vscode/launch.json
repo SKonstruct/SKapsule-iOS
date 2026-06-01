@@ -9,7 +9,7 @@
             "type": "lldb",
             "request": "custom",
             "targetCreateCommands": [
-                "target create ${workspaceFolder}/Natives/build/SKapsule.app/SKapsule"
+                "target create ${workspaceFolder}/artifacts/Payload/SKapsule.app/SKapsule"
             ],
             "processCreateCommands": [
                 "script lldb.debugger.HandleCommand('device select 00008110-001a71422246801e')"
@@ -20,7 +20,7 @@
             "name": "Attach to SKapsule (Device)",
             "type": "lldb",
             "request": "attach",
-            "program": "${workspaceFolder}/Natives/build/SKapsule.app/SKapsule",
+            "program": "${workspaceFolder}/artifacts/Payload/SKapsule.app/SKapsule",
             "waitFor": true
         }
     ]

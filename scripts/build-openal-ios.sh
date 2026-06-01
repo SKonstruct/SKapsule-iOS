@@ -6,7 +6,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-OPENAL_SRC="${OPENAL_SRC:-$REPO_ROOT/openal-soft}"
+OPENAL_SRC="${OPENAL_SRC:-$REPO_ROOT/external/openal-soft}"
 OUT_DIR="${OUT_DIR:-$REPO_ROOT/out/openal}"
 BUILD_DIR="${BUILD_DIR:-$OUT_DIR/build}"
 BUILD_TYPE="${BUILD_TYPE:-Release}"
@@ -27,7 +27,7 @@ mkdir -p "$BUILD_DIR" "$OUT_DIR"
 
 cmake -S "$OPENAL_SRC" -B "$BUILD_DIR" \
     -DCMAKE_CROSSCOMPILING=true \
-    -DCMAKE_SYSTEM_NAME=Darwin \
+    -DCMAKE_SYSTEM_NAME=iOS \
     -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
     -DCMAKE_OSX_SYSROOT="$SDKPATH" \
     -DCMAKE_OSX_ARCHITECTURES=arm64 \

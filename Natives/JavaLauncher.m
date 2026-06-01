@@ -32,10 +32,8 @@ int launchJVM(NSString *steamUser, NSString *steamPass, BOOL isSteam, int width,
 
     init_loadSKEnv();
 
-    // Activate dyld bypass for unsigned dylibs (JRE, LWJGL, gl4es, openal)
-#if !TARGET_OS_SIMULATOR
-    init_bypassDyldLibValidation();
-#endif
+    // The JRE and native libraries are now properly codesigned at build-time.
+    // Dyld validation bypass is no longer required and corrupts dyld4 memory on iOS 17.
 
     NSString *javaHome = getSelectedJavaHome(25);
     if (!javaHome) {
@@ -49,12 +47,6 @@ int launchJVM(NSString *steamUser, NSString *steamPass, BOOL isSteam, int width,
 
     const char *home = getenv("SKAPSULE_HOME");
     NSString *bundlePath = NSBundle.mainBundle.bundlePath;
-
-    // Symlink libawt_xawt.dylib into JRE's lib/ so AWT can find it
-    NSString *awtDest = [NSString stringWithFormat:@"%@/lib/libawt_xawt.dylib", javaHome];
-    NSString *awtSource = [NSString stringWithFormat:@"%@/Frameworks/libawt_xawt.dylib", bundlePath];
-    NSError *error;
-    [fm createSymbolicLinkAtPath:awtDest withDestinationPath:awtSource error:&error];
 
     // Load JLI
     NSString *libjliPath = [NSString stringWithFormat:@"%@/lib/libjli.dylib", javaHome];
@@ -81,7 +73,6 @@ int launchJVM(NSString *steamUser, NSString *steamPass, BOOL isSteam, int width,
     const char *margv[200];
 
     margv[++margc] = [NSString stringWithFormat:@"%@/bin/java", javaHome].UTF8String;
-    margv[++margc] = "-XstartOnFirstThread";
 
     // Memory: auto-allocate 25% of physical RAM (no increased-memory entitlement assumed)
     int allocMB = (int)((NSProcessInfo.processInfo.physicalMemory >> 20) * 0.25);

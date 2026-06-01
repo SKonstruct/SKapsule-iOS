@@ -39,15 +39,15 @@ id getEntitlementValue(NSString *key) {
 }
 
 NSString *getSelectedJavaHome(int minVersion) {
-    NSString *bundledJRE = [NSString stringWithFormat:@"%@/jre25",
-        NSBundle.mainBundle.bundlePath];
+    NSString *bundledJRE = [NSString stringWithFormat:@"%@/jre21",
+                             [[NSBundle mainBundle] bundlePath]];
     if ([NSFileManager.defaultManager fileExistsAtPath:bundledJRE]) {
         return bundledJRE;
     }
 
     const char *home = getenv("SKAPSULE_HOME");
     if (home) {
-        NSString *extractedJRE = [NSString stringWithFormat:@"%s/jre25", home];
+        NSString *extractedJRE = [NSString stringWithFormat:@"%s/jre21", home];
         if ([NSFileManager.defaultManager fileExistsAtPath:extractedJRE]) {
             return extractedJRE;
         }

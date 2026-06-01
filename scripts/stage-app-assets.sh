@@ -6,7 +6,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-APP_DIR="$REPO_ROOT/Natives/build/SKapsule.app"
+APP_DIR="${APP_DIR:-$REPO_ROOT/Natives/build/SKapsule.app}"
 
 stage() {
     local src="$1" dst="$2"

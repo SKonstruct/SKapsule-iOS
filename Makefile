@@ -38,6 +38,17 @@ METHOD_DIRCHECK = \
 		rm -rf $(1)/*; \
 	fi
 
+# Function to download and unpack Java runtimes.
+METHOD_JAVA_UNPACK = \
+	cd $(SOURCEDIR)/depends; \
+	if [ ! -f "java-$(1)-openjdk/release" ] && [ -z "$$(ls jre$(1)-*.tar.xz 2>/dev/null)" ]; then \
+		wget '$(2)' -q --show-progress; \
+		unzip jre$(1)-ios-aarch64.zip && rm jre$(1)-ios-aarch64.zip; \
+		mkdir -p java-$(1)-openjdk; \
+		tar xvf jre$(1)-*.tar.xz -C java-$(1)-openjdk; \
+	fi
+
+
 # Package the IPA
 METHOD_PACKAGE = \
 	if [ '$(TROLLSTORE_JIT_ENT)' == '1' ]; then \
@@ -56,6 +67,7 @@ help:
 	echo 'Usage:'
 	echo '    make                  Build everything'
 	echo '    make native           Build the native app'
+	echo '    make jre              Download and unpack JRE'
 	echo '    make payload          Assemble SKapsule.app'
 	echo '    make package          Create .ipa/.tipa'
 	echo '    make clean            Clean build dirs'
@@ -96,14 +108,36 @@ native:
 	rm -f $(WORKINGDIR)/libawt_headless.dylib
 	echo '[SKapsule v$(VERSION)] native - end'
 
-payload: native
+jre: native
+	echo '[SKapsule v$(VERSION)] jre - start'
+	mkdir -p $(SOURCEDIR)/depends
+	cd $(SOURCEDIR)/depends; \
+	$(call METHOD_JAVA_UNPACK,21,'https://crystall1ne.dev/cdn/amethyst-ios/jre21-ios-aarch64.zip'); \
+	if [ -n "$$(ls jre*.tar.xz 2>/dev/null)" ]; then rm $(SOURCEDIR)/depends/jre*.tar.xz; fi; \
+	cd $(SOURCEDIR); \
+	rm -rf $(SOURCEDIR)/depends/java-21-openjdk/{ASSEMBLY_EXCEPTION,bin,include,jre,legal,LICENSE,man,THIRD_PARTY_README,lib/{ct.sym,jspawnhelper,libjsig.dylib,src.zip,tools.jar}} 2>/dev/null || true; \
+	$(call METHOD_DIRCHECK,$(WORKINGDIR)/SKapsule.app/jre21); \
+	cp -R $(SOURCEDIR)/depends/java-21-openjdk/* $(WORKINGDIR)/SKapsule.app/jre21/ 2>/dev/null || true; \
+	cp $(WORKINGDIR)/libawt_xawt.dylib $(WORKINGDIR)/SKapsule.app/jre21/lib/ 2>/dev/null || true
+	echo '[SKapsule v$(VERSION)] jre - end'
+
+payload: jre
 	echo '[SKapsule v$(VERSION)] payload - start'
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/SKapsule.app/Frameworks)
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/SKapsule.app/libs)
+	# Compile Assets
+	xcrun actool $(SOURCEDIR)/Natives/Assets.xcassets \
+		--compile $(WORKINGDIR)/SKapsule.app \
+		--platform iphoneos \
+		--minimum-deployment-target 14.0 \
+		--app-icon AppIcon \
+		--output-partial-info-plist /dev/null
 	# Copy Info.plist
 	cp $(SOURCEDIR)/Natives/Info.plist $(WORKINGDIR)/SKapsule.app/
 	# Copy native dylibs
 	-cp $(WORKINGDIR)/*.dylib $(WORKINGDIR)/SKapsule.app/Frameworks/ 2>/dev/null
+	# Stage assets (jars and submodules)
+	$(SOURCEDIR)/scripts/stage-app-assets.sh
 	# Stage into output
 	$(call METHOD_DIRCHECK,$(OUTPUTDIR)/Payload)
 	cp -R $(WORKINGDIR)/SKapsule.app $(OUTPUTDIR)/Payload/
@@ -117,14 +151,50 @@ payload: native
 	chmod -R 755 $(OUTPUTDIR)/Payload
 	echo '[SKapsule v$(VERSION)] payload - end'
 
+# Special target for Xcode POST_BUILD hook (skips native compilation)
+xcode-payload:
+	echo '[SKapsule v$(VERSION)] xcode-payload - start'
+	$(call METHOD_DIRCHECK,$(WORKINGDIR)/SKapsule.app/Frameworks)
+	$(call METHOD_DIRCHECK,$(WORKINGDIR)/SKapsule.app/libs)
+	# Stage JRE
+	mkdir -p $(SOURCEDIR)/depends
+	cd $(SOURCEDIR)/depends; \
+	$(call METHOD_JAVA_UNPACK,21,'https://crystall1ne.dev/cdn/amethyst-ios/jre21-ios-aarch64.zip'); \
+	if [ -n "$$(ls jre*.tar.xz 2>/dev/null)" ]; then rm $(SOURCEDIR)/depends/jre*.tar.xz; fi; \
+	cd $(SOURCEDIR); \
+	rm -rf $(SOURCEDIR)/depends/java-21-openjdk/{ASSEMBLY_EXCEPTION,bin,include,jre,legal,LICENSE,man,THIRD_PARTY_README,lib/{ct.sym,jspawnhelper,libjsig.dylib,src.zip,tools.jar}} 2>/dev/null || true; \
+	$(call METHOD_DIRCHECK,$(WORKINGDIR)/SKapsule.app/jre21); \
+	cp -R $(SOURCEDIR)/depends/java-21-openjdk/* $(WORKINGDIR)/SKapsule.app/jre21/ 2>/dev/null || true
+	# Copy Xcode-built native dylibs
+	cp $(WORKINGDIR)/awt_xawt.dylib $(WORKINGDIR)/SKapsule.app/jre21/lib/libawt_xawt.dylib 2>/dev/null || true
+	cp $(WORKINGDIR)/awt_headless.dylib $(WORKINGDIR)/SKapsule.app/jre21/lib/libawt_headless.dylib 2>/dev/null || true
+	# Stage assets (jars and submodules)
+	APP_DIR="$(WORKINGDIR)/SKapsule.app" $(SOURCEDIR)/scripts/stage-app-assets.sh
+	# Codesign all dylibs using Xcode's identity (if running inside Xcode build phase)
+	if [ -n "$${EXPANDED_CODE_SIGN_IDENTITY}" ]; then \
+		echo "[SKapsule] Signing dylibs with EXPANDED_CODE_SIGN_IDENTITY: $${EXPANDED_CODE_SIGN_IDENTITY}"; \
+		find $(WORKINGDIR)/SKapsule.app -type f -name "*.dylib" -exec /usr/bin/codesign --force --sign "$${EXPANDED_CODE_SIGN_IDENTITY}" --timestamp=none {} + ; \
+	elif [ -n "$${CODE_SIGN_IDENTITY}" ]; then \
+		echo "[SKapsule] Signing dylibs with CODE_SIGN_IDENTITY: $${CODE_SIGN_IDENTITY}"; \
+		find $(WORKINGDIR)/SKapsule.app -type f -name "*.dylib" -exec /usr/bin/codesign --force --sign "$${CODE_SIGN_IDENTITY}" --timestamp=none {} + ; \
+	fi
+	echo '[SKapsule v$(VERSION)] xcode-payload - end'
+
+# Build using Xcode so that it properly codesigns, dropping the result in artifacts/Payload
+xcode-build:
+	echo '[SKapsule v$(VERSION)] xcode-build - start'
+	xcrun xcodebuild -project SKapsule.xcodeproj -scheme SKapsule -configuration Debug -destination 'generic/platform=iOS' -allowProvisioningUpdates CONFIGURATION_BUILD_DIR="$(OUTPUTDIR)/Payload" build
+	echo '[SKapsule v$(VERSION)] xcode-build - end'
+
 package: payload
 	echo '[SKapsule v$(VERSION)] package - start'
 	$(call METHOD_PACKAGE)
 	echo '[SKapsule v$(VERSION)] package - end'
 
-deploy: payload
+deploy: xcode-build
 	echo '[SKapsule v$(VERSION)] deploy - start'
 	xcrun devicectl device install app --device $(DEVICE_ID) $(OUTPUTDIR)/Payload/SKapsule.app
+	xcrun devicectl device process launch --device $(DEVICE_ID) com.skonstruct.dev.SKapsule
 	echo '[SKapsule v$(VERSION)] deploy - end'
 
 clean:

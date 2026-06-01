@@ -23,10 +23,18 @@
 - [x] `make package` — produces valid `.ipa` (49KB)
 
 ### Remaining for full Phase 1 testing
-- [ ] Source JRE 25 for iOS arm64
-- [ ] Build native submodules (gl4es, openal, LWJGL, cacio, frenchpress)
-- [ ] Bundle all assets into the .app and test on device
+- [x] Source JRE 25 for iOS arm64 (Temporarily downgraded to JRE 21)
+- [x] Build native submodules (gl4es, openal, LWJGL, cacio, frenchpress)
+- [x] Bundle all assets into the .app and test on device
 - [ ] Verify JVM boots and getdown downloads SK assets
+
+## Phase 1.5: JNI Bridge & GLFW Context
+**Status:** Not started
+
+Key tasks:
+- [ ] Create `jni_core.h` with basic JNI types
+- [ ] Implement `Java_com_skarm_launcher_bootstrap_SkBootstrap_*` bridge functions in `JavaLauncher.m` to fix UI hang
+- [ ] Implement `Java_org_lwjgl_glfw_GLFW_*` native stubs so the SK client doesn't crash during GL init
 
 ---
 

@@ -5,7 +5,7 @@
             "label": "Build Debug",
             "type": "shell",
             "command": "make",
-            "args": ["clean", "payload"],
+            "args": ["xcode-build"],
             "group": {
                 "kind": "build",
                 "isDefault": true

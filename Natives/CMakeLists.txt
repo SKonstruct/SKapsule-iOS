@@ -18,7 +18,7 @@ include_directories(
 )
 
 # rpath for loading dylibs from Frameworks/ and JRE lib/
-set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -rpath @loader_path -rpath @executable_path/jre25/lib")
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -rpath @loader_path -rpath @executable_path/jre21/lib")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -rpath @executable_path/Frameworks -rpath @loader_path/Frameworks")
 
 # Stub: libawt_headless (build-time dep, deleted after compile)
@@ -48,6 +48,7 @@ add_executable(SKapsule
   utils.m
   dyld_bypass_validation.m
   external/fishhook/fishhook.c
+  Assets.xcassets
 )
 
 target_link_libraries(SKapsule
@@ -64,4 +65,5 @@ target_link_libraries(SKapsule
 set_target_properties(SKapsule PROPERTIES
   MACOSX_BUNDLE TRUE
   MACOSX_FRAMEWORK_IDENTIFIER com.skonstruct.skapsule
-  MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_LIST_DIR}/Info.plist")
+  MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_LIST_DIR}/Info.plist"
+  XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED "NO")

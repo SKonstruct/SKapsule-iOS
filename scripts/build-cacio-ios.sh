@@ -7,7 +7,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-CACIO_SRC="${CACIO_SRC:-$REPO_ROOT/caciocavallo17}"
+CACIO_SRC="${CACIO_SRC:-$REPO_ROOT/external/caciocavallo17}"
 OUT_DIR="${OUT_DIR:-$REPO_ROOT/out/cacio}"
 CACIO_VERSION="1.18-SNAPSHOT"
 
@@ -23,12 +23,15 @@ fi
 JAVA_BIN="${JAVA_HOME:+$JAVA_HOME/bin/}java"
 command -v mvn >/dev/null 2>&1 || { echo "ERROR: 'mvn' not on PATH" >&2; exit 1; }
 
-JAVA_MAJOR="$("$JAVA_BIN" -version 2>&1 | head -1 | sed -E 's/.*version "([0-9]+).*/\1/')"
-if [[ -z "$JAVA_MAJOR" || "$JAVA_MAJOR" -lt 25 ]]; then
-    echo "ERROR: cacio java-25 branch needs JDK 25 (found '${JAVA_MAJOR:-?}')." >&2
+if [ -n "$JAVA_HOME" ]; then
+    export PATH="$JAVA_HOME/bin:$PATH"
+fi
+JAVA_VER=$(java -version 2>&1 | awk -F '"' '/version/ {print $2}' | cut -d'.' -f1)
+if [[ "$JAVA_VER" -lt 25 ]]; then
+    echo "ERROR: Java 25+ required (found $JAVA_VER)." >&2
     exit 1
 fi
-echo "Building cacio with JDK $JAVA_MAJOR"
+echo "Building cacio with JDK $JAVA_VER"
 
 ( cd "$CACIO_SRC" && mvn -B -DskipTests \
     -Dmaven.javadoc.skip=true -Dmaven.source.skip=true \

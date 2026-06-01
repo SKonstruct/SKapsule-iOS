@@ -7,7 +7,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-FRENCHPRESS_SRC="${FRENCHPRESS_SRC:-$REPO_ROOT/frenchpress}"
+FRENCHPRESS_SRC="${FRENCHPRESS_SRC:-$REPO_ROOT/external/frenchpress}"
 OUT_DIR="${OUT_DIR:-$REPO_ROOT/out/frenchpress}"
 FRENCHPRESS_VERSION="0.1-SNAPSHOT"
 
@@ -22,12 +22,15 @@ fi
 JAVA_BIN="${JAVA_HOME:+$JAVA_HOME/bin/}java"
 command -v mvn >/dev/null 2>&1 || { echo "ERROR: 'mvn' not on PATH" >&2; exit 1; }
 
-JAVA_MAJOR="$("$JAVA_BIN" -version 2>&1 | head -1 | sed -E 's/.*version "([0-9]+).*/\1/')"
-if [[ -z "$JAVA_MAJOR" || "$JAVA_MAJOR" -lt 25 ]]; then
-    echo "ERROR: frenchpress needs JDK 25 (found '${JAVA_MAJOR:-?}')." >&2
+if [ -n "$JAVA_HOME" ]; then
+    export PATH="$JAVA_HOME/bin:$PATH"
+fi
+JAVA_VER=$(java -version 2>&1 | awk -F '"' '/version/ {print $2}' | cut -d'.' -f1)
+if [[ "$JAVA_VER" -lt 25 ]]; then
+    echo "ERROR: Java 25+ required (found $JAVA_VER)." >&2
     exit 1
 fi
-echo "Building frenchpress with JDK $JAVA_MAJOR"
+echo "Building frenchpress with JDK $JAVA_VER"
 
 ( cd "$FRENCHPRESS_SRC" && mvn -B -DskipTests package )
 
