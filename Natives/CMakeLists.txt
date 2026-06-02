@@ -43,6 +43,7 @@ add_executable(SKapsule
   LauncherViewController.m
   GameViewController.m
   JavaLauncher.m
+  glfw_ios.m
   NativeBridge.m
   SKInstaller.m
   utils.m

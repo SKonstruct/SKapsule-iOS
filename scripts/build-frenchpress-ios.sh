@@ -22,15 +22,14 @@ fi
 JAVA_BIN="${JAVA_HOME:+$JAVA_HOME/bin/}java"
 command -v mvn >/dev/null 2>&1 || { echo "ERROR: 'mvn' not on PATH" >&2; exit 1; }
 
-if [ -n "$JAVA_HOME" ]; then
-    export PATH="$JAVA_HOME/bin:$PATH"
-fi
-JAVA_VER=$(java -version 2>&1 | awk -F '"' '/version/ {print $2}' | cut -d'.' -f1)
-if [[ "$JAVA_VER" -lt 25 ]]; then
-    echo "ERROR: Java 25+ required (found $JAVA_VER)." >&2
+# Verify the build JDK is 25+ since the pom compiles with --release 25.
+JAVA_MAJOR="$("$JAVA_BIN" -version 2>&1 | head -1 | sed -E 's/.*version "([0-9]+).*/\1/')"
+if [[ -z "$JAVA_MAJOR" || "$JAVA_MAJOR" -lt 25 ]]; then
+    echo "ERROR: frenchpress needs JDK 25 to build (found '${JAVA_MAJOR:-?}')." >&2
+    echo "       Point FRENCHPRESS_JAVA_HOME at a JDK 25." >&2
     exit 1
 fi
-echo "Building frenchpress with JDK $JAVA_VER"
+echo "Building frenchpress with JDK $JAVA_MAJOR (${JAVA_HOME:-system default})"
 
 ( cd "$FRENCHPRESS_SRC" && mvn -B -DskipTests package )
 

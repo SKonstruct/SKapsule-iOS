@@ -45,6 +45,12 @@ stage "$REPO_ROOT/out/frenchpress/frenchpress.jar" \
     echo "  (run ./scripts/build-frenchpress-ios.sh first)"
 
 echo
+echo "=== sk-bootstrap.jar ==="
+stage "$REPO_ROOT/out/bootstrap/sk-bootstrap.jar" \
+      "$APP_DIR/libs/sk-bootstrap.jar" || \
+    echo "  (run ./scripts/build-bootstrap.sh first)"
+
+echo
 echo "=== getdown-pro.jar ==="
 stage "$REPO_ROOT/assets/sk/getdown-pro.jar" \
       "$APP_DIR/libs/getdown-pro.jar" || \

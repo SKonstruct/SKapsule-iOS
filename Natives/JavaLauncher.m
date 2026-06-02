@@ -12,6 +12,11 @@
 #include "utils.h"
 #import "JavaLauncher.h"
 #import "NativeBridge.h"
+#include <dlfcn.h>
+#include <pthread.h>
+#include "jni.h"
+
+extern void register_glfw_natives(JNIEnv *env, jclass glfwClass);
 
 #define fm NSFileManager.defaultManager
 
@@ -211,3 +216,69 @@ int launchJVM(NSString *steamUser, NSString *steamPass, BOOL isSteam, int width,
         0,  // javaw
         1); // ergo
 }
+
+void register_sk_natives_if_needed(void) {
+    static BOOL registered = NO;
+    if (registered) return;
+    
+    typedef jint (*JNI_GetCreatedJavaVMs_func)(JavaVM **, jsize, jsize *);
+    JNI_GetCreatedJavaVMs_func getVMs = NULL;
+    
+    // Poll until libjvm is loaded and JNI_GetCreatedJavaVMs is available
+    while (!getVMs) {
+        getVMs = (JNI_GetCreatedJavaVMs_func)dlsym(RTLD_DEFAULT, "JNI_GetCreatedJavaVMs");
+        if (!getVMs) usleep(10000);
+    }
+    
+    JavaVM *jvm = NULL;
+    jsize count = 0;
+    
+    // Poll until JVM is fully created
+    while (count == 0 || jvm == NULL) {
+        getVMs(&jvm, 1, &count);
+        if (count == 0 || jvm == NULL) usleep(10000);
+    }
+    
+    JNIEnv *env = NULL;
+    if ((*jvm)->AttachCurrentThread(jvm, (void **)&env, NULL) != JNI_OK) {
+        NSLog(@"[JavaLauncher] Failed to attach thread for JNI registration");
+        return;
+    }
+    
+    if (env) {
+        jclass cls = NULL;
+        // Poll until SkBootstrap is loaded by the classloader
+        while (!cls) {
+            cls = (*env)->FindClass(env, "com/skarm/launcher/bootstrap/SkBootstrap");
+            if (!cls) {
+                (*env)->ExceptionClear(env);
+                usleep(10000);
+            }
+        }
+        
+        JNINativeMethod methods[] = {
+            {"nativeLaunchStatus", "(Ljava/lang/String;)V", (void *)&Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeLaunchStatus},
+            {"registerGlfwNatives", "(Ljava/lang/Class;)V", (void *)&Java_com_skarm_launcher_bootstrap_SkBootstrap_registerGlfwNatives},
+        };
+        (*env)->RegisterNatives(env, cls, methods, sizeof(methods)/sizeof(methods[0]));
+        registered = YES;
+        NSLog(@"[JavaLauncher] Successfully registered JNI natives for SkBootstrap!");
+        
+        (*jvm)->DetachCurrentThread(jvm);
+    }
+}
+
+JNIEXPORT void JNICALL Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeLaunchStatus(JNIEnv *env, jclass clazz, jstring status_text) {
+    const char *text = (*env)->GetStringUTFChars(env, status_text, NULL);
+    if (text != NULL) {
+        NSString *nsText = [NSString stringWithUTF8String:text];
+        [SKNativeBridge onLaunchStatus:nsText];
+        (*env)->ReleaseStringUTFChars(env, status_text, text);
+    }
+}
+
+JNIEXPORT void JNICALL Java_com_skarm_launcher_bootstrap_SkBootstrap_registerGlfwNatives(JNIEnv *env, jclass clazz, jclass glfwClass) {
+    extern void register_glfw_natives(JNIEnv *env, jclass glfwClass);
+    register_glfw_natives(env, glfwClass);
+}
+

@@ -24,11 +24,28 @@ echo "Compiling bootstrap Java source…"
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR" "$OUT_DIR"
 
+# Extract lwjgl modules to temp dir to get jars
+LWJGL_ZIP="$REPO_ROOT/out/lwjgl3/lwjgl-3.4.1-ios-modules.zip"
+FRENCHPRESS_JAR="$REPO_ROOT/out/frenchpress/frenchpress.jar"
+mkdir -p "$OUT_DIR/lwjgl_tmp"
+[[ -f "$LWJGL_ZIP" ]] && unzip -qo "$LWJGL_ZIP" -d "$OUT_DIR/lwjgl_tmp"
+
+# Build classpath
+CP="$GETDOWN_JAR"
+[[ -f "$FRENCHPRESS_JAR" ]] && CP="$CP:$FRENCHPRESS_JAR"
+if [[ -d "$OUT_DIR/lwjgl_tmp" ]]; then
+    while IFS= read -r jar; do
+        CP="$CP:$jar"
+    done < <(find "$OUT_DIR/lwjgl_tmp" -name "*.jar")
+fi
+
 find "$BOOTSTRAP_SRC" -name "*.java" | xargs "$JAVA_BIN" \
     -d "$BUILD_DIR" \
-    -cp "$GETDOWN_JAR" \
+    -cp "$CP" \
     --add-exports java.base/java.lang=ALL-UNNAMED \
-    -source 17 -target 17
+    -source 25 -target 25
+
+rm -rf "$OUT_DIR/lwjgl_tmp"
 
 echo "Packaging sk-bootstrap.jar…"
 "$JAR_BIN" cf "$OUT_DIR/sk-bootstrap.jar" -C "$BUILD_DIR" .

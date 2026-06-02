@@ -112,13 +112,13 @@ jre: native
 	echo '[SKapsule v$(VERSION)] jre - start'
 	mkdir -p $(SOURCEDIR)/depends
 	cd $(SOURCEDIR)/depends; \
-	$(call METHOD_JAVA_UNPACK,21,'https://crystall1ne.dev/cdn/amethyst-ios/jre21-ios-aarch64.zip'); \
+	$(call METHOD_JAVA_UNPACK,25,'https://crystall1ne.dev/cdn/amethyst-ios/jre25-ios-aarch64.zip'); \
 	if [ -n "$$(ls jre*.tar.xz 2>/dev/null)" ]; then rm $(SOURCEDIR)/depends/jre*.tar.xz; fi; \
 	cd $(SOURCEDIR); \
-	rm -rf $(SOURCEDIR)/depends/java-21-openjdk/{ASSEMBLY_EXCEPTION,bin,include,jre,legal,LICENSE,man,THIRD_PARTY_README,lib/{ct.sym,jspawnhelper,libjsig.dylib,src.zip,tools.jar}} 2>/dev/null || true; \
-	$(call METHOD_DIRCHECK,$(WORKINGDIR)/SKapsule.app/jre21); \
-	cp -R $(SOURCEDIR)/depends/java-21-openjdk/* $(WORKINGDIR)/SKapsule.app/jre21/ 2>/dev/null || true; \
-	cp $(WORKINGDIR)/libawt_xawt.dylib $(WORKINGDIR)/SKapsule.app/jre21/lib/ 2>/dev/null || true
+	rm -rf $(SOURCEDIR)/depends/java-25-openjdk/{ASSEMBLY_EXCEPTION,bin,include,jre,legal,LICENSE,man,THIRD_PARTY_README,lib/{ct.sym,jspawnhelper,libjsig.dylib,src.zip,tools.jar}} 2>/dev/null || true; \
+	$(call METHOD_DIRCHECK,$(WORKINGDIR)/SKapsule.app/jre25); \
+	cp -R $(SOURCEDIR)/depends/java-25-openjdk/* $(WORKINGDIR)/SKapsule.app/jre25/ 2>/dev/null || true; \
+	cp $(WORKINGDIR)/libawt_xawt.dylib $(WORKINGDIR)/SKapsule.app/jre25/lib/ 2>/dev/null || true
 	echo '[SKapsule v$(VERSION)] jre - end'
 
 payload: jre
@@ -159,15 +159,15 @@ xcode-payload:
 	# Stage JRE
 	mkdir -p $(SOURCEDIR)/depends
 	cd $(SOURCEDIR)/depends; \
-	$(call METHOD_JAVA_UNPACK,21,'https://crystall1ne.dev/cdn/amethyst-ios/jre21-ios-aarch64.zip'); \
+	$(call METHOD_JAVA_UNPACK,25,'https://crystall1ne.dev/cdn/amethyst-ios/jre25-ios-aarch64.zip'); \
 	if [ -n "$$(ls jre*.tar.xz 2>/dev/null)" ]; then rm $(SOURCEDIR)/depends/jre*.tar.xz; fi; \
 	cd $(SOURCEDIR); \
-	rm -rf $(SOURCEDIR)/depends/java-21-openjdk/{ASSEMBLY_EXCEPTION,bin,include,jre,legal,LICENSE,man,THIRD_PARTY_README,lib/{ct.sym,jspawnhelper,libjsig.dylib,src.zip,tools.jar}} 2>/dev/null || true; \
-	$(call METHOD_DIRCHECK,$(WORKINGDIR)/SKapsule.app/jre21); \
-	cp -R $(SOURCEDIR)/depends/java-21-openjdk/* $(WORKINGDIR)/SKapsule.app/jre21/ 2>/dev/null || true
+	rm -rf $(SOURCEDIR)/depends/java-25-openjdk/{ASSEMBLY_EXCEPTION,bin,include,jre,legal,LICENSE,man,THIRD_PARTY_README,lib/{ct.sym,jspawnhelper,libjsig.dylib,src.zip,tools.jar}} 2>/dev/null || true; \
+	$(call METHOD_DIRCHECK,$(WORKINGDIR)/SKapsule.app/jre25); \
+	cp -R $(SOURCEDIR)/depends/java-25-openjdk/* $(WORKINGDIR)/SKapsule.app/jre25/ 2>/dev/null || true
 	# Copy Xcode-built native dylibs
-	cp $(WORKINGDIR)/awt_xawt.dylib $(WORKINGDIR)/SKapsule.app/jre21/lib/libawt_xawt.dylib 2>/dev/null || true
-	cp $(WORKINGDIR)/awt_headless.dylib $(WORKINGDIR)/SKapsule.app/jre21/lib/libawt_headless.dylib 2>/dev/null || true
+	cp $(WORKINGDIR)/awt_xawt.dylib $(WORKINGDIR)/SKapsule.app/jre25/lib/libawt_xawt.dylib 2>/dev/null || true
+	cp $(WORKINGDIR)/awt_headless.dylib $(WORKINGDIR)/SKapsule.app/jre25/lib/libawt_headless.dylib 2>/dev/null || true
 	# Stage assets (jars and submodules)
 	APP_DIR="$(WORKINGDIR)/SKapsule.app" $(SOURCEDIR)/scripts/stage-app-assets.sh
 	# Codesign all dylibs using Xcode's identity (if running inside Xcode build phase)

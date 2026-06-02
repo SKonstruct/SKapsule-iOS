@@ -132,6 +132,8 @@ int main(int argc, char *argv[]) {
     // it will call UIApplicationMain a second time and crash. If we return, it calls exit()!
     if (argc > 0 && strstr(argv[0], "bin/java") != NULL) {
         NSLog(@"[Pre-init] Intercepted libjli main() callback. Parking thread.");
+        extern void register_sk_natives_if_needed(void);
+        register_sk_natives_if_needed();
         // Block forever so libjli doesn't call exit().
         while(1) { sleep(UINT32_MAX); }
         return 0;
@@ -145,7 +147,7 @@ int main(int argc, char *argv[]) {
 
     isJailbroken = init_checkForJailbreak();
     init_setupHomeDirectory();
-    init_redirectStdio();
+    // init_redirectStdio(); // Temporarily disabled so logs show up in Xcode console
     init_logDeviceAndVer();
     init_setupGameDirs();
 

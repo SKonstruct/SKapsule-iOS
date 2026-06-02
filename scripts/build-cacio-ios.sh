@@ -23,15 +23,15 @@ fi
 JAVA_BIN="${JAVA_HOME:+$JAVA_HOME/bin/}java"
 command -v mvn >/dev/null 2>&1 || { echo "ERROR: 'mvn' not on PATH" >&2; exit 1; }
 
-if [ -n "$JAVA_HOME" ]; then
-    export PATH="$JAVA_HOME/bin:$PATH"
-fi
-JAVA_VER=$(java -version 2>&1 | awk -F '"' '/version/ {print $2}' | cut -d'.' -f1)
-if [[ "$JAVA_VER" -lt 25 ]]; then
-    echo "ERROR: Java 25+ required (found $JAVA_VER)." >&2
+# Verify the build JDK is 25+; the java-25 branch adapts to JDK 25 internals
+# (e.g. removed SurfaceManager) and won't compile/run correctly on older JDKs.
+JAVA_MAJOR="$("$JAVA_BIN" -version 2>&1 | head -1 | sed -E 's/.*version "([0-9]+).*/\1/')"
+if [[ -z "$JAVA_MAJOR" || "$JAVA_MAJOR" -lt 25 ]]; then
+    echo "ERROR: cacio java-25 branch needs JDK 25 to build (found '${JAVA_MAJOR:-?}')." >&2
+    echo "       Point CACIO_JAVA_HOME at a JDK 25." >&2
     exit 1
 fi
-echo "Building cacio with JDK $JAVA_VER"
+echo "Building cacio with JDK $JAVA_MAJOR (${JAVA_HOME:-system default})"
 
 ( cd "$CACIO_SRC" && mvn -B -DskipTests \
     -Dmaven.javadoc.skip=true -Dmaven.source.skip=true \

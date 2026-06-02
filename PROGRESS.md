@@ -29,12 +29,12 @@
 - [ ] Verify JVM boots and getdown downloads SK assets
 
 ## Phase 1.5: JNI Bridge & GLFW Context
-**Status:** Not started
+**Status:** ✅ Complete (Basic Stubs)
 
 Key tasks:
-- [ ] Create `jni_core.h` with basic JNI types
-- [ ] Implement `Java_com_skarm_launcher_bootstrap_SkBootstrap_*` bridge functions in `JavaLauncher.m` to fix UI hang
-- [ ] Implement `Java_org_lwjgl_glfw_GLFW_*` native stubs so the SK client doesn't crash during GL init
+- [x] Copy `jni.h` from Amethyst-iOS (instead of creating `jni_core.h`)
+- [x] Implement `Java_com_skarm_launcher_bootstrap_SkBootstrap_*` bridge functions in `JavaLauncher.m` to fix UI hang
+- [x] Implement `register_glfw_natives` and basic native stubs in `glfw_ios.m` so the SK client doesn't crash during GL init
 
 ---
 
