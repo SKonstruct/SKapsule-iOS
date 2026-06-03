@@ -42,10 +42,10 @@ METHOD_DIRCHECK = \
 METHOD_JAVA_UNPACK = \
 	cd $(SOURCEDIR)/depends; \
 	if [ ! -f "java-$(1)-openjdk/release" ] && [ -z "$$(ls jre$(1)-*.tar.xz 2>/dev/null)" ]; then \
-		wget '$(2)' -q --show-progress; \
-		unzip jre$(1)-ios-aarch64.zip && rm jre$(1)-ios-aarch64.zip; \
+		# wget '$(2)' -q --show-progress; \
+		# unzip jre$(1)-ios-aarch64.zip && rm jre$(1)-ios-aarch64.zip; \
 		mkdir -p java-$(1)-openjdk; \
-		tar xvf jre$(1)-*.tar.xz -C java-$(1)-openjdk; \
+		# tar xvf jre$(1)-*.tar.xz -C java-$(1)-openjdk; \
 	fi
 
 

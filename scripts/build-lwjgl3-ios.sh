@@ -13,7 +13,7 @@ OUT_DIR="${OUT_DIR:-$REPO_ROOT/out/lwjgl3}"
 [[ -d "$LWJGL_SRC" ]] || { echo "ERROR: lwjgl3 source not found at $LWJGL_SRC" >&2; exit 1; }
 [[ -f "$LWJGL_SRC/ci_build_ios.bash" ]] || { echo "ERROR: ci_build_ios.bash missing" >&2; exit 1; }
 
-export JAVA_HOME="$(/usr/libexec/java_home -v 25 2>/dev/null)"
+export JAVA_HOME="/opt/homebrew/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home"
 export JAVA8_HOME="${JAVA8_HOME:-$(/usr/libexec/java_home -v 1.8 2>/dev/null)}"
 
 echo "lwjgl3 source: $LWJGL_SRC"

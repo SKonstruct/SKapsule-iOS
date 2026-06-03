@@ -23,9 +23,9 @@
 - [x] `make package` — produces valid `.ipa` (49KB)
 
 ### Remaining for full Phase 1 testing
-- [x] Source JRE 25 for iOS arm64 (Temporarily downgraded to JRE 21)
-- [x] Build native submodules (gl4es, openal, LWJGL, cacio, frenchpress)
-- [x] Bundle all assets into the .app and test on device
+- [x] Adopt OpenJDK 25 environment for builds (blocked on actual JRE download from CDN)
+- [ ] Complete native submodule builds (gl4es, openal, LWJGL, frenchpress succeeded; caciocavallo17 blocked by JDK 25 FontManager API changes)
+- [ ] Bundle all assets into the .app and test on device
 - [ ] Verify JVM boots and getdown downloads SK assets
 
 ## Phase 1.5: JNI Bridge & GLFW Context
@@ -38,9 +38,32 @@ Key tasks:
 
 ---
 
-## Phase 2: Steam Login Functional
+## Phase 2: OpenGL Surface & Rendering Bridge (GL4ES)
 **Status:** Not started
 
 Key tasks:
-- Steam Guard dialog integration (device code + email code prompts)
-- Frenchpress credential passing through env vars
+- Replace the placeholder `UIView` in `GameViewController` with a `CAEAGLLayer` or `GLKView`.
+- Initialize `EAGLContext` and manage renderbuffers.
+- Plumb the window/layer handle into the GLFW/GL4ES bridge so the JVM can present frames to the iOS display.
+
+## Phase 3: Input Bridge (Touch & Virtual Keyboard)
+**Status:** Not started
+
+Key tasks:
+- Override `touchesBegan:`, `touchesMoved:`, `touchesEnded:`, `touchesCancelled:` in `GameViewController`.
+- Map iOS touch coordinates to JVM/AWT mouse events (caciocavallo or GLFW injection).
+- Implement a virtual onscreen keyboard overlay for text input (login, chat).
+
+## Phase 4: Audio Integration (OpenAL)
+**Status:** Not started
+
+Key tasks:
+- Ensure `openal-soft` binds correctly to iOS `AVAudioSession`.
+- Verify LWJGL's OpenAL module successfully loads the native `libopenal.dylib` without sandbox/JIT crashes.
+
+## Phase 5: Steam Login Functional
+**Status:** Mostly complete (Native UI is done, blocked on JVM testing)
+
+Key tasks:
+- Test Steam Guard dialog integration (device code + email code prompts).
+- Verify Frenchpress credential passing through env vars.

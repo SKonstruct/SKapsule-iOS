@@ -55,11 +55,25 @@ This document contains architectural context, findings, file paths, and implemen
 - **Challenge**: The project requires a JRE 25 compatible with iOS.
 - **Discovery**: The SKapsule (Android) JRE is compiled as Linux ELF `.so` files and cannot be used on iOS. However, `Amethyst-iOS` solves this by downloading iOS JRE zip files directly into a `depends` directory and staging them.
 - **Action**: All scripts and the Makefile have been set to target Java 25, anticipating the release of `jre25-ios-aarch64.zip` on the CDN. The main goal right now is to build as much native code as possible before the runtime itself is fully available.
+- **Blocker**: The JVM boot sequence cannot be verified on-device until JRE 25 drops.
 
-### 2. Building Native Submodules
-- **Action**: Execute the build scripts in `scripts/` (e.g., `build-gl4es-ios.sh`, `build-lwjgl3-ios.sh`). They require JDK 25, Maven, Ant, and the iOS SDK. They output into the `out/` directory.
+### 2. Next Native Goals (While Blocked)
+Because we cannot boot the JVM without the `jre25-ios-aarch64.zip`, we must focus on native iOS components that can be compiled and statically linked into `SKapsule.app`.
+Currently, the `caciocavallo17` `java-25` branch is failing to compile on JDK 25.0.3 because `sun.font.FcFontManager` was removed from the JDK and `SunFontManager` had abstract method changes (`resolveAndMetrics`). We must wait for an upstream patch or heavily refactor `CTCFontManager.java`.
 
-### 3. Asset Staging & `getdown-pro.jar`
+**OpenGL Surface Setup (`GameViewController.m`)**
+- `caciocavallo` and `gl4es` need a native window to render into.
+- `GameViewController` currently just uses a black `UIView`. This must be upgraded to a `CAEAGLLayer` backed view, and an `EAGLContext` must be initialized.
+- A mechanism to pass the layer pointer to the JNI bridge must be written so `glfw_ios.m` can return a valid `EGLSurface` / `EGLNativeWindowType` to `gl4es`.
+
+**Touch Input Bridge**
+- The game relies on AWT/GLFW input events.
+- `GameViewController` needs to intercept `touchesBegan:withEvent:` and forward them via a new JNI method to `SkBootstrap` or directly into the `caciocavallo` event queue.
+
+### 3. Building Native Submodules
+- **Action**: All scripts in `scripts/` (e.g., `build-gl4es-ios.sh`, `build-lwjgl3-ios.sh`, `build-frenchpress-ios.sh`, `build-bootstrap.sh`) now successfully build on Java 25 (except `caciocavallo17`). `build-lwjgl3-ios.sh` and the other scripts have been modified to explicitly point `JAVA_HOME` to Homebrew's `openjdk@25` due to macOS `/usr/libexec/java_home` blindspots.
+
+### 4. Asset Staging & `getdown-pro.jar`
 - **Path**: `scripts/stage-app-assets.sh`
 - **Discovery**: The script explicitly looks for `getdown-pro.jar` at `assets/sk/getdown-pro.jar`. 
 - **Action**: **Copy `getdown-pro.jar` directly from the SKapsule Android repository** (`/path/to/SKapsule/launcher/app/src/main/assets/sk/getdown-pro.jar`) and place it in the SKapsule-iOS `assets/sk/` directory before running the staging script.

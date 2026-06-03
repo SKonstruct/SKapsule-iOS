@@ -217,6 +217,21 @@ int launchJVM(NSString *steamUser, NSString *steamPass, BOOL isSteam, int width,
         1); // ergo
 }
 
+
+JNIEXPORT void JNICALL Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeLaunchStatus(JNIEnv *env, jclass clazz, jstring status_text) {
+    const char *text = (*env)->GetStringUTFChars(env, status_text, NULL);
+    if (text != NULL) {
+        NSString *nsText = [NSString stringWithUTF8String:text];
+        [SKNativeBridge onLaunchStatus:nsText];
+        (*env)->ReleaseStringUTFChars(env, status_text, text);
+    }
+}
+
+JNIEXPORT void JNICALL Java_com_skarm_launcher_bootstrap_SkBootstrap_registerGlfwNatives(JNIEnv *env, jclass clazz, jclass glfwClass) {
+    extern void register_glfw_natives(JNIEnv *env, jclass glfwClass);
+    register_glfw_natives(env, glfwClass);
+}
+
 void register_sk_natives_if_needed(void) {
     static BOOL registered = NO;
     if (registered) return;
@@ -240,7 +255,7 @@ void register_sk_natives_if_needed(void) {
     }
     
     JNIEnv *env = NULL;
-    if ((*jvm)->AttachCurrentThread(jvm, (void **)&env, NULL) != JNI_OK) {
+    if ((*jvm)->AttachCurrentThread(jvm, &env, NULL) != JNI_OK) {
         NSLog(@"[JavaLauncher] Failed to attach thread for JNI registration");
         return;
     }
@@ -266,19 +281,5 @@ void register_sk_natives_if_needed(void) {
         
         (*jvm)->DetachCurrentThread(jvm);
     }
-}
-
-JNIEXPORT void JNICALL Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeLaunchStatus(JNIEnv *env, jclass clazz, jstring status_text) {
-    const char *text = (*env)->GetStringUTFChars(env, status_text, NULL);
-    if (text != NULL) {
-        NSString *nsText = [NSString stringWithUTF8String:text];
-        [SKNativeBridge onLaunchStatus:nsText];
-        (*env)->ReleaseStringUTFChars(env, status_text, text);
-    }
-}
-
-JNIEXPORT void JNICALL Java_com_skarm_launcher_bootstrap_SkBootstrap_registerGlfwNatives(JNIEnv *env, jclass clazz, jclass glfwClass) {
-    extern void register_glfw_natives(JNIEnv *env, jclass glfwClass);
-    register_glfw_natives(env, glfwClass);
 }
 
