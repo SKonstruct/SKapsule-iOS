@@ -1,10 +1,10 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#define CONFIG_BRANCH "main"
-#define CONFIG_COMMIT "5e2579d"
+#define CONFIG_BRANCH ""
+#define CONFIG_COMMIT ""
 
-#define CONFIG_RELEASE 1
+/* #undef CONFIG_RELEASE */
 #ifdef CONFIG_RELEASE
 #define CONFIG_TYPE "release"
 #else
