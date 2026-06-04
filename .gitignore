@@ -25,3 +25,4 @@ external/bootstrap/build/
 /.cache
 /build
 /Natives/build_xcode
+xcode-log.txt
