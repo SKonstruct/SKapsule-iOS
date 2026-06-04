@@ -18,22 +18,10 @@ include_directories(
 )
 
 # rpath for loading dylibs from Frameworks/ and JRE lib/
-set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -rpath @loader_path -rpath @executable_path/jre21/lib")
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -rpath @loader_path -rpath @executable_path/jre25/lib")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -rpath @executable_path/Frameworks -rpath @loader_path/Frameworks")
 
-# Stub: libawt_headless (build-time dep, deleted after compile)
-add_library(awt_headless SHARED
-  awt_xawt/empty.m
-)
 
-# Cacio AWT support library
-add_library(awt_xawt SHARED
-  awt_xawt/xawt_fake.m
-)
-target_link_libraries(awt_xawt
-  "-L'${CMAKE_CURRENT_LIST_DIR}/build'"
-  awt_headless
-)
 
 # SKapsule executable
 add_executable(SKapsule
@@ -52,10 +40,13 @@ add_executable(SKapsule
   Assets.xcassets
 )
 
+target_compile_options(SKapsule PRIVATE -fobjc-arc -Wno-deprecated-declarations -DGLES_SILENCE_DEPRECATION=1)
+
 target_link_libraries(SKapsule
   "-framework CoreFoundation"
   "-framework CoreGraphics"
   "-framework QuartzCore"
+  "-framework OpenGLES"
   "-framework UIKit"
   "-framework GameController"
   "-framework IOKit"

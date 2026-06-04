@@ -7,12 +7,12 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-BOOTSTRAP_SRC="$REPO_ROOT/bootstrap/src/main/java"
+BOOTSTRAP_SRC="$REPO_ROOT/external/bootstrap/src/main/java"
 OUT_DIR="$REPO_ROOT/out/bootstrap"
 BUILD_DIR="$OUT_DIR/classes"
 
 # getdown-pro.jar is needed at compile time (SkBootstrap references it)
-GETDOWN_JAR="${GETDOWN_JAR:-$REPO_ROOT/assets/sk/getdown-pro.jar}"
+GETDOWN_JAR="${GETDOWN_JAR:-$REPO_ROOT/assets/getdown-pro.jar}"
 [[ -f "$GETDOWN_JAR" ]] || { echo "ERROR: getdown-pro.jar not found at $GETDOWN_JAR" >&2; exit 1; }
 
 JAVA_BIN="${JAVA_HOME:+$JAVA_HOME/bin/}javac"

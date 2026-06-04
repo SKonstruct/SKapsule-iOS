@@ -56,7 +56,7 @@ static void init_setupHomeDirectory(void) {
     setenv("SKAPSULE_HOME", realpath(homeDir.UTF8String, NULL), 1);
 }
 
-static void init_redirectStdio(void) {
+static void __attribute__((unused)) init_redirectStdio(void) {
     NSString *home = @(getenv("SKAPSULE_HOME"));
     NSString *currName = [home stringByAppendingPathComponent:@"latestlog.txt"];
     NSString *oldName = [home stringByAppendingPathComponent:@"latestlog.old.txt"];
@@ -126,18 +126,15 @@ static void init_setupGameDirs(void) {
 }
 
 int main(int argc, char *argv[]) {
-    // Intercept libjli's macOS/iOS thread hijacking!
-    // When JLI_Launch is called, it spawns the JVM on a new thread and calls main() AGAIN
-    // on the calling thread, expecting us to start a UI runloop. If we let it proceed,
-    // it will call UIApplicationMain a second time and crash. If we return, it calls exit()!
-    if (argc > 0 && strstr(argv[0], "bin/java") != NULL) {
-        NSLog(@"[Pre-init] Intercepted libjli main() callback. Parking thread.");
+    static BOOL isMainReentered = NO;
+    if (isMainReentered) {
+        NSLog(@"[Pre-init] Intercepted libjli main() callback via re-entry! Parking thread.");
         extern void register_sk_natives_if_needed(void);
         register_sk_natives_if_needed();
-        // Block forever so libjli doesn't call exit().
-        while(1) { sleep(UINT32_MAX); }
+        while (1) { sleep(UINT32_MAX); }
         return 0;
     }
+    isMainReentered = YES;
 
     if (argc == 2 && strlen(argv[1]) == 0) {
         // Child process for JIT enablement via PT_TRACE_ME

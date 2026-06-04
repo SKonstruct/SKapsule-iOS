@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0249A9C9C90015426942BD8E /* GameViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = D213F0E8EEF4381DFE622FBF /* GameViewController.m */; };
+		06F32A40195F29A38EEA2B75 /* empty.m in Sources */ = {isa = PBXBuildFile; fileRef = F74EF3D8B08A315F2F20FA4F /* empty.m */; };
 		12DE5F6025708BE38E4CFB9A /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 68C5F0BF52335C919C72490A /* AppDelegate.m */; };
 		1753C36E43E0613B5B3F1FF9 /* CODE_OF_CONDUCT.md in Resources */ = {isa = PBXBuildFile; fileRef = 424B9EBCDD3EBD841FA9ACEC /* CODE_OF_CONDUCT.md */; };
 		54573B8B916B037F9D0E64FD /* fishhook.podspec in Resources */ = {isa = PBXBuildFile; fileRef = EEC406F6FC46E7343D682253 /* fishhook.podspec */; };
@@ -36,6 +37,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = B0610091326CEC8262801F41;
 			remoteInfo = awt_headless;
+		};
+		3892B21BB71B336F785149A3 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 227CD8099F8EB69750AEC07F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CA4AFB6AE3C808D0C736FA9A;
+			remoteInfo = awt;
 		};
 		61523DE2B84155778BABBCD1 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -70,6 +78,7 @@
 		938DA6D68E6BB2CDA7AF2000 /* LauncherViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = LauncherViewController.h; sourceTree = "<group>"; };
 		A74479BB3EA492E659794A0E /* utils.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = utils.h; sourceTree = "<group>"; };
 		AF179EB4850BD8983431E311 /* SKInstaller.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SKInstaller.m; sourceTree = "<group>"; };
+		AF476662EB209A1AF30CE47F /* awt.dylib */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "compiled.mach-o.dylib"; path = awt.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		BC9812E93F8AA6921EF87ACF /* fishhook.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = fishhook.h; sourceTree = "<group>"; };
 		C5A3E19B66F96254F249FB84 /* dyld_bypass_validation.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = dyld_bypass_validation.m; sourceTree = "<group>"; };
 		CCF840D1FBF1E2F94CC86EBF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -147,6 +156,7 @@
 			children = (
 				D8D6D79A6C0D2A590D790B27 /* awt_headless.dylib */,
 				1D696DEA9413425697E370C7 /* awt_xawt.dylib */,
+				AF476662EB209A1AF30CE47F /* awt.dylib */,
 				E12A6B20F7908457F69DF0D6 /* SKapsule.app */,
 			);
 			name = Products;
@@ -162,7 +172,7 @@
 			);
 			sourceTree = "<group>";
 		};
-		"TEMP_A2445F04-6DD2-40CC-80C6-022DEFE35999" /* external */ = {
+		"TEMP_816ABE11-AF32-49B1-959A-50B222B7B7D7" /* external */ = {
 			isa = PBXGroup;
 			children = (
 			);
@@ -206,6 +216,23 @@
 			productReference = D8D6D79A6C0D2A590D790B27 /* awt_headless.dylib */;
 			productType = "com.apple.product-type.library.dynamic";
 		};
+		CA4AFB6AE3C808D0C736FA9A /* awt */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 71975D2A16BE34EBC1C81CAE /* Build configuration list for PBXNativeTarget "awt" */;
+			buildPhases = (
+				8E16DD4C41A0F22BB073CAD2 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = awt;
+			packageProductDependencies = (
+			);
+			productName = awt;
+			productReference = AF476662EB209A1AF30CE47F /* awt.dylib */;
+			productType = "com.apple.product-type.library.dynamic";
+		};
 		FD84E7309941DAE1EB8E7043 /* SKapsule */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = F187A44F37D692D8B2162B42 /* Build configuration list for PBXNativeTarget "SKapsule" */;
@@ -219,6 +246,7 @@
 			dependencies = (
 				1F2A263446C184A63EC9EE17 /* PBXTargetDependency */,
 				AC8A463CA3B589AC9E2A6C7D /* PBXTargetDependency */,
+				3F32A87D9414170068181F4E /* PBXTargetDependency */,
 			);
 			name = SKapsule;
 			packageProductDependencies = (
@@ -242,6 +270,9 @@
 					B0610091326CEC8262801F41 = {
 						DevelopmentTeam = 87DLA8MPF5;
 					};
+					CA4AFB6AE3C808D0C736FA9A = {
+						DevelopmentTeam = 87DLA8MPF5;
+					};
 					FD84E7309941DAE1EB8E7043 = {
 						DevelopmentTeam = 87DLA8MPF5;
 					};
@@ -262,6 +293,7 @@
 			projectRoot = "";
 			targets = (
 				FD84E7309941DAE1EB8E7043 /* SKapsule */,
+				CA4AFB6AE3C808D0C736FA9A /* awt */,
 				B0610091326CEC8262801F41 /* awt_headless */,
 				7CC99DEABF7A3074EEFE990B /* awt_xawt */,
 			);
@@ -287,6 +319,7 @@
 /* Begin PBXShellScriptBuildPhase section */
 		5C4D88180D9933E106678C25 /* Stage JRE and Assets */ = {
 			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = (
 			);
@@ -333,6 +366,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		8E16DD4C41A0F22BB073CAD2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				06F32A40195F29A38EEA2B75 /* empty.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F3289D366AB446FA324E2028 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -348,6 +389,11 @@
 			isa = PBXTargetDependency;
 			target = B0610091326CEC8262801F41 /* awt_headless */;
 			targetProxy = 05660D1E26B93904851E5208 /* PBXContainerItemProxy */;
+		};
+		3F32A87D9414170068181F4E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CA4AFB6AE3C808D0C736FA9A /* awt */;
+			targetProxy = 3892B21BB71B336F785149A3 /* PBXContainerItemProxy */;
 		};
 		AC8A463CA3B589AC9E2A6C7D /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -369,6 +415,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				OTHER_CFLAGS = "-DGLES_SILENCE_DEPRECATION=1";
 				PRODUCT_BUNDLE_IDENTIFIER = com.skonstruct.dev.SKapsule;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -480,7 +527,38 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				OTHER_CFLAGS = "-DGLES_SILENCE_DEPRECATION=1";
 				PRODUCT_BUNDLE_IDENTIFIER = com.skonstruct.dev.SKapsule;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		76F022527AA9FD6DCBB422C9 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Development";
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.skonstruct.dev.awt;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		8F945CE62B1AD132D0CEE4BD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Development";
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.skonstruct.dev.awt;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -589,6 +667,15 @@
 			buildConfigurations = (
 				619816B9EA0ADA8621F38185 /* Debug */,
 				FB7DDCE47549187532107AE3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		71975D2A16BE34EBC1C81CAE /* Build configuration list for PBXNativeTarget "awt" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8F945CE62B1AD132D0CEE4BD /* Debug */,
+				76F022527AA9FD6DCBB422C9 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

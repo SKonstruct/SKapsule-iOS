@@ -26,7 +26,7 @@ live in `scripts/`.
 
 - **[SKapsule](https://github.com/SKonstruct/SKapsule)** — the Android version.
   Architecture reference for the bootstrap, JVM launch, input/GL bridges, and
-  Steam login. Most Java code (bootstrap/) is shared.
+  Steam login. Most Java code (external/bootstrap/) is shared.
 - **[Amethyst-iOS](https://github.com/AngelAuraMC/Amethyst-iOS)** — an iOS
   Minecraft launcher that informed the JVM-on-iOS approach (JIT enablement,
   dyld bypass, fishhook, cacio bridge, Makefile+CMake build system).
@@ -54,7 +54,7 @@ Natives/               iOS app (Objective-C) + CMake build
   Info.plist           iOS app metadata
   Assets.xcassets/     app icon + launch screen
   resources/           bundled frameworks, storyboards
-bootstrap/             Java bootstrap module (shared with Android)
+external/bootstrap/    Java bootstrap module (shared with Android)
   SkBootstrap.java     runs HeadlessGetdown → launches ProjectXApp
   HeadlessGetdown.java headless getdown driver
   NativeBridgePrompt.java   frenchpress credential prompt
@@ -126,7 +126,7 @@ Common types: `feat`, `fix`, `perf`, `chore`, `test`, `docs`.
 - No `TODO(agent):` or agent-attribution markers.
 - Don't reformat code you aren't changing.
 
-### Java (bootstrap/)
+### Java (external/bootstrap/)
 
 - This code is shared with SKapsule (Android). Changes here may need to be
   synced upstream. Keep it platform-independent.

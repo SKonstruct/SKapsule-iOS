@@ -33,10 +33,17 @@ cmake -S "$GL4ES_SRC" -B "$BUILD_DIR" \
     -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
     -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
     -DNOX11=ON \
+    -DNOEGL=ON \
     -DDEFAULT_ES=2 \
     -DSTATICLIB=OFF \
     -DNO_INIT_CONSTRUCTOR=ON \
     -DGBM=OFF
+
+# gl4es hardcodes EXPORT to empty on __APPLE__, and forces -fvisibility=hidden.
+# This causes the resulting dylib to export zero symbols, breaking LWJGL3's symbol lookup.
+# Strip -fvisibility=hidden from the generated ninja/make flags before building.
+find "$BUILD_DIR" -type f -name "flags.make" -exec sed -i '' 's/-fvisibility=hidden//g' {} +
+find "$BUILD_DIR" -type f -name "build.ninja" -exec sed -i '' 's/-fvisibility=hidden//g' {} + 2>/dev/null || true
 
 cmake --build "$BUILD_DIR" --config "$BUILD_TYPE" -j"$JOBS"
 

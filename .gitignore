@@ -21,7 +21,7 @@ playground.xcworkspace
 .DS_Store
 
 # Java build
-bootstrap/build/
+external/bootstrap/build/
 /.cache
 /build
 /Natives/build_xcode

@@ -18,7 +18,7 @@ This document contains architectural context, findings, file paths, and implemen
 ## 🧩 Submodule & Dependency Deep Dive
 *Evaluated as if building the app from scratch using reference repositories (SKapsule Android and Amethyst-iOS).*
 
-### 1. `bootstrap/`
+### 1. `external/bootstrap/`
 - **Purpose**: Pure Java glue code shared identically with the Android SKapsule repo. It handles invoking `HeadlessGetdown` (the SK updater) and subsequently `ProjectXApp`.
 - **Build**: Compiled via `scripts/build-bootstrap.sh` into `sk-bootstrap.jar`. No native dependencies, but acts as the entry point for the JVM execution.
 
@@ -74,9 +74,9 @@ Currently, the `caciocavallo17` `java-25` branch is failing to compile on JDK 25
 - **Action**: All scripts in `scripts/` (e.g., `build-gl4es-ios.sh`, `build-lwjgl3-ios.sh`, `build-frenchpress-ios.sh`, `build-bootstrap.sh`) now successfully build on Java 25 (except `caciocavallo17`). `build-lwjgl3-ios.sh` and the other scripts have been modified to explicitly point `JAVA_HOME` to Homebrew's `openjdk@25` due to macOS `/usr/libexec/java_home` blindspots.
 
 ### 4. Asset Staging & `getdown-pro.jar`
-- **Path**: `scripts/stage-app-assets.sh`
-- **Discovery**: The script explicitly looks for `getdown-pro.jar` at `assets/sk/getdown-pro.jar`. 
-- **Action**: **Copy `getdown-pro.jar` directly from the SKapsule Android repository** (`/path/to/SKapsule/launcher/app/src/main/assets/sk/getdown-pro.jar`) and place it in the SKapsule-iOS `assets/sk/` directory before running the staging script.
+The SKapsule iOS port relies on an external asset staging step that requires `getdown-pro.jar`.
+- **Discovery**: The script explicitly looks for `getdown-pro.jar` at `assets/getdown-pro.jar`. 
+- **Action**: **Copy `getdown-pro.jar` directly from the SKapsule Android repository** (`/path/to/SKapsule/launcher/app/src/main/assets/sk/getdown-pro.jar`) and place it in the SKapsule-iOS `assets/` directory before running the staging script.
 
 ### 4. Device Deployment & JIT
 - **Path**: `Makefile` supports a `deploy` target using `xcrun devicectl`.

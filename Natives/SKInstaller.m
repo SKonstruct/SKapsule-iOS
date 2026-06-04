@@ -1,8 +1,8 @@
 #import "SKInstaller.h"
 
 #define fm NSFileManager.defaultManager
-#define SK_MANIFEST_URL @"http://gamemedia2.spiralknights.com/spiral/latest/getdown.txt"
-#define VERSION_MARKER @".skapsule_installed_v1"
+#define SK_MANIFEST_URL @"https://gamemedia2.spiralknights.com/spiral/latest/getdown.txt"
+#define VERSION_MARKER @".skapsule_installed_v2"
 
 @implementation SKInstaller
 
@@ -11,7 +11,8 @@
     if (!home) return NO;
 
     NSString *marker = [NSString stringWithFormat:@"%s/%@", home, VERSION_MARKER];
-    return [fm fileExistsAtPath:marker];
+    NSString *manifest = [NSString stringWithFormat:@"%s/sk/getdown.txt", home];
+    return [fm fileExistsAtPath:marker] && [fm fileExistsAtPath:manifest];
 }
 
 + (void)installWithProgress:(void (^)(NSString *))progress {

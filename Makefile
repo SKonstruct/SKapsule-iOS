@@ -38,14 +38,12 @@ METHOD_DIRCHECK = \
 		rm -rf $(1)/*; \
 	fi
 
-# Function to download and unpack Java runtimes.
+# Function to unpack Java runtimes from assets.
 METHOD_JAVA_UNPACK = \
 	cd $(SOURCEDIR)/depends; \
-	if [ ! -f "java-$(1)-openjdk/release" ] && [ -z "$$(ls jre$(1)-*.tar.xz 2>/dev/null)" ]; then \
-		# wget '$(2)' -q --show-progress; \
-		# unzip jre$(1)-ios-aarch64.zip && rm jre$(1)-ios-aarch64.zip; \
-		mkdir -p java-$(1)-openjdk; \
-		# tar xvf jre$(1)-*.tar.xz -C java-$(1)-openjdk; \
+	if [ ! -f "jre$(1)/release" ]; then \
+		echo "Unpacking JRE $(1) from assets..."; \
+		unzip -q $(SOURCEDIR)/assets/jre$(1)-ios-aarch64.zip -d . || true; \
 	fi
 
 
@@ -112,13 +110,20 @@ jre: native
 	echo '[SKapsule v$(VERSION)] jre - start'
 	mkdir -p $(SOURCEDIR)/depends
 	cd $(SOURCEDIR)/depends; \
-	$(call METHOD_JAVA_UNPACK,25,'https://crystall1ne.dev/cdn/amethyst-ios/jre25-ios-aarch64.zip'); \
+	$(call METHOD_JAVA_UNPACK,25); \
+	if [ -d "jre25/lib/zero" ]; then mv jre25/lib/zero jre25/lib/server; fi; \
+	if [ -f "jre25/lib/jvm.cfg" ]; then echo "-server KNOWN" > jre25/lib/jvm.cfg; fi; \
 	if [ -n "$$(ls jre*.tar.xz 2>/dev/null)" ]; then rm $(SOURCEDIR)/depends/jre*.tar.xz; fi; \
 	cd $(SOURCEDIR); \
-	rm -rf $(SOURCEDIR)/depends/java-25-openjdk/{ASSEMBLY_EXCEPTION,bin,include,jre,legal,LICENSE,man,THIRD_PARTY_README,lib/{ct.sym,jspawnhelper,libjsig.dylib,src.zip,tools.jar}} 2>/dev/null || true; \
+	rm -rf $(SOURCEDIR)/depends/jre25/{ASSEMBLY_EXCEPTION,bin,include,jre,legal,LICENSE,man,THIRD_PARTY_README,lib/{ct.sym,jspawnhelper,libjsig.dylib,src.zip,tools.jar}} 2>/dev/null || true; \
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/SKapsule.app/jre25); \
-	cp -R $(SOURCEDIR)/depends/java-25-openjdk/* $(WORKINGDIR)/SKapsule.app/jre25/ 2>/dev/null || true; \
-	cp $(WORKINGDIR)/libawt_xawt.dylib $(WORKINGDIR)/SKapsule.app/jre25/lib/ 2>/dev/null || true
+	cp -R $(SOURCEDIR)/depends/jre25/* $(WORKINGDIR)/SKapsule.app/jre25/ 2>/dev/null || true; \
+	rm -rf $(WORKINGDIR)/SKapsule.app/lib $(WORKINGDIR)/SKapsule.app/conf $(WORKINGDIR)/SKapsule.app/jre25/lib/server/lib $(WORKINGDIR)/SKapsule.app/jre25/lib/server/conf; \
+	ln -sfn jre25/lib $(WORKINGDIR)/SKapsule.app/lib; \
+	ln -sfn jre25/conf $(WORKINGDIR)/SKapsule.app/conf; \
+	ln -sfn .. $(WORKINGDIR)/SKapsule.app/jre25/lib/server/lib; \
+	ln -sfn ../../conf $(WORKINGDIR)/SKapsule.app/jre25/lib/server/conf; \
+	(cd $(WORKINGDIR)/SKapsule.app/jre25/lib/server && for f in ../*.dylib; do ln -sfn "$$f" "$$(basename $$f)"; done)
 	echo '[SKapsule v$(VERSION)] jre - end'
 
 payload: jre
@@ -159,15 +164,21 @@ xcode-payload:
 	# Stage JRE
 	mkdir -p $(SOURCEDIR)/depends
 	cd $(SOURCEDIR)/depends; \
-	$(call METHOD_JAVA_UNPACK,25,'https://crystall1ne.dev/cdn/amethyst-ios/jre25-ios-aarch64.zip'); \
+	$(call METHOD_JAVA_UNPACK,25); \
+	if [ -d "jre25/lib/zero" ]; then mv jre25/lib/zero jre25/lib/server; fi; \
+	if [ -f "jre25/lib/jvm.cfg" ]; then echo "-server KNOWN" > jre25/lib/jvm.cfg; fi; \
 	if [ -n "$$(ls jre*.tar.xz 2>/dev/null)" ]; then rm $(SOURCEDIR)/depends/jre*.tar.xz; fi; \
 	cd $(SOURCEDIR); \
-	rm -rf $(SOURCEDIR)/depends/java-25-openjdk/{ASSEMBLY_EXCEPTION,bin,include,jre,legal,LICENSE,man,THIRD_PARTY_README,lib/{ct.sym,jspawnhelper,libjsig.dylib,src.zip,tools.jar}} 2>/dev/null || true; \
+	rm -rf $(SOURCEDIR)/depends/jre25/{ASSEMBLY_EXCEPTION,bin,include,jre,legal,LICENSE,man,THIRD_PARTY_README,lib/{ct.sym,jspawnhelper,libjsig.dylib,src.zip,tools.jar}} 2>/dev/null || true; \
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/SKapsule.app/jre25); \
-	cp -R $(SOURCEDIR)/depends/java-25-openjdk/* $(WORKINGDIR)/SKapsule.app/jre25/ 2>/dev/null || true
-	# Copy Xcode-built native dylibs
-	cp $(WORKINGDIR)/awt_xawt.dylib $(WORKINGDIR)/SKapsule.app/jre25/lib/libawt_xawt.dylib 2>/dev/null || true
-	cp $(WORKINGDIR)/awt_headless.dylib $(WORKINGDIR)/SKapsule.app/jre25/lib/libawt_headless.dylib 2>/dev/null || true
+	cp -R $(SOURCEDIR)/depends/jre25/* $(WORKINGDIR)/SKapsule.app/jre25/ 2>/dev/null || true; \
+	rm -rf $(WORKINGDIR)/SKapsule.app/lib $(WORKINGDIR)/SKapsule.app/conf $(WORKINGDIR)/SKapsule.app/jre25/lib/server/lib $(WORKINGDIR)/SKapsule.app/jre25/lib/server/conf; \
+	ln -sfn jre25/lib $(WORKINGDIR)/SKapsule.app/lib; \
+	ln -sfn jre25/conf $(WORKINGDIR)/SKapsule.app/conf; \
+	mkdir -p $(WORKINGDIR)/SKapsule.app/jre25/lib/server; \
+	ln -sfn .. $(WORKINGDIR)/SKapsule.app/jre25/lib/server/lib; \
+	ln -sfn ../../conf $(WORKINGDIR)/SKapsule.app/jre25/lib/server/conf; \
+	(cd $(WORKINGDIR)/SKapsule.app/jre25/lib/server && for f in ../*.dylib; do ln -sfn "$$f" "$$(basename $$f)"; done)
 	# Stage assets (jars and submodules)
 	APP_DIR="$(WORKINGDIR)/SKapsule.app" $(SOURCEDIR)/scripts/stage-app-assets.sh
 	# Codesign all dylibs using Xcode's identity (if running inside Xcode build phase)
@@ -201,6 +212,7 @@ clean:
 	echo '[SKapsule v$(VERSION)] clean - start'
 	rm -rf $(WORKINGDIR)
 	rm -rf $(OUTPUTDIR)
+	rm -rf $(SOURCEDIR)/depends
 	echo '[SKapsule v$(VERSION)] clean - end'
 
 .PHONY: all clean check native payload package deploy help

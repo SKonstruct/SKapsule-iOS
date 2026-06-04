@@ -52,9 +52,31 @@ stage "$REPO_ROOT/out/bootstrap/sk-bootstrap.jar" \
 
 echo
 echo "=== getdown-pro.jar ==="
-stage "$REPO_ROOT/assets/sk/getdown-pro.jar" \
+stage "$REPO_ROOT/assets/getdown-pro.jar" \
       "$APP_DIR/libs/getdown-pro.jar" || \
-    echo "  (place getdown-pro.jar in assets/sk/)"
+    echo "  (place getdown-pro.jar in assets/)"
+
+echo
+echo "=== LWJGL Modules ==="
+LWJGL_MODS="$REPO_ROOT/out/lwjgl3/lwjgl-3.4.1-ios-modules.zip"
+if [[ -f "$LWJGL_MODS" ]]; then
+    mkdir -p "$APP_DIR/libs_lwjgl"
+    # Unzip all jars flattening the structure, and overwrite if exists
+    unzip -q -o -j "$LWJGL_MODS" '*.jar' -d "$APP_DIR/libs_lwjgl" || true
+else
+    echo "  (run ./scripts/build-lwjgl3-ios.sh first)"
+fi
+
+echo
+echo "=== LWJGL Natives ==="
+LWJGL_NATIVES="$REPO_ROOT/out/lwjgl3/lwjgl-3.4.1-ios-natives-arm64.zip"
+if [[ -f "$LWJGL_NATIVES" ]]; then
+    mkdir -p "$APP_DIR/Frameworks"
+    # Unzip all dylibs flattening the structure, and overwrite if exists
+    unzip -q -o -j "$LWJGL_NATIVES" '*.dylib' -d "$APP_DIR/Frameworks" || true
+else
+    echo "  (run ./scripts/build-lwjgl3-ios.sh first)"
+fi
 
 echo
 echo "done."

@@ -1,3 +1,4 @@
+#define GLES_SILENCE_DEPRECATION 1
 #import "GameViewController.h"
 #import "JavaLauncher.h"
 #import "NativeBridge.h"
@@ -5,6 +6,20 @@
 #import "utils.h"
 
 #import <QuartzCore/QuartzCore.h>
+#import <OpenGLES/EAGL.h>
+#import <OpenGLES/ES2/gl.h>
+#import <OpenGLES/ES2/glext.h>
+
+EAGLContext *gEAGLContext = nil;
+CAEAGLLayer *gEAGLLayer = nil;
+GLuint gRenderbuffer = 0;
+GLuint gFramebuffer = 0;
+
+@interface EAGLView : UIView
+@end
+@implementation EAGLView
++ (Class)layerClass { return [CAEAGLLayer class]; }
+@end
 
 typedef NS_ENUM(NSInteger, SKLoginMode);
 
@@ -22,11 +37,32 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
     [super viewDidLoad];
     self.view.backgroundColor = UIColor.blackColor;
 
-    // GL surface placeholder
-    self.surfaceView = [[UIView alloc] initWithFrame:self.view.bounds];
+    // GL surface
+    self.surfaceView = [[EAGLView alloc] initWithFrame:self.view.bounds];
     self.surfaceView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     self.surfaceView.backgroundColor = UIColor.blackColor;
     [self.view addSubview:self.surfaceView];
+
+    gEAGLLayer = (CAEAGLLayer *)self.surfaceView.layer;
+    gEAGLLayer.opaque = YES;
+    gEAGLLayer.drawableProperties = @{
+        kEAGLDrawablePropertyRetainedBacking: @(NO),
+        kEAGLDrawablePropertyColorFormat: kEAGLColorFormatRGBA8
+    };
+
+    gEAGLContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES3];
+    if (!gEAGLContext) {
+        gEAGLContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES2];
+    }
+    [EAGLContext setCurrentContext:gEAGLContext];
+
+    glGenRenderbuffers(1, &gRenderbuffer);
+    glBindRenderbuffer(GL_RENDERBUFFER, gRenderbuffer);
+    [gEAGLContext renderbufferStorage:GL_RENDERBUFFER fromDrawable:gEAGLLayer];
+
+    glGenFramebuffers(1, &gFramebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, gFramebuffer);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, gRenderbuffer);
 
     // Boot overlay (shown while getdown runs)
     self.bootOverlay = [[UIView alloc] initWithFrame:self.view.bounds];
@@ -122,6 +158,15 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
 
     dispatch_semaphore_wait(sem, DISPATCH_TIME_FOREVER);
     return result;
+}
+
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    if (gEAGLContext) {
+        [EAGLContext setCurrentContext:gEAGLContext];
+        glBindRenderbuffer(GL_RENDERBUFFER, gRenderbuffer);
+        [gEAGLContext renderbufferStorage:GL_RENDERBUFFER fromDrawable:gEAGLLayer];
+    }
 }
 
 - (void)viewDidAppear:(BOOL)animated {
