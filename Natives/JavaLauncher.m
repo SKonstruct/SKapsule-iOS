@@ -98,7 +98,7 @@ int launchJVM(NSString *steamUser, NSString *steamPass, BOOL isSteam, int width,
     margv[++margc] = [NSString stringWithFormat:@"-Duser.home=%s/home", home].UTF8String;
     margv[++margc] = [NSString stringWithFormat:@"-Djava.util.prefs.userRoot=%s/home/.userPrefs", home].UTF8String;
     margv[++margc] = [NSString stringWithFormat:@"-Djava.util.prefs.systemRoot=%s/home/.systemPrefs", home].UTF8String;
-    margv[++margc] = @"-Djava.util.prefs.PreferencesFactory=java.util.prefs.MacOSXPreferencesFactory".UTF8String;
+    margv[++margc] = @"-Djava.util.prefs.PreferencesFactory=java.util.prefs.FileSystemPreferencesFactory".UTF8String;
     margv[++margc] = [NSString stringWithFormat:@"-Duser.dir=%s/sk", home].UTF8String;
     margv[++margc] = [NSString stringWithFormat:@"-Duser.timezone=%@", NSTimeZone.localTimeZone.name].UTF8String;
     margv[++margc] = [NSString stringWithFormat:@"-DUIScreen.maximumFramesPerSecond=%d",
@@ -107,6 +107,7 @@ int launchJVM(NSString *steamUser, NSString *steamPass, BOOL isSteam, int width,
     // LWJGL / OpenGL
     margv[++margc] = "-Dorg.lwjgl.glfw.checkThread0=false";
     margv[++margc] = "-Dorg.lwjgl.system.allocator=system";
+    margv[++margc] = [NSString stringWithFormat:@"-Dorg.lwjgl.system.SharedLibraryExtractPath=%@/Frameworks", bundlePath].UTF8String;
     margv[++margc] = "-Dorg.lwjgl.util.NoChecks=true";
     margv[++margc] = [NSString stringWithFormat:@"-Dorg.lwjgl.opengl.libname=%@/Frameworks/libgl4es.dylib",
         bundlePath].UTF8String;
@@ -147,7 +148,7 @@ int launchJVM(NSString *steamUser, NSString *steamPass, BOOL isSteam, int width,
     margv[++margc] = "-XX:+SuppressFatalErrorMessage";
     margv[++margc] = "-XX:+UnlockExperimentalVMOptions";
     margv[++margc] = "-XX:+DisablePrimordialThreadGuardPages";
-    margv[++margc] = "-Xlog:os=trace";
+    // Remove verbose OS tracing — re-enable with -Xlog:os=trace for debugging
 
     // Caciocavallo AWT bridge
     NSString *cacioDir = [NSString stringWithFormat:@"%s/cacio", home];
@@ -162,8 +163,10 @@ int launchJVM(NSString *steamUser, NSString *steamPass, BOOL isSteam, int width,
         int sw = width > 0 ? width : 1280;
         int sh = height > 0 ? height : 720;
         margv[++margc] = [NSString stringWithFormat:@"-Dcacio.managed.screensize=%dx%d", sw, sh].UTF8String;
-        margv[++margc] = "-Dcacio.font.fontmanager=sun.awt.X11FontManager";
+        // Use the default macOS/iOS font manager (CFontManager)
+        // X11FontManager doesn't exist in this JRE build
         margv[++margc] = "-Dcacio.font.fontscaler=sun.font.FreetypeFontScaler";
+        margv[++margc] = [NSString stringWithFormat:@"-Dsun.java2d.fontpath=%@/jre25/lib/fonts", bundlePath].UTF8String;
 
         // Module exports for cacio
         margv[++margc] = "--add-exports=java.desktop/java.awt=ALL-UNNAMED";
@@ -314,6 +317,33 @@ void register_sk_natives_if_needed(void) {
         (*env)->RegisterNatives(env, cls, methods, sizeof(methods)/sizeof(methods[0]));
         registered = YES;
         NSLog(@"[JavaLauncher] Successfully registered JNI natives for SkBootstrap!");
+        
+        // Force load libawt_headless and libprefs into the Bootstrap ClassLoader
+        // By calling System.loadLibrary from JNI, Reflection.getCallerClass() is null,
+        // which makes it use the Bootstrap ClassLoader. This fixes the iOS two-level
+        // namespace issue natively by ensuring our stubs are available to all core Java classes.
+        jclass sysCls = (*env)->FindClass(env, "java/lang/System");
+        if (sysCls) {
+            jmethodID loadLib = (*env)->GetStaticMethodID(env, sysCls, "loadLibrary", "(Ljava/lang/String;)V");
+            if (loadLib) {
+                jstring awt = (*env)->NewStringUTF(env, "awt_headless");
+                (*env)->CallStaticVoidMethod(env, sysCls, loadLib, awt);
+                if ((*env)->ExceptionCheck(env)) {
+                    (*env)->ExceptionDescribe(env);
+                    (*env)->ExceptionClear(env);
+                }
+                (*env)->DeleteLocalRef(env, awt);
+
+                jstring prefs = (*env)->NewStringUTF(env, "prefs");
+                (*env)->CallStaticVoidMethod(env, sysCls, loadLib, prefs);
+                if ((*env)->ExceptionCheck(env)) {
+                    (*env)->ExceptionDescribe(env);
+                    (*env)->ExceptionClear(env);
+                }
+                (*env)->DeleteLocalRef(env, prefs);
+                NSLog(@"[JavaLauncher] Pre-loaded awt_headless and prefs into Bootstrap ClassLoader");
+            }
+        }
         
         (*jvm)->DetachCurrentThread(jvm);
     }

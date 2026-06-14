@@ -19,7 +19,8 @@ include_directories(
 
 # rpath for loading dylibs from Frameworks/ and JRE lib/
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -rpath @loader_path -rpath @executable_path/jre25/lib")
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -rpath @executable_path/Frameworks -rpath @loader_path/Frameworks")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -rpath @executable_path/Frameworks -rpath @loader_path/Frameworks -Wl,-export_dynamic")
+
 
 
 
@@ -40,6 +41,15 @@ add_executable(SKapsule
   Assets.xcassets
 )
 
+# Compile awt_stubs.c into a shared library that replaces the JRE's empty libawt_headless.dylib
+add_library(awt_headless SHARED awt_stubs.c)
+set_target_properties(awt_headless PROPERTIES PREFIX "lib")
+
+# Compile prefs_stubs.c into a shared library that replaces the JRE's libprefs.dylib
+add_library(prefs SHARED prefs_stubs.c)
+set_target_properties(prefs PROPERTIES PREFIX "lib")
+
+
 target_compile_options(SKapsule PRIVATE -fobjc-arc -Wno-deprecated-declarations -DGLES_SILENCE_DEPRECATION=1)
 
 target_link_libraries(SKapsule
@@ -55,6 +65,7 @@ target_link_libraries(SKapsule
 )
 
 set_target_properties(SKapsule PROPERTIES
+  ENABLE_EXPORTS TRUE
   MACOSX_BUNDLE TRUE
   MACOSX_FRAMEWORK_IDENTIFIER com.skonstruct.skapsule
   MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_LIST_DIR}/Info.plist"

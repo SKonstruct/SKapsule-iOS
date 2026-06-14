@@ -14,6 +14,7 @@ EAGLContext *gEAGLContext = nil;
 CAEAGLLayer *gEAGLLayer = nil;
 GLuint gRenderbuffer = 0;
 GLuint gFramebuffer = 0;
+GLuint gDepthRenderbuffer = 0;
 
 @interface EAGLView : UIView
 @end
@@ -45,6 +46,7 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
 
     gEAGLLayer = (CAEAGLLayer *)self.surfaceView.layer;
     gEAGLLayer.opaque = YES;
+    gEAGLLayer.contentsScale = UIScreen.mainScreen.scale;
     gEAGLLayer.drawableProperties = @{
         kEAGLDrawablePropertyRetainedBacking: @(NO),
         kEAGLDrawablePropertyColorFormat: kEAGLColorFormatRGBA8
@@ -63,6 +65,20 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
     glGenFramebuffers(1, &gFramebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, gFramebuffer);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, gRenderbuffer);
+
+    glGenRenderbuffers(1, &gDepthRenderbuffer);
+    
+    GLint width, height;
+    glBindRenderbuffer(GL_RENDERBUFFER, gRenderbuffer);
+    glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_WIDTH, &width);
+    glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_HEIGHT, &height);
+    
+    glBindRenderbuffer(GL_RENDERBUFFER, gDepthRenderbuffer);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8_OES, width, height);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, gDepthRenderbuffer);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER, gDepthRenderbuffer);
+
+    glBindRenderbuffer(GL_RENDERBUFFER, gRenderbuffer);
 
     // Boot overlay (shown while getdown runs)
     self.bootOverlay = [[UIView alloc] initWithFrame:self.view.bounds];
@@ -164,8 +180,22 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
     [super viewDidLayoutSubviews];
     if (gEAGLContext) {
         [EAGLContext setCurrentContext:gEAGLContext];
+        gEAGLLayer.contentsScale = UIScreen.mainScreen.scale;
         glBindRenderbuffer(GL_RENDERBUFFER, gRenderbuffer);
         [gEAGLContext renderbufferStorage:GL_RENDERBUFFER fromDrawable:gEAGLLayer];
+
+        if (gDepthRenderbuffer) {
+            glBindFramebuffer(GL_FRAMEBUFFER, gFramebuffer);
+            GLint width, height;
+            glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_WIDTH, &width);
+            glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_HEIGHT, &height);
+            
+            glBindRenderbuffer(GL_RENDERBUFFER, gDepthRenderbuffer);
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8_OES, width, height);
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, gDepthRenderbuffer);
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER, gDepthRenderbuffer);
+            glBindRenderbuffer(GL_RENDERBUFFER, gRenderbuffer);
+        }
     }
 }
 
@@ -206,6 +236,10 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
 
 - (UIRectEdge)preferredScreenEdgesDeferringSystemGestures {
     return UIRectEdgeAll;
+}
+
+- (UIInterfaceOrientationMask)supportedInterfaceOrientations {
+    return UIInterfaceOrientationMaskLandscape;
 }
 
 @end

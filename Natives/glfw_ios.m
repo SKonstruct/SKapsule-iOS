@@ -3,6 +3,7 @@
 #include "jni.h"
 #import <OpenGLES/EAGL.h>
 #import <OpenGLES/ES2/gl.h>
+#import "NativeBridge.h"
 
 extern EAGLContext *gEAGLContext;
 extern CAEAGLLayer *gEAGLLayer;
@@ -55,10 +56,17 @@ static void nativeMakeContextCurrent(JNIEnv *env, jclass clazz, jlong window) {
     gl4es_bring_up_once();
 }
 
+static BOOL gRenderReadyFired = NO;
+
 static void nativeSwapBuffers(JNIEnv *env, jclass clazz, jlong window) {
     [EAGLContext setCurrentContext:gEAGLContext];
     glBindRenderbuffer(GL_RENDERBUFFER, gRenderbuffer);
     [gEAGLContext presentRenderbuffer:GL_RENDERBUFFER];
+
+    if (!gRenderReadyFired) {
+        gRenderReadyFired = YES;
+        [SKNativeBridge onRenderReady];
+    }
 }
 
 static jboolean nativeGamepadPresent(JNIEnv *env, jclass clazz) {

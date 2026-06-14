@@ -57,6 +57,17 @@ stage "$REPO_ROOT/assets/getdown-pro.jar" \
     echo "  (place getdown-pro.jar in assets/)"
 
 echo
+echo "=== Fonts ==="
+mkdir -p "$APP_DIR/jre25/lib/fonts"
+cp "$REPO_ROOT/assets/fonts/"*.ttf "$APP_DIR/jre25/lib/fonts/" 2>/dev/null || \
+    echo "  (place .ttf font files in assets/fonts/)"
+
+echo "=== fontconfig.properties ==="
+stage "$REPO_ROOT/assets/fontconfig.properties" \
+      "$APP_DIR/jre25/lib/fontconfig.properties" || \
+    echo "  (create assets/fontconfig.properties)"
+
+echo
 echo "=== LWJGL Modules ==="
 LWJGL_MODS="$REPO_ROOT/out/lwjgl3/lwjgl-3.4.1-ios-modules.zip"
 if [[ -f "$LWJGL_MODS" ]]; then
@@ -77,6 +88,10 @@ if [[ -f "$LWJGL_NATIVES" ]]; then
 else
     echo "  (run ./scripts/build-lwjgl3-ios.sh first)"
 fi
+
+echo
+echo "=== LWJGL AngelAura compat symlink ==="
+ln -sfn Frameworks/liblwjgl.dylib "$APP_DIR/AngelAuraAmethyst"
 
 echo
 echo "done."

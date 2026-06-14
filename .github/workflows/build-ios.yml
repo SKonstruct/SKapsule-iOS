@@ -31,7 +31,7 @@ jobs:
           java-version: '25'
 
       - name: Install build dependencies
-        run: brew install ant maven ninja wget
+        run: brew install ant maven ninja wget ldid
 
       - name: Cache native build outputs
         id: cache-out
@@ -43,14 +43,23 @@ jobs:
       - name: Build native submodules
         if: steps.cache-out.outputs.cache-hit != 'true'
         env:
-          JAVA8_HOME: ${{ env.JAVA_HOME_8_X64 }}
-          JAVA_HOME: ${{ env.JAVA_HOME_25_X64 }}
+          JAVA8_HOME: ${{ env.JAVA_HOME_8_ARM64 }}
+          JAVA_HOME: ${{ env.JAVA_HOME_25_ARM64 }}
         run: |
           ./scripts/build-gl4es-ios.sh
           ./scripts/build-openal-ios.sh
           ./scripts/build-lwjgl3-ios.sh
           ./scripts/build-cacio-ios.sh
           ./scripts/build-frenchpress-ios.sh
+          ./scripts/build-bootstrap.sh
+
+      - name: Ensure JRE zip is present
+        run: |
+          mkdir -p assets
+          if [ ! -f "assets/jre25-ios-aarch64.zip" ]; then
+            echo "Downloading pre-built JRE 25..."
+            curl -L -o assets/jre25-ios-aarch64.zip https://github.com/SKonstruct/SKapsule-iOS/releases/download/v0.1.0/jre25-ios-aarch64.zip || true
+          fi
 
       - name: Stage app assets
         run: ./scripts/stage-app-assets.sh

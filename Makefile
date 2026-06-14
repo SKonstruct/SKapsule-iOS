@@ -103,7 +103,6 @@ native:
 		-DCONFIG_RELEASE=$(RELEASE) \
 		..
 	cmake --build $(WORKINGDIR) --config $(CMAKE_BUILD_TYPE) -j$(JOBS)
-	rm -f $(WORKINGDIR)/libawt_headless.dylib
 	echo '[SKapsule v$(VERSION)] native - end'
 
 jre: native
@@ -115,9 +114,27 @@ jre: native
 	if [ -f "jre25/lib/jvm.cfg" ]; then echo "-server KNOWN" > jre25/lib/jvm.cfg; fi; \
 	if [ -n "$$(ls jre*.tar.xz 2>/dev/null)" ]; then rm $(SOURCEDIR)/depends/jre*.tar.xz; fi; \
 	cd $(SOURCEDIR); \
+	echo "[SKapsule] Building libawt_headless.dylib stub..."; \
+	xcrun -sdk iphoneos clang -shared -arch arm64 \
+		-isysroot $$(xcrun --sdk iphoneos --show-sdk-path) \
+		-I$(SOURCEDIR)/depends/jre25/include \
+		-I$(SOURCEDIR)/depends/jre25/include/darwin \
+		-miphoneos-version-min=14.0 \
+		-o $(WORKINGDIR)/libawt_headless.dylib \
+		$(SOURCEDIR)/Natives/awt_stubs.c; \
+	echo "[SKapsule] Building libprefs.dylib stub..."; \
+	xcrun -sdk iphoneos clang -shared -arch arm64 \
+		-isysroot $$(xcrun --sdk iphoneos --show-sdk-path) \
+		-I$(SOURCEDIR)/depends/jre25/include \
+		-I$(SOURCEDIR)/depends/jre25/include/darwin \
+		-miphoneos-version-min=14.0 \
+		-o $(WORKINGDIR)/libprefs.dylib \
+		$(SOURCEDIR)/Natives/prefs_stubs.c; \
 	rm -rf $(SOURCEDIR)/depends/jre25/{ASSEMBLY_EXCEPTION,bin,include,jre,legal,LICENSE,man,THIRD_PARTY_README,lib/{ct.sym,jspawnhelper,libjsig.dylib,src.zip,tools.jar}} 2>/dev/null || true; \
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/SKapsule.app/jre25); \
 	cp -R $(SOURCEDIR)/depends/jre25/* $(WORKINGDIR)/SKapsule.app/jre25/ 2>/dev/null || true; \
+	cp $(WORKINGDIR)/libawt_headless.dylib $(WORKINGDIR)/SKapsule.app/jre25/lib/libawt_headless.dylib 2>/dev/null || true; \
+	cp $(WORKINGDIR)/libprefs.dylib $(WORKINGDIR)/SKapsule.app/jre25/lib/libprefs.dylib 2>/dev/null || true; \
 	rm -rf $(WORKINGDIR)/SKapsule.app/lib $(WORKINGDIR)/SKapsule.app/conf $(WORKINGDIR)/SKapsule.app/jre25/lib/server/lib $(WORKINGDIR)/SKapsule.app/jre25/lib/server/conf; \
 	ln -sfn jre25/lib $(WORKINGDIR)/SKapsule.app/lib; \
 	ln -sfn jre25/conf $(WORKINGDIR)/SKapsule.app/conf; \
@@ -169,9 +186,27 @@ xcode-payload:
 	if [ -f "jre25/lib/jvm.cfg" ]; then echo "-server KNOWN" > jre25/lib/jvm.cfg; fi; \
 	if [ -n "$$(ls jre*.tar.xz 2>/dev/null)" ]; then rm $(SOURCEDIR)/depends/jre*.tar.xz; fi; \
 	cd $(SOURCEDIR); \
+	echo "[SKapsule] Building libawt_headless.dylib stub..."; \
+	xcrun -sdk iphoneos clang -shared -arch arm64 \
+		-isysroot $$(xcrun --sdk iphoneos --show-sdk-path) \
+		-I$(SOURCEDIR)/depends/jre25/include \
+		-I$(SOURCEDIR)/depends/jre25/include/darwin \
+		-miphoneos-version-min=14.0 \
+		-o $(WORKINGDIR)/libawt_headless.dylib \
+		$(SOURCEDIR)/Natives/awt_stubs.c; \
+	echo "[SKapsule] Building libprefs.dylib stub..."; \
+	xcrun -sdk iphoneos clang -shared -arch arm64 \
+		-isysroot $$(xcrun --sdk iphoneos --show-sdk-path) \
+		-I$(SOURCEDIR)/depends/jre25/include \
+		-I$(SOURCEDIR)/depends/jre25/include/darwin \
+		-miphoneos-version-min=14.0 \
+		-o $(WORKINGDIR)/libprefs.dylib \
+		$(SOURCEDIR)/Natives/prefs_stubs.c; \
 	rm -rf $(SOURCEDIR)/depends/jre25/{ASSEMBLY_EXCEPTION,bin,include,jre,legal,LICENSE,man,THIRD_PARTY_README,lib/{ct.sym,jspawnhelper,libjsig.dylib,src.zip,tools.jar}} 2>/dev/null || true; \
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/SKapsule.app/jre25); \
 	cp -R $(SOURCEDIR)/depends/jre25/* $(WORKINGDIR)/SKapsule.app/jre25/ 2>/dev/null || true; \
+	cp $(WORKINGDIR)/libawt_headless.dylib $(WORKINGDIR)/SKapsule.app/jre25/lib/libawt_headless.dylib 2>/dev/null || true; \
+	cp $(WORKINGDIR)/libprefs.dylib $(WORKINGDIR)/SKapsule.app/jre25/lib/libprefs.dylib 2>/dev/null || true; \
 	rm -rf $(WORKINGDIR)/SKapsule.app/lib $(WORKINGDIR)/SKapsule.app/conf $(WORKINGDIR)/SKapsule.app/jre25/lib/server/lib $(WORKINGDIR)/SKapsule.app/jre25/lib/server/conf; \
 	ln -sfn jre25/lib $(WORKINGDIR)/SKapsule.app/lib; \
 	ln -sfn jre25/conf $(WORKINGDIR)/SKapsule.app/conf; \

@@ -8,117 +8,82 @@ This document contains architectural context, findings, file paths, and implemen
 
 ## 🏗️ Current Architecture & State
 
-- **Build System**: Driven by a top-level `Makefile` which handles everything from invoking CMake (for the `Natives/` Objective-C app) to creating `.app`/`.ipa` bundles and codesigning with `ldid`.
+- **Build System**: Driven by a top-level `Makefile` which handles invoking CMake (for the `Natives/` Objective-C app), creating `.app`/`.ipa` bundles, and codesigning with `ldid`. There is also an Xcode project generated via XcodeGen (`project.yml`) which uses `make xcode-payload` as a post-build step.
 - **Java Bootstrapping**: The iOS app initializes the JVM within its own process via `JLI_Launch` (implemented in `Natives/JavaLauncher.m`).
-- **Native Bridge**: `Natives/NativeBridge.m` acts as the communication layer between the Objective-C UI and the JVM (used for things like boot status and upcoming Steam Guard credential prompts).
-- **Progress**: Phase 0 (App setup) is **COMPLETE**. Phase 1 (JVM Bootstrap & Native Bridge) is **PARTIALLY COMPLETE**. The boilerplate native code is largely in place.
+- **Native Bridge**: `Natives/NativeBridge.m` acts as the communication layer between the Objective-C UI and the JVM (used for things like boot status and Steam Guard credential prompts).
+- **Progress**: Phase 0 (App setup) and Phase 1 (JVM Bootstrap & Native Bridge) are **COMPLETE**. 
+  - The JVM successfully boots using JRE 25.
+  - Getdown successfully downloads and validates all 20 game resources (~120MB).
+  - Cacio AWT bridge active and correctly initialized.
+  - Native JNI `initIDs` stubs are functional (all 30 resolve).
+  - Preferences `FileSystemPreferencesFactory` is working, establishing user prefs correctly.
+  - Symlink `AngelAuraAmethyst` resolves correctly, clearing LWJGL load errors.
 
 ---
 
 ## 🧩 Submodule & Dependency Deep Dive
 
-_Evaluated as if building the app from scratch using reference repositories (SKapsule Android and Amethyst-iOS)._
-
 ### 1. `external/bootstrap/`
 
-- **Purpose**: Pure Java glue code shared identically with the Android SKapsule repo. It handles invoking `HeadlessGetdown` (the SK updater) and subsequently `ProjectXApp`.
-- **Build**: Compiled via `scripts/build-bootstrap.sh` into `sk-bootstrap.jar`. No native dependencies, but acts as the entry point for the JVM execution.
+- **Purpose**: Pure Java glue code shared identically with the Android SKapsule repo. Handles invoking `HeadlessGetdown` (the SK updater) and subsequently `ProjectXApp`.
+- **Build**: Compiled via `scripts/build-bootstrap.sh` into `sk-bootstrap.jar`.
 
 ### 2. `gl4es/` & `openal-soft/`
 
 - **Purpose**: Shims to provide Desktop APIs on iOS.
   - `gl4es`: Translates Desktop OpenGL calls from the game into OpenGL ES (which iOS natively supports).
-  - `openal-soft`: Audio backend provider.
-- **Build Insights**:
-  - `scripts/build-gl4es-ios.sh`: Configured with `-DNOX11=ON` and `-DGBM=OFF` because iOS has no X11/Wayland windowing system. Output: `libgl4es.dylib`.
-  - `scripts/build-openal-ios.sh`: Explicitly forces `-DALSOFT_BACKEND_COREAUDIO=ON` to utilize native Apple audio APIs, disabling standard Linux backends (ALSA, Pulse, etc.). Output: `libopenal.dylib`.
+  - `openal-soft`: Audio backend provider configured natively for Apple CoreAudio.
 
 ### 3. `lwjgl3/`
 
 - **Purpose**: The Lightweight Java Game Library.
-- **Build Insights**: Cross-compilation is driven by a custom `ci_build_ios.bash` inside the submodule. It outputs both native `.dylib` files and Java modules (`.jar`).
+- **Build Insights**: Cross-compilation outputs both native `.dylib` files and Java modules (`.jar`). Uses the `AngelAuraAmethyst` framework symlink to resolve load paths.
 
 ### 4. `caciocavallo17/` & CMake `awt` stubs
 
 - **Purpose**: Replaces the desktop AWT windowing system with headless dummy handles.
-- **Build Insights**: Compiled via Maven (`scripts/build-cacio-ios.sh`). Crucially, in `Natives/CMakeLists.txt`, we compile empty stub libraries `libawt_headless.dylib` and `libawt_xawt.dylib`. This is necessary to satisfy Java's native load dependencies without the JVM crashing on iOS since there is no native windowing system to hook into.
+- **Build Insights**: Compiled via Maven (`scripts/build-cacio-ios.sh`). This dependency is **strictly required**. Without Cacio, the JVM falls back to the macOS AWT stack (`LWCToolkit`), which attempts to load unsupported macOS-native libraries (like CoreText) and inevitably crashes.
+- **Native Stubs (`awt_stubs.c`)**: Provides critical JNI `initIDs` stubs and defensive C symbols (e.g., `_AccelGlyphCache_RemoveAllCellInfos`) so that native JDK libraries like `libfontmanager.dylib` don't throw `UnsatisfiedLinkError`.
 
 ### 5. `frenchpress/`
 
-- **Purpose**: Steam login shim (bypasses the need for a running native Steam process).
-- **Build Insights**: Compiled via Maven. Since there's no native Java Swing/AWT UI on iOS, `frenchpress` relies entirely on environment variables (`FRENCHPRESS_STEAM_USER` and `FRENCHPRESS_STEAM_PASS`).
+- **Purpose**: Steam login shim (bypasses the need for a running native Steam process). Relies entirely on environment variables (`FRENCHPRESS_STEAM_USER` and `FRENCHPRESS_STEAM_PASS`).
 
 ### 6. `Natives/external/fishhook/` & Amethyst-iOS Influences
 
-- **Purpose**: To hook C functions dynamically.
-- **Why it matters**: iOS strictly forbids dynamically loading unsigned or arbitrarily downloaded `.dylib`/`.so` files at runtime. However, Java uses `System.loadLibrary()`, which invokes `dlopen()`. Based on the `Amethyst-iOS` architecture, `fishhook` is used to intercept these `dlopen` calls and seamlessly redirect them to our pre-packaged, code-signed `.dylib` files inside the app's `Frameworks/` directory.
-- **Additionally**: We utilize `dyld_bypass_validation.m` (another concept derived from Amethyst-iOS) to bypass library validation for JIT execution when sideloaded.
+- **Purpose**: To hook C functions dynamically. We utilize `dyld_bypass_validation.m` (derived from Amethyst-iOS) to bypass library validation for JIT execution when sideloaded.
 
 ---
 
-## 🚀 Immediate Next Steps (Phase 1 Completion)
+## 🏗️ The Two Build Pipelines
 
-### 1. Sourcing JRE 25 for iOS (arm64)
+The project maintains two functional build pipelines for deploying native stubs and compiling the app. Both must be kept operational.
 
-- **Challenge**: The project requires a JRE 25 compatible with iOS.
-- **Discovery**: The SKapsule (Android) JRE is compiled as Linux ELF `.so` files and cannot be used on iOS. However, `Amethyst-iOS` solves this by downloading iOS JRE zip files directly into a `depends` directory and staging them.
-- **Action**: All scripts and the Makefile have been set to target Java 25, anticipating the release of `jre25-ios-aarch64.zip` on the CDN. The main goal right now is to build as much native code as possible before the runtime itself is fully available.
-- **Blocker**: The JVM boot sequence cannot be verified on-device until JRE 25 drops.
+1. **CMake pipeline** (`make native` → `make package`): Builds everything natively via standard command-line tools, creating `libawt_headless.dylib` and `libprefs.dylib`.
+2. **Xcode pipeline** (Xcode Run → `make xcode-payload`): The Xcode project is generated from `project.yml` via XcodeGen. The Xcode IDE triggers `make xcode-payload` as a post-build step, utilizing `xcrun clang` to compile stubs on-the-fly and deploy them into `jre25/lib/`. 
 
-### 2. Next Native Goals (While Blocked)
-
-Because we cannot boot the JVM without the `jre25-ios-aarch64.zip`, we must focus on native iOS components that can be compiled and statically linked into `SKapsule.app`.
-Currently, the `caciocavallo17` `java-25` branch is failing to compile on JDK 25.0.3 because `sun.font.FcFontManager` was removed from the JDK and `SunFontManager` had abstract method changes (`resolveAndMetrics`). We must wait for an upstream patch or heavily refactor `CTCFontManager.java`.
-
-**OpenGL Surface Setup (`GameViewController.m`)**
-
-- `caciocavallo` and `gl4es` need a native window to render into.
-- `GameViewController` currently just uses a black `UIView`. This must be upgraded to a `CAEAGLLayer` backed view, and an `EAGLContext` must be initialized.
-- A mechanism to pass the layer pointer to the JNI bridge must be written so `glfw_ios.m` can return a valid `EGLSurface` / `EGLNativeWindowType` to `gl4es`.
-
-**Touch Input Bridge**
-
-- The game relies on AWT/GLFW input events.
-- `GameViewController` needs to intercept `touchesBegan:withEvent:` and forward them via a new JNI method to `SkBootstrap` or directly into the `caciocavallo` event queue.
-
-### 3. Building Native Submodules
-
-- **Action**: All scripts in `scripts/` (e.g., `build-gl4es-ios.sh`, `build-lwjgl3-ios.sh`, `build-frenchpress-ios.sh`, `build-bootstrap.sh`) now successfully build on Java 25 (except `caciocavallo17`). `build-lwjgl3-ios.sh` and the other scripts have been modified to explicitly point `JAVA_HOME` to Homebrew's `openjdk@25` due to macOS `/usr/libexec/java_home` blindspots.
-
-### 4. Asset Staging & `getdown-pro.jar`
-
-The SKapsule iOS port relies on an external asset staging step that requires `getdown-pro.jar`.
-
-- **Discovery**: The script explicitly looks for `getdown-pro.jar` at `assets/getdown-pro.jar`.
-- **Action**: **Copy `getdown-pro.jar` directly from the SKapsule Android repository** (`/path/to/SKapsule/launcher/app/src/main/assets/sk/getdown-pro.jar`) and place it in the SKapsule-iOS `assets/` directory before running the staging script.
-
-### 4. Device Deployment & JIT
-
-- **Path**: `Makefile` supports a `deploy` target using `xcrun devicectl`.
-- **Note on JIT**: Running a JVM on iOS requires JIT (Just-In-Time compilation) entitlements. If using TrollStore, invoke the build with `make package TROLLSTORE_JIT_ENT=1` to apply `entitlements.trollstore.xml`.
-
-### 5. Overcoming iOS Runtime Jail (Phase 1 Epilogue)
-
-- **Codesigning Subverted Libraries**: iOS strictly prohibits mapping unsigned binaries (like our downloaded JRE) into memory, causing `EXC_BAD_ACCESS` upon `dlopen()`. We eliminated the need for dirty `dyld` memory hooking (which broke on iOS 17) by injecting a manual `codesign` sweep over all `.dylib` files inside the `xcode-payload` Make target using `$CODE_SIGN_IDENTITY`.
-- **`libjli` Thread Hijacking (`apple_main`)**: OpenJDK's macOS launcher forcibly calls `main()` to hijack the application and start a UI event loop. Because `SKapsule` is an iOS app, calling `UIApplicationMain` a second time crashes the app. We fixed this by intercepting `argv[0] == "bin/java"` inside `main.m` and parking the thread indefinitely.
+**Critical Warning**: If adding new source files for Xcode targets directly, ensure `project.yml` is updated alongside the Makefile.
 
 ---
 
-## 🔐 Look-Ahead: Phase 2 (Steam Login)
+## 🚀 Immediate Next Steps
 
-- **Discovery**: `GameViewController.m` has **ALREADY** been populated with a massive amount of Phase 2 logic! It registers callbacks via `NativeBridge.m` for `promptDeviceCode` and `promptEmailCode`, displaying `UIAlertController` dialogs that block via semaphores until user input is received.
-- **Action**: Because `GameViewController.m` already passes `self.steamUser` and `self.steamPass` into `launchJVM`, you simply need to ensure that `JavaLauncher.m` correctly sets `FRENCHPRESS_STEAM_USER` and `FRENCHPRESS_STEAM_PASS` into the environment variables right before `JLI_Launch` is invoked.
+Now that the core JVM boots and Getdown completes execution, development has advanced to rendering and platform bridging.
 
----
+### Phase 2A: Font & Text Rendering Validation
+- Ensure that Java AWT can create `Font` objects and `FontMetrics` works.
+- Verify SK's `TextFactory` initializes properly and that the game's login screen can render text. This requires bundling fonts since the iOS JRE contains no built-in `fontconfig.properties` or system fonts.
 
-## 💡 Tips & Rules for Opus
+### Phase 2B: OpenGL Rendering Validation
+- Ensure `GameViewController.m` is correctly set up with a `CAEAGLLayer` backed view and an initialized `EAGLContext`.
+- Verify `gl4es` translates SK's OpenGL calls to GLES without fatal errors.
+- Watch for missing GL extensions or "LIBGL:" warnings.
 
-1. **Strict Scoping**: Do not bundle drive-by cleanups or unrelated refactors (per `AGENTS.md`). Focus entirely on getting the submodules to build and sourcing the JRE.
-2. **Build Verification**: Never blind-edit. Run `make native` to ensure CMake configuration remains valid.
-3. **No Unprompted Submodule Bumps**: Do not update the git submodules (`gl4es`, etc.) unless it's an explicit fix for an iOS compilation error.
+### Phase 3: Input Bridge
+- `GameViewController.m` must intercept `touchesBegan:withEvent:` and forward these touch events into the GLFW shadow's `nativeDrainInput` to enable UI interactivity.
 
-## 🌉 Look-Ahead: Phase 1.5 (JNI Bridge & GLFW)
+### Phase 4: Audio (OpenAL)
+- Verify `libopenal.dylib` interacts correctly with iOS's `AVAudioSession`.
 
-- **Discovery**: The iOS UI currently hangs at "Launching Spiral Knights..." because `SkBootstrap.java` attempts to update the UI via `nativeLaunchStatus()`, but the corresponding JNI C functions are **missing** from `JavaLauncher.m`. Because the Java code swallows `UnsatisfiedLinkError`, it fails silently.
-- **Action (JNI)**: We must define and export standard JNI C functions (e.g., `Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeLaunchStatus`) inside `JavaLauncher.m`. Since the iOS JRE does not ship with `jni.h` development headers, a minimal standalone `jni_core.h` must be created containing the standard JNI types (`JNIEnv`, `jclass`, `jstring`, etc.).
-- **Action (GLFW)**: `SkBootstrap` loads a custom iOS `org.lwjgl.glfw.GLFW` shadow class, which requires several native methods (like `nativeMakeContextCurrent`, `nativeSwapBuffers`, `nativeDrainInput`). Basic C stubs must be implemented for these in `JavaLauncher.m` (or a dedicated `glfw_ios.m`) so the JVM does not crash when the SK client initializes its OpenGL context.
+### Phase 5: Steam Login
+- `GameViewController.m` already registers callbacks via `NativeBridge.m` for credential prompts. End-to-end testing must be completed to ensure the JVM accurately receives these inputs.

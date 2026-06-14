@@ -40,6 +40,17 @@
             "group": "test",
             "dependsOn": "Build Debug",
             "problemMatcher": []
+        },
+        {
+            "label": "Build All",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-c",
+                "export JAVA_HOME=$(jenv prefix 25.0) && export CACIO_JAVA_HOME=$JAVA_HOME && export FRENCHPRESS_JAVA_HOME=$JAVA_HOME && ./scripts/build-gl4es-ios.sh && ./scripts/build-openal-ios.sh && ./scripts/build-lwjgl3-ios.sh && ./scripts/build-cacio-ios.sh && ./scripts/build-frenchpress-ios.sh && ./scripts/build-bootstrap.sh && ./scripts/stage-app-assets.sh && make package"
+            ],
+            "group": "build",
+            "problemMatcher": []
         }
     ]
 }
