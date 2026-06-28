@@ -9,8 +9,8 @@ typedef void (^SKBootStatusBlock)(NSString *message);
 typedef void (^SKRenderReadyBlock)(void);
 
 // Steam Guard credential prompt callbacks (JVM → UI, blocking)
-typedef NSString * _Nonnull (^SKPromptDeviceCodeBlock)(BOOL prevWrong);
-typedef NSString * _Nonnull (^SKPromptEmailCodeBlock)(NSString *email, BOOL prevWrong);
+typedef void (^SKPromptDeviceCodeBlock)(BOOL prevWrong);
+typedef void (^SKPromptEmailCodeBlock)(NSString *email, BOOL prevWrong);
 
 @interface SKNativeBridge : NSObject
 

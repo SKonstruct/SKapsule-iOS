@@ -119,6 +119,7 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
     }];
 
     [SKNativeBridge setRenderReadyHandler:^{
+        [UIApplication sharedApplication].idleTimerDisabled = YES;
         [UIView animateWithDuration:0.3 animations:^{
             weakSelf.bootOverlay.alpha = 0;
         } completion:^(BOOL finished) {
@@ -126,54 +127,45 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
         }];
     }];
 
-    [SKNativeBridge setPromptDeviceCodeHandler:^NSString *(BOOL prevWrong) {
-        return [weakSelf showSteamGuardPromptWithTitle:@"Steam Guard"
+    [SKNativeBridge setPromptDeviceCodeHandler:^(BOOL prevWrong) {
+        [weakSelf showSteamGuardPromptWithTitle:@"Steam Guard"
             message:prevWrong
                 ? @"Incorrect code. Enter your Steam Guard authenticator code:"
                 : @"Enter your Steam Guard authenticator code:"];
     }];
 
-    [SKNativeBridge setPromptEmailCodeHandler:^NSString *(NSString *email, BOOL prevWrong) {
+    [SKNativeBridge setPromptEmailCodeHandler:^(NSString *email, BOOL prevWrong) {
         NSString *msg = prevWrong
             ? [NSString stringWithFormat:@"Incorrect code. Enter the code sent to %@:", email]
             : [NSString stringWithFormat:@"Enter the Steam Guard code sent to %@:", email];
-        return [weakSelf showSteamGuardPromptWithTitle:@"Steam Guard (Email)" message:msg];
+        [weakSelf showSteamGuardPromptWithTitle:@"Steam Guard (Email)" message:msg];
     }];
 }
 
-// Blocking Steam Guard prompt: dispatches to main thread, parks caller via semaphore
-- (NSString *)showSteamGuardPromptWithTitle:(NSString *)title message:(NSString *)message {
-    __block NSString *result = @"";
-    dispatch_semaphore_t sem = dispatch_semaphore_create(0);
+// Steam Guard prompt: alerts on main thread and submits asynchronously
+- (void)showSteamGuardPromptWithTitle:(NSString *)title message:(NSString *)message {
+    UIAlertController *alert = [UIAlertController
+        alertControllerWithTitle:title message:message
+        preferredStyle:UIAlertControllerStyleAlert];
 
-    dispatch_async(dispatch_get_main_queue(), ^{
-        UIAlertController *alert = [UIAlertController
-            alertControllerWithTitle:title message:message
-            preferredStyle:UIAlertControllerStyleAlert];
+    [alert addTextFieldWithConfigurationHandler:^(UITextField *tf) {
+        tf.placeholder = @"Code";
+        tf.keyboardType = UIKeyboardTypeNumberPad;
+        tf.autocorrectionType = UITextAutocorrectionTypeNo;
+    }];
 
-        [alert addTextFieldWithConfigurationHandler:^(UITextField *tf) {
-            tf.placeholder = @"Code";
-            tf.keyboardType = UIKeyboardTypeNumberPad;
-            tf.autocorrectionType = UITextAutocorrectionTypeNo;
-        }];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Submit" style:UIAlertActionStyleDefault
+        handler:^(UIAlertAction *action) {
+            NSString *code = alert.textFields.firstObject.text ?: @"";
+            [SKNativeBridge submitCode:code];
+        }]];
 
-        [alert addAction:[UIAlertAction actionWithTitle:@"Submit" style:UIAlertActionStyleDefault
-            handler:^(UIAlertAction *action) {
-                result = alert.textFields.firstObject.text ?: @"";
-                dispatch_semaphore_signal(sem);
-            }]];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel
+        handler:^(UIAlertAction *action) {
+            [SKNativeBridge submitCode:@""];
+        }]];
 
-        [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel
-            handler:^(UIAlertAction *action) {
-                result = @"";
-                dispatch_semaphore_signal(sem);
-            }]];
-
-        [self presentViewController:alert animated:YES completion:nil];
-    });
-
-    dispatch_semaphore_wait(sem, DISPATCH_TIME_FOREVER);
-    return result;
+    [self presentViewController:alert animated:YES completion:nil];
 }
 
 - (void)viewDidLayoutSubviews {
@@ -205,6 +197,11 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
         self.jvmKicked = YES;
         [self startJVM];
     }
+}
+
+- (void)viewDidDisappear:(BOOL)animated {
+    [super viewDidDisappear:animated];
+    [UIApplication sharedApplication].idleTimerDisabled = NO;
 }
 
 - (void)startJVM {

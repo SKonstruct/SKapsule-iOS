@@ -37,15 +37,55 @@ if [ ! -d "cups-2.3.3" ]; then
     curl -sL "https://github.com/apple/cups/releases/download/v2.3.3/cups-2.3.3-source.tar.gz" | tar xz
 fi
 
-# Force boot JDK to use downloaded JDK 27 EA 24
-if [ ! -d "jdk-27.jdk" ]; then
-    echo "Downloading Boot JDK 27..."
-    curl -sL "https://download.java.net/java/early_access/jdk27/24/GPL/openjdk-27-ea+24_macos-aarch64_bin.tar.gz" | tar xz
+# Find boot JDK
+BOOT_JDK=""
+
+check_jdk_version() {
+    local jdk_path="$1"
+    if [ -x "$jdk_path/bin/javac" ]; then
+        local ver=$("$jdk_path/bin/javac" -version 2>&1)
+        if [[ "$ver" == *"javac 26"* ]] || [[ "$ver" == *"javac 27"* ]] || [[ "$ver" == *"javac 28"* ]]; then
+            return 0
+        fi
+    fi
+    return 1
+}
+
+if command -v jenv >/dev/null 2>&1; then
+    TEMP_JDK=$(jenv prefix)
+    if check_jdk_version "$TEMP_JDK"; then
+        BOOT_JDK="$TEMP_JDK"
+        echo "Using Boot JDK from jenv: $BOOT_JDK"
+    else
+        echo "Boot JDK from jenv is not version 26, 27, or 28. Ignoring."
+    fi
 fi
-BOOT_JDK="$OUT_DIR/jdk-27.jdk/Contents/Home"
+
+if [ -z "$BOOT_JDK" ] && [ -n "$JAVA_HOME" ]; then
+    if check_jdk_version "$JAVA_HOME"; then
+        BOOT_JDK="$JAVA_HOME"
+        echo "Using Boot JDK from JAVA_HOME: $BOOT_JDK"
+    else
+        echo "Boot JDK from JAVA_HOME is not version 26, 27, or 28. Ignoring."
+    fi
+fi
+
+if [ -z "$BOOT_JDK" ]; then
+    # Force boot JDK to use downloaded JDK 27 EA 24 as fallback
+    if [ ! -d "jdk-27.jdk" ] || [ ! -x "jdk-27.jdk/Contents/Home/bin/javac" ]; then
+        echo "Downloading Boot JDK 27..."
+        rm -rf "jdk-27.jdk"
+        if ! curl -sL "https://download.java.net/java/early_access/jdk27/24/GPL/openjdk-27-ea+24_macos-aarch64_bin.tar.gz" | tar xz; then
+            echo "Error: Failed to download or extract Boot JDK 27."
+            rm -rf "jdk-27.jdk"
+            exit 1
+        fi
+    fi
+    BOOT_JDK="$OUT_DIR/jdk-27.jdk/Contents/Home"
+fi
 
 if [ ! -d "$BOOT_JDK" ]; then
-    echo "Could not find JDK 27 in $BOOT_JDK"
+    echo "Could not find Boot JDK in $BOOT_JDK"
     exit 1
 fi
 
