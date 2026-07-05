@@ -1,4 +1,5 @@
 #import "SKInstaller.h"
+#import "config.h"
 
 #define fm NSFileManager.defaultManager
 #define SK_MANIFEST_URL @"https://gamemedia2.spiralknights.com/spiral/latest/getdown.txt"
@@ -10,9 +11,18 @@
     const char *home = getenv("SKAPSULE_HOME");
     if (!home) return NO;
 
-    NSString *marker = [NSString stringWithFormat:@"%s/%@", home, VERSION_MARKER];
     NSString *manifest = [NSString stringWithFormat:@"%s/sk/getdown.txt", home];
-    return [fm fileExistsAtPath:marker] && [fm fileExistsAtPath:manifest];
+    if (![fm fileExistsAtPath:manifest]) return NO;
+
+    NSString *marker = [NSString stringWithFormat:@"%s/%@", home, VERSION_MARKER];
+    if (![fm fileExistsAtPath:marker]) return NO;
+
+    // Verify version/commit matches current build to trigger re-staging on updates
+    NSString *markerContent = [NSString stringWithContentsOfFile:marker encoding:NSUTF8StringEncoding error:nil];
+    NSString *currentVersion = [NSString stringWithFormat:@"%@-%s",
+        NSBundle.mainBundle.infoDictionary[@"CFBundleVersion"], CONFIG_COMMIT];
+
+    return [markerContent isEqualToString:currentVersion];
 }
 
 + (void)installWithProgress:(void (^)(NSString *))progress {
@@ -54,9 +64,11 @@
         [self downloadManifest:manifestPath];
     }
 
-    // 6. Write version marker
+    // 6. Write version marker with current build info
     NSString *marker = [NSString stringWithFormat:@"%s/%@", home, VERSION_MARKER];
-    [@"" writeToFile:marker atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    NSString *currentVersion = [NSString stringWithFormat:@"%@-%s",
+        NSBundle.mainBundle.infoDictionary[@"CFBundleVersion"], CONFIG_COMMIT];
+    [currentVersion writeToFile:marker atomically:YES encoding:NSUTF8StringEncoding error:nil];
 
     progress(@"Runtime ready.");
     NSLog(@"[SKInstaller] Installation complete");

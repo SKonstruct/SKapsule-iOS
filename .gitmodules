@@ -18,4 +18,4 @@
 	url = https://github.com/SKonstruct/fishhook.git
 [submodule "bootstrap"]
 	path = external/bootstrap
-	url = https://github.com/SKonstruct/skapsule-bootstrap.git
+	url = https://github.com/SKonstruct/bootstrap.git

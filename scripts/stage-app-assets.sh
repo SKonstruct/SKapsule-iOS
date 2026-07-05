@@ -59,7 +59,7 @@ stage "$REPO_ROOT/assets/getdown-pro.jar" \
 echo
 echo "=== Fonts ==="
 mkdir -p "$APP_DIR/jre25/lib/fonts"
-cp "$REPO_ROOT/assets/fonts/"*.ttf "$APP_DIR/jre25/lib/fonts/" 2>/dev/null || \
+cp "$REPO_ROOT/assets/fonts/"* "$APP_DIR/jre25/lib/fonts/" 2>/dev/null || \
     echo "  (place .ttf font files in assets/fonts/)"
 
 echo "=== fontconfig.properties ==="

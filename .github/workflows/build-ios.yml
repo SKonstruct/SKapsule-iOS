@@ -1,4 +1,4 @@
-name: Build iOS
+name: Build for iOS
 
 on:
   push:
@@ -20,8 +20,8 @@ jobs:
 
       - name: Setup Java 8 (for LWJGL multi-release layer)
         uses: actions/setup-java@v4
-        with: 
-          distribution: temurin
+        with:
+          distribution: zulu
           java-version: '8'
 
       - name: Setup Java 25 (for build tools)

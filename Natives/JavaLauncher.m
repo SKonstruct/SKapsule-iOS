@@ -163,8 +163,9 @@ int launchJVM(NSString *steamUser, NSString *steamPass, BOOL isSteam, int width,
         int sw = width > 0 ? width : 1280;
         int sh = height > 0 ? height : 720;
         margv[++margc] = [NSString stringWithFormat:@"-Dcacio.managed.screensize=%dx%d", sw, sh].UTF8String;
-        // Use the default macOS/iOS font manager (CFontManager)
-        // X11FontManager doesn't exist in this JRE build
+        // Force the use of cacio's custom CTCFontManager instead of macOS default CFontManager
+        margv[++margc] = "-Dsun.font.fontmanager=com.github.caciocavallosilano.cacio.ctc.CTCFontManager";
+        margv[++margc] = "-Dcacio.font.fontmanager=com.github.caciocavallosilano.cacio.ctc.CTCFontManager";
         margv[++margc] = "-Dcacio.font.fontscaler=sun.font.FreetypeFontScaler";
         margv[++margc] = [NSString stringWithFormat:@"-Dsun.java2d.fontpath=%@/jre25/lib/fonts", bundlePath].UTF8String;
 

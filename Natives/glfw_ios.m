@@ -8,6 +8,7 @@
 extern EAGLContext *gEAGLContext;
 extern CAEAGLLayer *gEAGLLayer;
 extern GLuint gRenderbuffer;
+extern GLuint gFramebuffer;
 
 // Basic stub implementations to prevent UnsatisfiedLinkError during JVM boot.
 
@@ -53,6 +54,23 @@ static void gl4es_bring_up_once(void) {
 
 static void nativeMakeContextCurrent(JNIEnv *env, jclass clazz, jlong window) {
     [EAGLContext setCurrentContext:gEAGLContext];
+
+    // Dynamically call native GLES glBindFramebuffer to bind the custom FBO on the render thread context.
+    // We must do this dynamically using dlsym to bypass gl4es interception before it is initialized.
+    if (gFramebuffer != 0) {
+        static void (*native_glBindFramebuffer)(GLenum, GLuint) = NULL;
+        static dispatch_once_t onceToken;
+        dispatch_once(&onceToken, ^{
+            void *gles = dlopen("/System/Library/Frameworks/OpenGLES.framework/OpenGLES", RTLD_NOW);
+            if (gles) {
+                native_glBindFramebuffer = dlsym(gles, "glBindFramebuffer");
+            }
+        });
+        if (native_glBindFramebuffer) {
+            native_glBindFramebuffer(GL_FRAMEBUFFER, gFramebuffer);
+        }
+    }
+
     gl4es_bring_up_once();
 }
 
