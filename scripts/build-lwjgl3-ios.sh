@@ -13,8 +13,24 @@ OUT_DIR="${OUT_DIR:-$REPO_ROOT/out/lwjgl3}"
 [[ -d "$LWJGL_SRC" ]] || { echo "ERROR: lwjgl3 source not found at $LWJGL_SRC" >&2; exit 1; }
 [[ -f "$LWJGL_SRC/ci_build_ios.bash" ]] || { echo "ERROR: ci_build_ios.bash missing" >&2; exit 1; }
 
-export JAVA_HOME="/opt/homebrew/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home"
-export JAVA8_HOME="${JAVA8_HOME:-$(/usr/libexec/java_home -v 1.8 2>/dev/null)}"
+if [[ -z "${JAVA_HOME:-}" ]]; then
+    export JAVA_HOME="$(jenv prefix zulu64-25.0.3 2>/dev/null || jenv prefix 25 2>/dev/null || echo "")"
+fi
+if [[ -z "${JAVA8_HOME:-}" ]]; then
+    export JAVA8_HOME="$(jenv prefix zulu64-1.8.0.492 2>/dev/null || jenv prefix 1.8 2>/dev/null || echo "")"
+fi
+
+if [[ -z "${JAVA_HOME:-}" || ! -d "$JAVA_HOME" ]]; then
+    echo "ERROR: JAVA_HOME is not set or invalid." >&2
+    echo "       Please run ./scripts/setup-mac.sh to configure the environment." >&2
+    exit 1
+fi
+
+if [[ -z "${JAVA8_HOME:-}" || ! -f "${JAVA8_HOME:-}/jre/lib/rt.jar" ]]; then
+    echo "ERROR: JAVA8_HOME must point at a JDK 8 install (with jre/lib/rt.jar)." >&2
+    echo "       Please run ./scripts/setup-mac.sh to configure the environment." >&2
+    exit 1
+fi
 
 echo "lwjgl3 source: $LWJGL_SRC"
 echo "Output dir:    $OUT_DIR"

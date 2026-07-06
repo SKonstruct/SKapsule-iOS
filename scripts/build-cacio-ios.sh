@@ -17,6 +17,9 @@ CACIO_VERSION="1.18-SNAPSHOT"
     exit 1
 }
 
+if [[ -z "${JAVA_HOME:-}" ]]; then
+    export JAVA_HOME="$(jenv prefix zulu64-25.0.3 2>/dev/null || jenv prefix 25 2>/dev/null || echo "")"
+fi
 if [[ -n "${CACIO_JAVA_HOME:-}" ]]; then
     export JAVA_HOME="$CACIO_JAVA_HOME"
 fi
