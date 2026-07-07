@@ -66,15 +66,15 @@ jobs:
         run: ./scripts/stage-app-assets.sh
 
       - name: Build Standard IPA
-        run: make package RELEASE=1
+        run: |
+          make package RELEASE=1
+          mv artifacts/com.skonstruct.skapsule-*.ipa artifacts/SKapsule.ipa
 
       - name: Build TrollStore IPA (JIT Entitlements)
         run: |
           make clean
           make package TROLLSTORE_JIT_ENT=1 RELEASE=1
-
-      - name: Rename TrollStore TIPA
-        run: mv artifacts/SKapsule.ipa artifacts/SKapsule-TrollStore.tipa
+          mv artifacts/com.skonstruct.skapsule-*-trollstore.tipa artifacts/SKapsule-TrollStore.tipa
 
       - name: Upload Standard IPA
         uses: actions/upload-artifact@v4
