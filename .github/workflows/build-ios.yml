@@ -72,9 +72,11 @@ jobs:
 
       - name: Build TrollStore IPA (JIT Entitlements)
         run: |
+          mv artifacts/SKapsule.ipa ./SKapsule.ipa
           make clean
           make package TROLLSTORE_JIT_ENT=1 RELEASE=1
           mv artifacts/com.skonstruct.skapsule-*-trollstore.tipa artifacts/SKapsule-TrollStore.tipa
+          mv ./SKapsule.ipa artifacts/SKapsule.ipa
 
       - name: Upload Standard IPA
         uses: actions/upload-artifact@v4
