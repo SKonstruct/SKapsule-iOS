@@ -7,10 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		006B5AB3D45FDE34B350884D /* prefs_stubs.c in Sources */ = {isa = PBXBuildFile; fileRef = 866F2B8C858E3F619CB4129F /* prefs_stubs.c */; };
 		0249A9C9C90015426942BD8E /* GameViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = D213F0E8EEF4381DFE622FBF /* GameViewController.m */; };
 		06F32A40195F29A38EEA2B75 /* empty.m in Sources */ = {isa = PBXBuildFile; fileRef = F74EF3D8B08A315F2F20FA4F /* empty.m */; };
 		12DE5F6025708BE38E4CFB9A /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 68C5F0BF52335C919C72490A /* AppDelegate.m */; };
 		1753C36E43E0613B5B3F1FF9 /* CODE_OF_CONDUCT.md in Resources */ = {isa = PBXBuildFile; fileRef = 424B9EBCDD3EBD841FA9ACEC /* CODE_OF_CONDUCT.md */; };
+		47BC0B686B1F30FBA5C727F9 /* awt_stubs.c in Sources */ = {isa = PBXBuildFile; fileRef = 73706EE631C12186CF3B22F3 /* awt_stubs.c */; };
 		54573B8B916B037F9D0E64FD /* fishhook.podspec in Resources */ = {isa = PBXBuildFile; fileRef = EEC406F6FC46E7343D682253 /* fishhook.podspec */; };
 		5750D4D2F9292B0FE9F8200A /* CONTRIBUTING.md in Resources */ = {isa = PBXBuildFile; fileRef = 76DA70269D003A01B6104C97 /* CONTRIBUTING.md */; };
 		64E3239549CB296047631E26 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = D6DAA12FB3C03AA2DCC75C84 /* README.md */; };
@@ -68,11 +70,13 @@
 		4B911D1568CD0DE81D45E719 /* fishhook.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = fishhook.c; sourceTree = "<group>"; };
 		68C5F0BF52335C919C72490A /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
 		694B3D7E5A5DDDB5E6C5C317 /* SceneDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SceneDelegate.h; sourceTree = "<group>"; };
+		73706EE631C12186CF3B22F3 /* awt_stubs.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = awt_stubs.c; sourceTree = "<group>"; };
 		741BFD72FAF843F281C68E7A /* NativeBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = NativeBridge.m; sourceTree = "<group>"; };
 		7509064C9612D6BC5DD29650 /* JavaLauncher.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = JavaLauncher.m; sourceTree = "<group>"; };
 		76DA70269D003A01B6104C97 /* CONTRIBUTING.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CONTRIBUTING.md; sourceTree = "<group>"; };
 		7A6E3EF1FA97790D3DBED4C2 /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
 		84774DE3AC9D0EA9856B3228 /* xawt_fake.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = xawt_fake.m; sourceTree = "<group>"; };
+		866F2B8C858E3F619CB4129F /* prefs_stubs.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = prefs_stubs.c; sourceTree = "<group>"; };
 		8C5CDBAC8A1997AB6C168A9A /* .git */ = {isa = PBXFileReference; path = .git; sourceTree = "<group>"; };
 		8E9EE76547F63608B1AFE425 /* NativeBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NativeBridge.h; sourceTree = "<group>"; };
 		938DA6D68E6BB2CDA7AF2000 /* LauncherViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = LauncherViewController.h; sourceTree = "<group>"; };
@@ -108,7 +112,7 @@
 				D6DAA12FB3C03AA2DCC75C84 /* README.md */,
 			);
 			name = fishhook;
-			path = Natives/external/fishhook;
+			path = external/fishhook;
 			sourceTree = "<group>";
 		};
 		C4AFBA8B79EF425B5C2DBB74 /* Natives */ = {
@@ -117,6 +121,7 @@
 				7A6E3EF1FA97790D3DBED4C2 /* AppDelegate.h */,
 				68C5F0BF52335C919C72490A /* AppDelegate.m */,
 				CCF840D1FBF1E2F94CC86EBF /* Assets.xcassets */,
+				73706EE631C12186CF3B22F3 /* awt_stubs.c */,
 				DD33DA300A60BB5119D19241 /* config.h */,
 				FE7003D28950F227547F58AC /* config.h.in */,
 				C5A3E19B66F96254F249FB84 /* dyld_bypass_validation.m */,
@@ -131,6 +136,7 @@
 				2FBF045EA58960ED19A7C1F0 /* main.m */,
 				8E9EE76547F63608B1AFE425 /* NativeBridge.h */,
 				741BFD72FAF843F281C68E7A /* NativeBridge.m */,
+				866F2B8C858E3F619CB4129F /* prefs_stubs.c */,
 				694B3D7E5A5DDDB5E6C5C317 /* SceneDelegate.h */,
 				3860F7BEDF92809A48BDB35B /* SceneDelegate.m */,
 				2FACF0E1D1C4B9035412632A /* SKInstaller.h */,
@@ -170,13 +176,6 @@
 				C4AFBA8B79EF425B5C2DBB74 /* Natives */,
 				CFBE761F876BD9BA2174C4A2 /* Products */,
 			);
-			sourceTree = "<group>";
-		};
-		"TEMP_816ABE11-AF32-49B1-959A-50B222B7B7D7" /* external */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = external;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -358,10 +357,12 @@
 				EA35344B6E4F2A50377BCD18 /* NativeBridge.m in Sources */,
 				BB2CF1D6605B390FD0ABE875 /* SKInstaller.m in Sources */,
 				6A3466DBD9E08B57B575115C /* SceneDelegate.m in Sources */,
+				47BC0B686B1F30FBA5C727F9 /* awt_stubs.c in Sources */,
 				D95DBD7AEBF1204A1ED67112 /* dyld_bypass_validation.m in Sources */,
 				7600E21B6E5090AA0ABCF1F7 /* fishhook.c in Sources */,
 				F3B4129DCA02CFB6D81080ED /* glfw_ios.m in Sources */,
 				978739D1F01DAEE113A94CEF /* main.m in Sources */,
+				006B5AB3D45FDE34B350884D /* prefs_stubs.c in Sources */,
 				81DB249991868B43A01D5325 /* utils.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

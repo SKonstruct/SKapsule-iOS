@@ -14,7 +14,7 @@ endif()
 
 include_directories(
   "."
-  "external/fishhook"
+  "../external/fishhook"
 )
 
 # rpath for loading dylibs from Frameworks/ and JRE lib/
@@ -37,7 +37,7 @@ add_executable(SKapsule
   SKInstaller.m
   utils.m
   dyld_bypass_validation.m
-  external/fishhook/fishhook.c
+  ../external/fishhook/fishhook.c
   Assets.xcassets
 )
 

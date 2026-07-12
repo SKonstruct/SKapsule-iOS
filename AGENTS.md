@@ -50,7 +50,6 @@ Natives/               iOS app (Objective-C) + CMake build
   utils.*              JIT detection, entitlements, file helpers
   dyld_bypass_validation.m  library validation bypass for unsigned dylibs
   awt_xawt/            cacio AWT stubs
-  external/fishhook/   submodule: runtime function hooking
   Info.plist           iOS app metadata
   Assets.xcassets/     app icon + launch screen
   resources/           bundled frameworks, storyboards
@@ -65,6 +64,7 @@ openal-soft/           submodule — audio
 lwjgl3/                submodule — LWJGL iOS build
 caciocavallo17/        submodule — headless AWT
 frenchpress/           submodule — Steam login
+fishhook/              submodule — runtime function hooking
 entitlements.*.xml     signing entitlements (sideload / TrollStore)
 out/                   native build outputs (generated, gitignored)
 out/artifacts/         packaged IPA output (generated, gitignored)

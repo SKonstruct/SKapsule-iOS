@@ -15,9 +15,8 @@ targets:
           - "build_xcode"
           - "CMakeLists.txt"
           - "awt_xawt"
-          - "external/fishhook"
           - "Info.plist"
-      - path: Natives/external/fishhook
+      - path: external/fishhook
     settings:
       CODE_SIGN_IDENTITY: "Apple Development"
       ENABLE_USER_SCRIPT_SANDBOXING: NO
