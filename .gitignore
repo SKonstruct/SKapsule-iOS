@@ -1,8 +1,6 @@
 # Build outputs
 out/
-artifacts/
 Natives/build/
-depends/
 
 # Xcode
 xcuserdata/

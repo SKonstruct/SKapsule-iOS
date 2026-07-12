@@ -48,6 +48,7 @@
     [fm createDirectoryAtPath:[fpDst stringByDeletingLastPathComponent]
         withIntermediateDirectories:YES attributes:nil error:nil];
     if ([fm fileExistsAtPath:fpSrc]) {
+        [fm removeItemAtPath:fpDst error:nil];
         [fm copyItemAtPath:fpSrc toPath:fpDst error:nil];
     }
 

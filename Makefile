@@ -3,7 +3,7 @@ SHELL := /bin/bash
 $(VERBOSE).SILENT:
 
 SOURCEDIR   := $(shell printf "%q\n" "$(shell pwd)")
-OUTPUTDIR   := $(SOURCEDIR)/artifacts
+OUTPUTDIR   := $(SOURCEDIR)/out/artifacts
 WORKINGDIR  := $(SOURCEDIR)/Natives/build
 VERSION     := 0.1.0
 BRANCH      := $(shell git branch --show-current 2>/dev/null || echo unknown)
@@ -40,7 +40,7 @@ METHOD_DIRCHECK = \
 
 # Function to unpack Java runtimes from assets.
 METHOD_JAVA_UNPACK = \
-	cd $(SOURCEDIR)/depends; \
+	cd $(SOURCEDIR)/out; \
 	if [ ! -f "jre$(1)/release" ]; then \
 		echo "Unpacking JRE $(1) from assets..."; \
 		unzip -q $(SOURCEDIR)/assets/jre$(1)-ios-aarch64.zip -d . || true; \
@@ -107,32 +107,32 @@ native:
 
 jre: native
 	echo '[SKapsule v$(VERSION)] jre - start'
-	mkdir -p $(SOURCEDIR)/depends
-	cd $(SOURCEDIR)/depends; \
+	mkdir -p $(SOURCEDIR)/out
+	cd $(SOURCEDIR)/out; \
 	$(call METHOD_JAVA_UNPACK,25); \
 	if [ -d "jre25/lib/zero" ]; then mv jre25/lib/zero jre25/lib/server; fi; \
 	if [ -f "jre25/lib/jvm.cfg" ]; then echo "-server KNOWN" > jre25/lib/jvm.cfg; fi; \
-	if [ -n "$$(ls jre*.tar.xz 2>/dev/null)" ]; then rm $(SOURCEDIR)/depends/jre*.tar.xz; fi; \
+	if [ -n "$$(ls jre*.tar.xz 2>/dev/null)" ]; then rm $(SOURCEDIR)/out/jre*.tar.xz; fi; \
 	cd $(SOURCEDIR); \
 	echo "[SKapsule] Building libawt_headless.dylib stub..."; \
 	xcrun -sdk iphoneos clang -shared -arch arm64 \
 		-isysroot $$(xcrun --sdk iphoneos --show-sdk-path) \
-		-I$(SOURCEDIR)/depends/jre25/include \
-		-I$(SOURCEDIR)/depends/jre25/include/darwin \
+		-I$(SOURCEDIR)/out/jre25/include \
+		-I$(SOURCEDIR)/out/jre25/include/darwin \
 		-miphoneos-version-min=14.0 \
 		-o $(WORKINGDIR)/libawt_headless.dylib \
 		$(SOURCEDIR)/Natives/awt_stubs.c; \
 	echo "[SKapsule] Building libprefs.dylib stub..."; \
 	xcrun -sdk iphoneos clang -shared -arch arm64 \
 		-isysroot $$(xcrun --sdk iphoneos --show-sdk-path) \
-		-I$(SOURCEDIR)/depends/jre25/include \
-		-I$(SOURCEDIR)/depends/jre25/include/darwin \
+		-I$(SOURCEDIR)/out/jre25/include \
+		-I$(SOURCEDIR)/out/jre25/include/darwin \
 		-miphoneos-version-min=14.0 \
 		-o $(WORKINGDIR)/libprefs.dylib \
 		$(SOURCEDIR)/Natives/prefs_stubs.c; \
-	rm -rf $(SOURCEDIR)/depends/jre25/{ASSEMBLY_EXCEPTION,bin,include,jre,legal,LICENSE,man,THIRD_PARTY_README,lib/{ct.sym,jspawnhelper,libjsig.dylib,src.zip,tools.jar}} 2>/dev/null || true; \
+	rm -rf $(SOURCEDIR)/out/jre25/{ASSEMBLY_EXCEPTION,bin,include,jre,legal,LICENSE,man,THIRD_PARTY_README,lib/{ct.sym,jspawnhelper,libjsig.dylib,src.zip,tools.jar}} 2>/dev/null || true; \
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/SKapsule.app/jre25); \
-	cp -R $(SOURCEDIR)/depends/jre25/* $(WORKINGDIR)/SKapsule.app/jre25/ 2>/dev/null || true; \
+	cp -R $(SOURCEDIR)/out/jre25/* $(WORKINGDIR)/SKapsule.app/jre25/ 2>/dev/null || true; \
 	cp $(WORKINGDIR)/libawt_headless.dylib $(WORKINGDIR)/SKapsule.app/jre25/lib/libawt_headless.dylib 2>/dev/null || true; \
 	cp $(WORKINGDIR)/libprefs.dylib $(WORKINGDIR)/SKapsule.app/jre25/lib/libprefs.dylib 2>/dev/null || true; \
 	rm -rf $(WORKINGDIR)/SKapsule.app/lib $(WORKINGDIR)/SKapsule.app/conf $(WORKINGDIR)/SKapsule.app/jre25/lib/server/lib $(WORKINGDIR)/SKapsule.app/jre25/lib/server/conf; \
@@ -179,32 +179,32 @@ xcode-payload:
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/SKapsule.app/Frameworks)
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/SKapsule.app/libs)
 	# Stage JRE
-	mkdir -p $(SOURCEDIR)/depends
-	cd $(SOURCEDIR)/depends; \
+	mkdir -p $(SOURCEDIR)/out
+	cd $(SOURCEDIR)/out; \
 	$(call METHOD_JAVA_UNPACK,25); \
 	if [ -d "jre25/lib/zero" ]; then mv jre25/lib/zero jre25/lib/server; fi; \
 	if [ -f "jre25/lib/jvm.cfg" ]; then echo "-server KNOWN" > jre25/lib/jvm.cfg; fi; \
-	if [ -n "$$(ls jre*.tar.xz 2>/dev/null)" ]; then rm $(SOURCEDIR)/depends/jre*.tar.xz; fi; \
+	if [ -n "$$(ls jre*.tar.xz 2>/dev/null)" ]; then rm $(SOURCEDIR)/out/jre*.tar.xz; fi; \
 	cd $(SOURCEDIR); \
 	echo "[SKapsule] Building libawt_headless.dylib stub..."; \
 	xcrun -sdk iphoneos clang -shared -arch arm64 \
 		-isysroot $$(xcrun --sdk iphoneos --show-sdk-path) \
-		-I$(SOURCEDIR)/depends/jre25/include \
-		-I$(SOURCEDIR)/depends/jre25/include/darwin \
+		-I$(SOURCEDIR)/out/jre25/include \
+		-I$(SOURCEDIR)/out/jre25/include/darwin \
 		-miphoneos-version-min=14.0 \
 		-o $(WORKINGDIR)/libawt_headless.dylib \
 		$(SOURCEDIR)/Natives/awt_stubs.c; \
 	echo "[SKapsule] Building libprefs.dylib stub..."; \
 	xcrun -sdk iphoneos clang -shared -arch arm64 \
 		-isysroot $$(xcrun --sdk iphoneos --show-sdk-path) \
-		-I$(SOURCEDIR)/depends/jre25/include \
-		-I$(SOURCEDIR)/depends/jre25/include/darwin \
+		-I$(SOURCEDIR)/out/jre25/include \
+		-I$(SOURCEDIR)/out/jre25/include/darwin \
 		-miphoneos-version-min=14.0 \
 		-o $(WORKINGDIR)/libprefs.dylib \
 		$(SOURCEDIR)/Natives/prefs_stubs.c; \
-	rm -rf $(SOURCEDIR)/depends/jre25/{ASSEMBLY_EXCEPTION,bin,include,jre,legal,LICENSE,man,THIRD_PARTY_README,lib/{ct.sym,jspawnhelper,libjsig.dylib,src.zip,tools.jar}} 2>/dev/null || true; \
+	rm -rf $(SOURCEDIR)/out/jre25/{ASSEMBLY_EXCEPTION,bin,include,jre,legal,LICENSE,man,THIRD_PARTY_README,lib/{ct.sym,jspawnhelper,libjsig.dylib,src.zip,tools.jar}} 2>/dev/null || true; \
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/SKapsule.app/jre25); \
-	cp -R $(SOURCEDIR)/depends/jre25/* $(WORKINGDIR)/SKapsule.app/jre25/ 2>/dev/null || true; \
+	cp -R $(SOURCEDIR)/out/jre25/* $(WORKINGDIR)/SKapsule.app/jre25/ 2>/dev/null || true; \
 	cp $(WORKINGDIR)/libawt_headless.dylib $(WORKINGDIR)/SKapsule.app/jre25/lib/libawt_headless.dylib 2>/dev/null || true; \
 	cp $(WORKINGDIR)/libprefs.dylib $(WORKINGDIR)/SKapsule.app/jre25/lib/libprefs.dylib 2>/dev/null || true; \
 	rm -rf $(WORKINGDIR)/SKapsule.app/lib $(WORKINGDIR)/SKapsule.app/conf $(WORKINGDIR)/SKapsule.app/jre25/lib/server/lib $(WORKINGDIR)/SKapsule.app/jre25/lib/server/conf; \
@@ -226,7 +226,7 @@ xcode-payload:
 	fi
 	echo '[SKapsule v$(VERSION)] xcode-payload - end'
 
-# Build using Xcode so that it properly codesigns, dropping the result in artifacts/Payload
+# Build using Xcode so that it properly codesigns, dropping the result in out/artifacts/Payload
 xcode-build:
 	echo '[SKapsule v$(VERSION)] xcode-build - start'
 	xcrun xcodebuild -project SKapsule.xcodeproj -scheme SKapsule -configuration Debug -destination 'generic/platform=iOS' -allowProvisioningUpdates CONFIGURATION_BUILD_DIR="$(OUTPUTDIR)/Payload" build
@@ -247,7 +247,7 @@ clean:
 	echo '[SKapsule v$(VERSION)] clean - start'
 	rm -rf $(WORKINGDIR)
 	rm -rf $(OUTPUTDIR)
-	rm -rf $(SOURCEDIR)/depends
+	rm -rf $(SOURCEDIR)/out/jre25
 	echo '[SKapsule v$(VERSION)] clean - end'
 
 .PHONY: all clean check native payload package deploy help

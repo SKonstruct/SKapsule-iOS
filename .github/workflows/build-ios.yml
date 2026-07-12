@@ -68,28 +68,28 @@ jobs:
       - name: Build Standard IPA
         run: |
           make package RELEASE=1
-          mv artifacts/com.skonstruct.skapsule-*.ipa artifacts/SKapsule.ipa
+          mv out/artifacts/com.skonstruct.skapsule-*.ipa out/artifacts/SKapsule.ipa
 
       - name: Build TrollStore IPA (JIT Entitlements)
         run: |
-          mv artifacts/SKapsule.ipa ./SKapsule.ipa
+          mv out/artifacts/SKapsule.ipa ./SKapsule.ipa
           make clean
           make package TROLLSTORE_JIT_ENT=1 RELEASE=1
-          mv artifacts/com.skonstruct.skapsule-*-trollstore.tipa artifacts/SKapsule-TrollStore.tipa
-          mv ./SKapsule.ipa artifacts/SKapsule.ipa
+          mv out/artifacts/com.skonstruct.skapsule-*-trollstore.tipa out/artifacts/SKapsule-TrollStore.tipa
+          mv ./SKapsule.ipa out/artifacts/SKapsule.ipa
 
       - name: Upload Standard IPA
         uses: actions/upload-artifact@v4
         with:
           name: SKapsule-iOS
-          path: artifacts/SKapsule.ipa
+          path: out/artifacts/SKapsule.ipa
           if-no-files-found: error
 
       - name: Upload TrollStore TIPA
         uses: actions/upload-artifact@v4
         with:
           name: SKapsule-iOS-TrollStore
-          path: artifacts/SKapsule-TrollStore.tipa
+          path: out/artifacts/SKapsule-TrollStore.tipa
           if-no-files-found: error
 
       - name: Publish GitHub Release
@@ -97,7 +97,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/SKapsule.ipa
-            artifacts/SKapsule-TrollStore.tipa
+            out/artifacts/SKapsule.ipa
+            out/artifacts/SKapsule-TrollStore.tipa
           generate_release_notes: true
           fail_on_unmatched_files: true

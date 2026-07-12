@@ -67,7 +67,7 @@ caciocavallo17/        submodule — headless AWT
 frenchpress/           submodule — Steam login
 entitlements.*.xml     signing entitlements (sideload / TrollStore)
 out/                   native build outputs (generated, gitignored)
-artifacts/             packaged IPA output (generated, gitignored)
+out/artifacts/         packaged IPA output (generated, gitignored)
 ```
 
 ---
@@ -75,7 +75,7 @@ artifacts/             packaged IPA output (generated, gitignored)
 ## Build & verification
 
 - **Native app (CMake):** `make native` (requires Xcode CLI tools + iOS SDK)
-- **Full package:** `make package` (produces `.ipa` in `artifacts/`)
+- **Full package:** `make package` (produces `.ipa` in `out/artifacts/`)
 - **TrollStore:** `make package TROLLSTORE_JIT_ENT=1` (produces `.tipa`)
 - **Release:** `make all RELEASE=1`
 - **Xcode IDE Build:** The user builds and tests on-device via Xcode. **CRITICAL**: The Xcode build uses `make xcode-payload` as a post-build step. Any new stub dylibs or source files must be available through this pathway. Both the CMake and Xcode pipelines must be kept functional.
