@@ -12,9 +12,11 @@
 		06F32A40195F29A38EEA2B75 /* empty.m in Sources */ = {isa = PBXBuildFile; fileRef = F74EF3D8B08A315F2F20FA4F /* empty.m */; };
 		12DE5F6025708BE38E4CFB9A /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 68C5F0BF52335C919C72490A /* AppDelegate.m */; };
 		1753C36E43E0613B5B3F1FF9 /* CODE_OF_CONDUCT.md in Resources */ = {isa = PBXBuildFile; fileRef = 424B9EBCDD3EBD841FA9ACEC /* CODE_OF_CONDUCT.md */; };
+		477E3673FE42DCA38029BA8F /* SKModManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 7A33F77D0C19BF2CF6A46A71 /* SKModManager.m */; };
 		47BC0B686B1F30FBA5C727F9 /* awt_stubs.c in Sources */ = {isa = PBXBuildFile; fileRef = 73706EE631C12186CF3B22F3 /* awt_stubs.c */; };
 		54573B8B916B037F9D0E64FD /* fishhook.podspec in Resources */ = {isa = PBXBuildFile; fileRef = EEC406F6FC46E7343D682253 /* fishhook.podspec */; };
 		5750D4D2F9292B0FE9F8200A /* CONTRIBUTING.md in Resources */ = {isa = PBXBuildFile; fileRef = 76DA70269D003A01B6104C97 /* CONTRIBUTING.md */; };
+		60FB49B067D39C5E838FBB0B /* SKZipUtils.m in Sources */ = {isa = PBXBuildFile; fileRef = E8DC5FE13732EB6D70FD62A1 /* SKZipUtils.m */; };
 		64E3239549CB296047631E26 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = D6DAA12FB3C03AA2DCC75C84 /* README.md */; };
 		6A3466DBD9E08B57B575115C /* SceneDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 3860F7BEDF92809A48BDB35B /* SceneDelegate.m */; };
 		7600E21B6E5090AA0ABCF1F7 /* fishhook.c in Sources */ = {isa = PBXBuildFile; fileRef = 4B911D1568CD0DE81D45E719 /* fishhook.c */; };
@@ -70,32 +72,36 @@
 		4B911D1568CD0DE81D45E719 /* fishhook.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = fishhook.c; sourceTree = "<group>"; };
 		68C5F0BF52335C919C72490A /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
 		694B3D7E5A5DDDB5E6C5C317 /* SceneDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SceneDelegate.h; sourceTree = "<group>"; };
+		6E84F1721BED6B371EB2B603 /* SKZipUtils.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SKZipUtils.h; sourceTree = "<group>"; };
 		73706EE631C12186CF3B22F3 /* awt_stubs.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = awt_stubs.c; sourceTree = "<group>"; };
 		741BFD72FAF843F281C68E7A /* NativeBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = NativeBridge.m; sourceTree = "<group>"; };
 		7509064C9612D6BC5DD29650 /* JavaLauncher.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = JavaLauncher.m; sourceTree = "<group>"; };
 		76DA70269D003A01B6104C97 /* CONTRIBUTING.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CONTRIBUTING.md; sourceTree = "<group>"; };
+		7A33F77D0C19BF2CF6A46A71 /* SKModManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SKModManager.m; sourceTree = "<group>"; };
 		7A6E3EF1FA97790D3DBED4C2 /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
 		84774DE3AC9D0EA9856B3228 /* xawt_fake.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = xawt_fake.m; sourceTree = "<group>"; };
 		866F2B8C858E3F619CB4129F /* prefs_stubs.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = prefs_stubs.c; sourceTree = "<group>"; };
-		8C5CDBAC8A1997AB6C168A9A /* .git */ = {isa = PBXFileReference; lastKnownFileType = text; path = .git; sourceTree = "<group>"; };
+		8C5CDBAC8A1997AB6C168A9A /* .git */ = {isa = PBXFileReference; path = .git; sourceTree = "<group>"; };
 		8E9EE76547F63608B1AFE425 /* NativeBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NativeBridge.h; sourceTree = "<group>"; };
 		938DA6D68E6BB2CDA7AF2000 /* LauncherViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = LauncherViewController.h; sourceTree = "<group>"; };
 		A74479BB3EA492E659794A0E /* utils.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = utils.h; sourceTree = "<group>"; };
 		AF179EB4850BD8983431E311 /* SKInstaller.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SKInstaller.m; sourceTree = "<group>"; };
 		AF476662EB209A1AF30CE47F /* awt.dylib */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "compiled.mach-o.dylib"; path = awt.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		BC9812E93F8AA6921EF87ACF /* fishhook.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = fishhook.h; sourceTree = "<group>"; };
+		C1C866ED8F4BE69C85B9C261 /* SKModManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SKModManager.h; sourceTree = "<group>"; };
 		C5A3E19B66F96254F249FB84 /* dyld_bypass_validation.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = dyld_bypass_validation.m; sourceTree = "<group>"; };
 		CCF840D1FBF1E2F94CC86EBF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		D213F0E8EEF4381DFE622FBF /* GameViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = GameViewController.m; sourceTree = "<group>"; };
 		D6DAA12FB3C03AA2DCC75C84 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		D8D6D79A6C0D2A590D790B27 /* awt_headless.dylib */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "compiled.mach-o.dylib"; path = awt_headless.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		DD33DA300A60BB5119D19241 /* config.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = config.h; sourceTree = "<group>"; };
-		E12A6B20F7908457F69DF0D6 /* SKapsule.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SKapsule.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		EB6643112C66D62A751C4972 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
-		EEC406F6FC46E7343D682253 /* fishhook.podspec */ = {isa = PBXFileReference; lastKnownFileType = text; path = fishhook.podspec; sourceTree = "<group>"; };
+		E12A6B20F7908457F69DF0D6 /* SKapsule.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SKapsule.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E8DC5FE13732EB6D70FD62A1 /* SKZipUtils.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SKZipUtils.m; sourceTree = "<group>"; };
+		EB6643112C66D62A751C4972 /* LICENSE */ = {isa = PBXFileReference; path = LICENSE; sourceTree = "<group>"; };
+		EEC406F6FC46E7343D682253 /* fishhook.podspec */ = {isa = PBXFileReference; path = fishhook.podspec; sourceTree = "<group>"; };
 		F74EF3D8B08A315F2F20FA4F /* empty.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = empty.m; sourceTree = "<group>"; };
 		FC64AF7E5F85F5D8BF89D79C /* JavaLauncher.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = JavaLauncher.h; sourceTree = "<group>"; };
-		FE7003D28950F227547F58AC /* config.h.in */ = {isa = PBXFileReference; lastKnownFileType = text; path = config.h.in; sourceTree = "<group>"; };
+		FE7003D28950F227547F58AC /* config.h.in */ = {isa = PBXFileReference; path = config.h.in; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -141,6 +147,10 @@
 				3860F7BEDF92809A48BDB35B /* SceneDelegate.m */,
 				2FACF0E1D1C4B9035412632A /* SKInstaller.h */,
 				AF179EB4850BD8983431E311 /* SKInstaller.m */,
+				C1C866ED8F4BE69C85B9C261 /* SKModManager.h */,
+				7A33F77D0C19BF2CF6A46A71 /* SKModManager.m */,
+				6E84F1721BED6B371EB2B603 /* SKZipUtils.h */,
+				E8DC5FE13732EB6D70FD62A1 /* SKZipUtils.m */,
 				A74479BB3EA492E659794A0E /* utils.h */,
 				4ABDACF22A6AA55B724B388E /* utils.m */,
 			);
@@ -356,6 +366,8 @@
 				B35ADB85955D5FD717080F40 /* LauncherViewController.m in Sources */,
 				EA35344B6E4F2A50377BCD18 /* NativeBridge.m in Sources */,
 				BB2CF1D6605B390FD0ABE875 /* SKInstaller.m in Sources */,
+				477E3673FE42DCA38029BA8F /* SKModManager.m in Sources */,
+				60FB49B067D39C5E838FBB0B /* SKZipUtils.m in Sources */,
 				6A3466DBD9E08B57B575115C /* SceneDelegate.m in Sources */,
 				47BC0B686B1F30FBA5C727F9 /* awt_stubs.c in Sources */,
 				D95DBD7AEBF1204A1ED67112 /* dyld_bypass_validation.m in Sources */,
@@ -411,8 +423,6 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = Natives/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = SKapsule;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.adventure-games";
 				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -525,8 +535,6 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = Natives/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = SKapsule;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.adventure-games";
 				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

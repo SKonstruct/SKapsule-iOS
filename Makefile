@@ -5,7 +5,7 @@ $(VERBOSE).SILENT:
 SOURCEDIR   := $(shell printf "%q\n" "$(shell pwd)")
 OUTPUTDIR   := $(SOURCEDIR)/out/artifacts
 WORKINGDIR  := $(SOURCEDIR)/Natives/build
-VERSION     := 0.1.0
+VERSION     := 1.0.0
 BRANCH      := $(shell git branch --show-current 2>/dev/null || echo unknown)
 COMMIT      := $(shell git log --oneline -1 2>/dev/null | cut -b 1-7 || echo unknown)
 

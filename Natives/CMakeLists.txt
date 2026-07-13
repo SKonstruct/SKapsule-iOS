@@ -30,6 +30,8 @@ add_executable(SKapsule
   AppDelegate.m
   SceneDelegate.m
   LauncherViewController.m
+  SKZipUtils.m
+  SKModManager.m
   GameViewController.m
   JavaLauncher.m
   glfw_ios.m
