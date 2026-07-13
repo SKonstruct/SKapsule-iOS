@@ -12,10 +12,16 @@ BUILD_DIR="${BUILD_DIR:-$OUT_DIR/build}"
 BUILD_TYPE="${BUILD_TYPE:-Release}"
 
 SDKPATH="${SDKPATH:-$(xcrun --sdk iphoneos --show-sdk-path)}"
-[[ -d "$SDKPATH" ]] || { echo "ERROR: iOS SDK not found at $SDKPATH" >&2; exit 1; }
-[[ -d "$GL4ES_SRC" ]] || { echo "ERROR: gl4es source not found at $GL4ES_SRC" >&2; exit 1; }
+[[ -d "$SDKPATH" ]] || {
+                         echo "ERROR: iOS SDK not found at $SDKPATH" >&2
+                                                                          exit 1
+}
+[[ -d "$GL4ES_SRC" ]] || {
+                           echo "ERROR: gl4es source not found at $GL4ES_SRC" >&2
+                                                                                   exit 1
+}
 
-JOBS="${JOBS:-$(sysctl -n hw.logicalcpu 2>/dev/null || echo 4)}"
+JOBS="${JOBS:-$(sysctl -n hw.logicalcpu 2> /dev/null || echo 4)}"
 
 echo "gl4es source: $GL4ES_SRC"
 echo "iOS SDK:      $SDKPATH"
@@ -43,17 +49,17 @@ cmake -S "$GL4ES_SRC" -B "$BUILD_DIR" \
 # This causes the resulting dylib to export zero symbols, breaking LWJGL3's symbol lookup.
 # Strip -fvisibility=hidden from the generated ninja/make flags before building.
 find "$BUILD_DIR" -type f -name "flags.make" -exec sed -i '' 's/-fvisibility=hidden//g' {} +
-find "$BUILD_DIR" -type f -name "build.ninja" -exec sed -i '' 's/-fvisibility=hidden//g' {} + 2>/dev/null || true
+find "$BUILD_DIR" -type f -name "build.ninja" -exec sed -i '' 's/-fvisibility=hidden//g' {} + 2> /dev/null || true
 
 cmake --build "$BUILD_DIR" --config "$BUILD_TYPE" -j"$JOBS"
 
 SRC_LIB=""
 for cand in "$BUILD_DIR/libGL.dylib" "$GL4ES_SRC/lib/libGL.dylib"; do
-    [[ -e "$cand" ]] && SRC_LIB="$(readlink -f "$cand" 2>/dev/null || realpath "$cand")" && break
+    [[ -e "$cand" ]] && SRC_LIB="$(readlink -f "$cand" 2> /dev/null || realpath "$cand")" && break
 done
 if [[ -z "$SRC_LIB" || ! -f "$SRC_LIB" ]]; then
     echo "ERROR: could not locate built libGL.dylib" >&2
-    find "$BUILD_DIR" "$GL4ES_SRC/lib" -maxdepth 3 -name 'libGL*' 2>/dev/null >&2
+    find "$BUILD_DIR" "$GL4ES_SRC/lib" -maxdepth 3 -name 'libGL*' 2> /dev/null >&2
     exit 1
 fi
 

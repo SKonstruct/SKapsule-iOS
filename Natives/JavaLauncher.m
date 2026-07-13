@@ -9,13 +9,13 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "utils.h"
 #import <mach-o/dyld.h>
+#include "utils.h"
 
-#import "JavaLauncher.h"
-#import "NativeBridge.h"
 #include <dlfcn.h>
 #include <pthread.h>
+#import "JavaLauncher.h"
+#import "NativeBridge.h"
 #include "jni.h"
 
 extern void register_glfw_natives(JNIEnv *env, jclass glfwClass);
@@ -83,8 +83,10 @@ int launchJVM(NSString *steamUser, NSString *steamPass, BOOL isSteam, int width,
 
     // Memory: auto-allocate 25% of physical RAM (no increased-memory entitlement assumed)
     int allocMB = (int)((NSProcessInfo.processInfo.physicalMemory >> 20) * 0.25);
-    if (allocMB < 256) allocMB = 256;
-    if (allocMB > 2048) allocMB = 2048;
+    if (allocMB < 256)
+        allocMB = 256;
+    if (allocMB > 2048)
+        allocMB = 2048;
     NSLog(@"[JavaLauncher] Max RAM: %d MB", allocMB);
     margv[++margc] = "-Xms128M";
     margv[++margc] = [NSString stringWithFormat:@"-Xmx%dM", allocMB].UTF8String;
@@ -102,15 +104,17 @@ int launchJVM(NSString *steamUser, NSString *steamPass, BOOL isSteam, int width,
     margv[++margc] = [NSString stringWithFormat:@"-Duser.dir=%s/sk", home].UTF8String;
     margv[++margc] = [NSString stringWithFormat:@"-Duser.timezone=%@", NSTimeZone.localTimeZone.name].UTF8String;
     margv[++margc] = [NSString stringWithFormat:@"-DUIScreen.maximumFramesPerSecond=%d",
-        (int)UIScreen.mainScreen.maximumFramesPerSecond].UTF8String;
+                                                (int)UIScreen.mainScreen.maximumFramesPerSecond]
+                         .UTF8String;
 
     // LWJGL / OpenGL
     margv[++margc] = "-Dorg.lwjgl.glfw.checkThread0=false";
     margv[++margc] = "-Dorg.lwjgl.system.allocator=system";
-    margv[++margc] = [NSString stringWithFormat:@"-Dorg.lwjgl.system.SharedLibraryExtractPath=%@/Frameworks", bundlePath].UTF8String;
+    margv[++margc] =
+        [NSString stringWithFormat:@"-Dorg.lwjgl.system.SharedLibraryExtractPath=%@/Frameworks", bundlePath].UTF8String;
     margv[++margc] = "-Dorg.lwjgl.util.NoChecks=true";
-    margv[++margc] = [NSString stringWithFormat:@"-Dorg.lwjgl.opengl.libname=%@/Frameworks/libgl4es.dylib",
-        bundlePath].UTF8String;
+    margv[++margc] =
+        [NSString stringWithFormat:@"-Dorg.lwjgl.opengl.libname=%@/Frameworks/libgl4es.dylib", bundlePath].UTF8String;
 
     // SK-specific
     margv[++margc] = "-Dcom.threerings.froth.disable_steam_api=true";
@@ -134,7 +138,9 @@ int launchJVM(NSString *steamUser, NSString *steamPass, BOOL isSteam, int width,
         setenv("FRENCHPRESS_CRED_FILE", credFile.UTF8String, 1);
         // Ensure cred directory exists
         [fm createDirectoryAtPath:[credFile stringByDeletingLastPathComponent]
-            withIntermediateDirectories:YES attributes:nil error:nil];
+            withIntermediateDirectories:YES
+                             attributes:nil
+                                  error:nil];
     }
 
     // Module opens/exports for LWJGL + cacio
@@ -153,8 +159,8 @@ int launchJVM(NSString *steamUser, NSString *steamPass, BOOL isSteam, int width,
     // Caciocavallo AWT bridge
     NSString *cacioDir = [NSString stringWithFormat:@"%s/cacio", home];
     if ([fm fileExistsAtPath:cacioDir]) {
-        NSString *cacioBootcp = [NSString stringWithFormat:@"-Xbootclasspath/a:%@/cacio-shared.jar:%@/cacio-tta.jar",
-            cacioDir, cacioDir];
+        NSString *cacioBootcp =
+            [NSString stringWithFormat:@"-Xbootclasspath/a:%@/cacio-shared.jar:%@/cacio-tta.jar", cacioDir, cacioDir];
         margv[++margc] = cacioBootcp.UTF8String;
         margv[++margc] = [NSString stringWithFormat:@"-javaagent:%@/cacio-tta.jar", cacioDir].UTF8String;
         margv[++margc] = "-Djava.awt.headless=false";
@@ -189,8 +195,10 @@ int launchJVM(NSString *steamUser, NSString *steamPass, BOOL isSteam, int width,
     }
 
     // Set LWJGL library paths for OpenGL (gl4es) and OpenAL
-    margv[++margc] = [NSString stringWithFormat:@"-Dorg.lwjgl.opengl.libname=%@/Frameworks/libgl4es.dylib", bundlePath].UTF8String;
-    margv[++margc] = [NSString stringWithFormat:@"-Dorg.lwjgl.openal.libname=%@/Frameworks/libopenal.dylib", bundlePath].UTF8String;
+    margv[++margc] =
+        [NSString stringWithFormat:@"-Dorg.lwjgl.opengl.libname=%@/Frameworks/libgl4es.dylib", bundlePath].UTF8String;
+    margv[++margc] =
+        [NSString stringWithFormat:@"-Dorg.lwjgl.openal.libname=%@/Frameworks/libopenal.dylib", bundlePath].UTF8String;
     setenv("BUNDLE_PATH", bundlePath.UTF8String, 1);
 
     // Classpath: bootstrap + getdown JARs
@@ -219,20 +227,16 @@ int launchJVM(NSString *steamUser, NSString *steamPass, BOOL isSteam, int width,
 
     [SKNativeBridge onLaunchStatus:@"Launching Spiral Knights…"];
 
-    return pJLI_Launch(++margc, margv,
-        0, NULL,
-        0, NULL,
-        "25-internal",
-        "25",
-        "java", "openjdk",
-        0,  // javaargs
-        1,  // cpwildcard
-        0,  // javaw
-        1); // ergo
+    return pJLI_Launch(++margc, margv, 0, NULL, 0, NULL, "25-internal", "25", "java", "openjdk",
+                       0,   // javaargs
+                       1,   // cpwildcard
+                       0,   // javaw
+                       1);  // ergo
 }
 
 
-JNIEXPORT void JNICALL Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeLaunchStatus(JNIEnv *env, jclass clazz, jstring status_text) {
+JNIEXPORT void JNICALL Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeLaunchStatus(JNIEnv *env, jclass clazz,
+                                                                                        jstring status_text) {
     const char *text = (*env)->GetStringUTFChars(env, status_text, NULL);
     if (text != NULL) {
         NSString *nsText = [NSString stringWithUTF8String:text];
@@ -241,17 +245,22 @@ JNIEXPORT void JNICALL Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeLaunc
     }
 }
 
-JNIEXPORT void JNICALL Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeSteamKeepAlive(JNIEnv *env, jclass clazz, jboolean active) {
+JNIEXPORT void JNICALL Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeSteamKeepAlive(JNIEnv *env, jclass clazz,
+                                                                                          jboolean active) {
     // iOS doesn't strictly need a keep-alive foreground service like Android, but we stub it here
     // so frenchpress doesn't crash.
 }
 
-JNIEXPORT jstring JNICALL Java_com_skarm_launcher_bootstrap_SkBootstrap_nativePromptDeviceCode(JNIEnv *env, jclass clazz, jboolean prev_wrong) {
+JNIEXPORT jstring JNICALL Java_com_skarm_launcher_bootstrap_SkBootstrap_nativePromptDeviceCode(JNIEnv *env,
+                                                                                               jclass clazz,
+                                                                                               jboolean prev_wrong) {
     NSString *code = [SKNativeBridge promptForDeviceCode:(BOOL)prev_wrong];
     return (*env)->NewStringUTF(env, code.UTF8String);
 }
 
-JNIEXPORT jstring JNICALL Java_com_skarm_launcher_bootstrap_SkBootstrap_nativePromptEmailCode(JNIEnv *env, jclass clazz, jstring email_str, jboolean prev_wrong) {
+JNIEXPORT jstring JNICALL Java_com_skarm_launcher_bootstrap_SkBootstrap_nativePromptEmailCode(JNIEnv *env, jclass clazz,
+                                                                                              jstring email_str,
+                                                                                              jboolean prev_wrong) {
     NSString *email = @"";
     if (email_str != NULL) {
         const char *email_c = (*env)->GetStringUTFChars(env, email_str, NULL);
@@ -264,39 +273,43 @@ JNIEXPORT jstring JNICALL Java_com_skarm_launcher_bootstrap_SkBootstrap_nativePr
     return (*env)->NewStringUTF(env, code.UTF8String);
 }
 
-JNIEXPORT void JNICALL Java_com_skarm_launcher_bootstrap_SkBootstrap_registerGlfwNatives(JNIEnv *env, jclass clazz, jclass glfwClass) {
-    extern void register_glfw_natives(JNIEnv *env, jclass glfwClass);
+JNIEXPORT void JNICALL Java_com_skarm_launcher_bootstrap_SkBootstrap_registerGlfwNatives(JNIEnv *env, jclass clazz,
+                                                                                         jclass glfwClass) {
+    extern void register_glfw_natives(JNIEnv * env, jclass glfwClass);
     register_glfw_natives(env, glfwClass);
 }
 
 void register_sk_natives_if_needed(void) {
     static BOOL registered = NO;
-    if (registered) return;
-    
+    if (registered)
+        return;
+
     typedef jint (*JNI_GetCreatedJavaVMs_func)(JavaVM **, jsize, jsize *);
     JNI_GetCreatedJavaVMs_func getVMs = NULL;
-    
+
     // Poll until libjvm is loaded and JNI_GetCreatedJavaVMs is available
     while (!getVMs) {
         getVMs = (JNI_GetCreatedJavaVMs_func)dlsym(RTLD_DEFAULT, "JNI_GetCreatedJavaVMs");
-        if (!getVMs) usleep(10000);
+        if (!getVMs)
+            usleep(10000);
     }
-    
+
     JavaVM *jvm = NULL;
     jsize count = 0;
-    
+
     // Poll until JVM is fully created
     while (count == 0 || jvm == NULL) {
         getVMs(&jvm, 1, &count);
-        if (count == 0 || jvm == NULL) usleep(10000);
+        if (count == 0 || jvm == NULL)
+            usleep(10000);
     }
-    
+
     JNIEnv *env = NULL;
     if ((*jvm)->AttachCurrentThread(jvm, &env, NULL) != JNI_OK) {
         NSLog(@"[JavaLauncher] Failed to attach thread for JNI registration");
         return;
     }
-    
+
     if (env) {
         jclass cls = NULL;
         // Poll until SkBootstrap is loaded by the classloader
@@ -307,18 +320,23 @@ void register_sk_natives_if_needed(void) {
                 usleep(10000);
             }
         }
-        
+
         JNINativeMethod methods[] = {
-            {"nativeLaunchStatus", "(Ljava/lang/String;)V", (void *)&Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeLaunchStatus},
-            {"nativeSteamKeepAlive", "(Z)V", (void *)&Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeSteamKeepAlive},
-            {"nativePromptDeviceCode", "(Z)Ljava/lang/String;", (void *)&Java_com_skarm_launcher_bootstrap_SkBootstrap_nativePromptDeviceCode},
-            {"nativePromptEmailCode", "(Ljava/lang/String;Z)Ljava/lang/String;", (void *)&Java_com_skarm_launcher_bootstrap_SkBootstrap_nativePromptEmailCode},
-            {"registerGlfwNatives", "(Ljava/lang/Class;)V", (void *)&Java_com_skarm_launcher_bootstrap_SkBootstrap_registerGlfwNatives},
+            {"nativeLaunchStatus", "(Ljava/lang/String;)V",
+             (void *)&Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeLaunchStatus},
+            {"nativeSteamKeepAlive", "(Z)V",
+             (void *)&Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeSteamKeepAlive},
+            {"nativePromptDeviceCode", "(Z)Ljava/lang/String;",
+             (void *)&Java_com_skarm_launcher_bootstrap_SkBootstrap_nativePromptDeviceCode},
+            {"nativePromptEmailCode", "(Ljava/lang/String;Z)Ljava/lang/String;",
+             (void *)&Java_com_skarm_launcher_bootstrap_SkBootstrap_nativePromptEmailCode},
+            {"registerGlfwNatives", "(Ljava/lang/Class;)V",
+             (void *)&Java_com_skarm_launcher_bootstrap_SkBootstrap_registerGlfwNatives},
         };
-        (*env)->RegisterNatives(env, cls, methods, sizeof(methods)/sizeof(methods[0]));
+        (*env)->RegisterNatives(env, cls, methods, sizeof(methods) / sizeof(methods[0]));
         registered = YES;
         NSLog(@"[JavaLauncher] Successfully registered JNI natives for SkBootstrap!");
-        
+
         // Force load libawt_headless and libprefs into the Bootstrap ClassLoader
         // By calling System.loadLibrary from JNI, Reflection.getCallerClass() is null,
         // which makes it use the Bootstrap ClassLoader. This fixes the iOS two-level
@@ -345,8 +363,7 @@ void register_sk_natives_if_needed(void) {
                 NSLog(@"[JavaLauncher] Pre-loaded awt_headless and prefs into Bootstrap ClassLoader");
             }
         }
-        
+
         (*jvm)->DetachCurrentThread(jvm);
     }
 }
-

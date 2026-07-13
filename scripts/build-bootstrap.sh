@@ -13,12 +13,18 @@ BUILD_DIR="$OUT_DIR/classes"
 
 # getdown-pro.jar is needed at compile time (SkBootstrap references it)
 GETDOWN_JAR="${GETDOWN_JAR:-$REPO_ROOT/assets/getdown-pro.jar}"
-[[ -f "$GETDOWN_JAR" ]] || { echo "ERROR: getdown-pro.jar not found at $GETDOWN_JAR" >&2; exit 1; }
+[[ -f "$GETDOWN_JAR" ]] || {
+                             echo "ERROR: getdown-pro.jar not found at $GETDOWN_JAR" >&2
+                                                                                          exit 1
+}
 
 JAVA_BIN="${JAVA_HOME:+$JAVA_HOME/bin/}javac"
 JAR_BIN="${JAVA_HOME:+$JAVA_HOME/bin/}jar"
 
-command -v "$JAVA_BIN" >/dev/null 2>&1 || { echo "ERROR: javac not found" >&2; exit 1; }
+command -v "$JAVA_BIN" > /dev/null 2>&1 || {
+                                            echo "ERROR: javac not found" >&2
+                                                                               exit 1
+}
 
 echo "Compiling bootstrap Java source…"
 rm -rf "$BUILD_DIR"

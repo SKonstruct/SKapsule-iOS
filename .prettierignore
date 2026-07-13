@@ -1,0 +1,19 @@
+# Submodules and external code to exclude
+external/
+
+# Build and artifact outputs
+out/
+build/
+Natives/build/
+Natives/build_xcode/
+SKapsule.xcodeproj/
+
+# Binary assets
+*.zip
+*.jar
+*.png
+*.ttf
+
+# Plist and Xcode specific structures
+Natives/Info.plist
+Natives/Assets.xcassets/

@@ -10,6 +10,7 @@
 ## Current State Summary
 
 All critical startup/rendering issues and font crashes have been resolved:
+
 - **Font NPE Fixed**: The application now successfully runs with `CTCFontManager` enabled, and all custom log outputs reach the Xcode console properly.
 - **Render Thread SIGSEGV Fixed**: Resolved the `GLRResourceList::addResource` crash by dynamically binding the custom `gFramebuffer` on the render thread context and using it as the default target in `gl4es`.
 - **Installer Caching Fixed**: `SKInstaller` is now version-aware, correctly re-staging updated JARs to the device documents container on every new build.
@@ -45,15 +46,25 @@ All critical startup/rendering issues and font crashes have been resolved:
 ## Completed Tickets ✅
 
 ### ~~TICKET 1-14~~ ✅
+
 ### ~~TICKET 16: Dismiss boot overlay~~ ✅
+
 ### ~~TICKET 17: Add depth+stencil buffer~~ ✅
+
 ### ~~TICKET 19: Fix prefs lock~~ ✅ (partial)
+
 ### ~~TICKET 20: Comment GL-Agent spam~~ ✅
+
 ### ~~TICKET 21: Fix viewport/Retina scaling~~ ✅
+
 ### ~~TICKET 22: Support portrait mode~~ 🚫 (Cancelled)
+
 ### ~~TICKET 18 (revisit): Fix font resolution~~ ✅ (partial — registerFontDir fixed, NPE persists)
+
 ### ~~TICKET 23: Replace app icon~~ ✅
+
 ### ~~TICKET 24: Fix gl4es function lookup regression~~ ✅
+
 ### ~~TICKET 25: Update GitHub Actions workflow~~ ✅
 
 ---
@@ -102,6 +113,7 @@ public class CTCFontConfiguration extends FontConfiguration {
 Then update `CTCFontManager.createFontConfiguration()` to return `new CTCFontConfiguration(this)`.
 
 After either fix, **rebuild cacio**:
+
 ```bash
 ./scripts/build-cacio-ios.sh
 ```
@@ -123,6 +135,7 @@ After either fix, **rebuild cacio**:
 #### Problem
 
 The log says:
+
 ```
 Framebuffer incomplete. [status=36061, color?=true, depth?=false, depthBits?=true, stencil?=true]
 ```
@@ -134,6 +147,7 @@ Status 36061 = `GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT` (0x8CD6). The depth render
 The issue might be that `viewDidLayoutSubviews` (which recreates the depth buffer) runs at a point where the GL context isn't the game's current context. The fix is to ensure the framebuffer with its depth attachment is fully set up before the game starts GL operations.
 
 Verify that in `viewDidLayoutSubviews`, the framebuffer attachments are being bound correctly:
+
 1. `glBindFramebuffer(GL_FRAMEBUFFER, gFramebuffer)` should be called
 2. After resizing the depth renderbuffer, it should be re-attached to the framebuffer
 
@@ -233,6 +247,7 @@ The `awt_stubs.c` file is compiled into `libawt_headless.dylib` which **replaces
 When the JVM resolves these JNI symbols via `dlsym(RTLD_DEFAULT, ...)`, it finds the stub versions first. Without rendering loops, `GraphicsPrimitiveMgr.locatePrim()` returns `null` → `InternalError`.
 
 **Evidence**:
+
 ```
 $ nm -g libawt.dylib | grep registerNativeLoops
 0000000000020738 T _Java_sun_java2d_loops_GraphicsPrimitiveMgr_registerNativeLoops
@@ -248,6 +263,7 @@ The real `libawt_headless.dylib` only exports 4 symbols: `Font_initIDs`, `FontDe
 Strip `awt_stubs.c` down to ONLY the symbols that the real `libawt_headless.dylib` provides (font and printing stubs), plus the AccelGlyphCache and CFontManager stubs needed by `libfontmanager.dylib`.
 
 **Remove ALL of these** from `awt_stubs.c`:
+
 - `STUB_INIT_IDS(java_awt_AWTEvent)`
 - `STUB_INIT_IDS(java_awt_Toolkit)`
 - `STUB_INIT_IDS(java_awt_Dimension)`
@@ -281,6 +297,7 @@ Strip `awt_stubs.c` down to ONLY the symbols that the real `libawt_headless.dyli
 - `GraphicsPrimitiveMgr_registerNativeLoops` stub
 
 **Keep ONLY**:
+
 - `STUB_INIT_IDS(java_awt_Font)` — matches real libawt_headless
 - `STUB_INIT_IDS(sun_awt_FontDescriptor)` — matches real libawt_headless
 - `STUB_INIT_IDS(sun_awt_PlatformFont)` — matches real libawt_headless
@@ -308,12 +325,14 @@ Strip `awt_stubs.c` down to ONLY the symbols that the real `libawt_headless.dyli
 Ticket 31 stripped `awt_stubs.c` too aggressively. Some `initIDs` functions are NOT in `libawt.dylib` — they're provided by platform-specific backends (`libawt_xawt.dylib` on Linux, Cocoa backend on macOS). On iOS there's no platform backend, so these need empty stubs.
 
 The error:
+
 ```
 UnsatisfiedLinkError: 'void java.awt.Component.initIDs()'
   at Knight.<clinit> → Component.<clinit> → Component.initIDs()
 ```
 
 Also:
+
 ```
 UnsatisfiedLinkError: 'void java.awt.AWTEvent.initIDs()'
   at AWT-Shutdown thread
@@ -322,6 +341,7 @@ UnsatisfiedLinkError: 'void java.awt.AWTEvent.initIDs()'
 #### Solution
 
 **Add back stubs for these symbols** (NOT in `libawt.dylib` or `libawt_headless.dylib`):
+
 ```c
 STUB_INIT_IDS(java_awt_AWTEvent)
 STUB_INIT_IDS(java_awt_Insets)
@@ -340,6 +360,7 @@ STUB_INIT_IDS(java_awt_event_KeyEvent)
 ```
 
 **Do NOT add back** (these ARE in `libawt.dylib` — stubs would shadow real implementations):
+
 - `Toolkit_initIDs`, `Dimension_initIDs`, `FontMetrics_initIDs`, `MouseEvent_initIDs`
 - `ColorModel_initIDs`, `BufferedImage_initIDs`, `Raster_initIDs`, `SampleModel_initIDs`, `SinglePixelPackedSampleModel_initIDs`
 - `IntegerComponentRaster_initIDs`, `SurfaceData_initIDs`, `SpanClipRenderer_initIDs`, `Region_initIDs`
@@ -365,6 +386,7 @@ STUB_INIT_IDS(java_awt_event_KeyEvent)
 `showSteamGuardPromptWithTitle:message:` is called from the `promptDeviceCodeHandler` block, which `NativeBridge` dispatches to the main queue. Inside that method, it dispatches ANOTHER block to the main queue (to present the alert), then calls `dispatch_semaphore_wait` — blocking the main thread. The alert presentation block is queued behind the blocked main thread, so it never executes. Classic deadlock.
 
 Deadlock chain:
+
 ```
 Main thread:
   dispatch_async(main_queue, promptDeviceCodeHandler)  // runs on main
@@ -407,6 +429,7 @@ Since `showSteamGuardPromptWithTitle:` is already called on the main thread (fro
 Also change the handler block signatures from `^NSString *(...)` to `^void(...)` since the method no longer returns a value — the code is delivered asynchronously via `submitCode:`.
 
 Update `NativeBridge.h` handler typedefs:
+
 ```objc
 typedef void (^SKPromptDeviceCodeBlock)(BOOL prevWrong);
 typedef void (^SKPromptEmailCodeBlock)(NSString *email, BOOL prevWrong);
@@ -502,6 +525,7 @@ public CTCFontManager() {
 ```
 
 AND create `assets/fonts/fonts.dir` so `registerFontDir()` has something to parse:
+
 ```
 12
 DejaVuSans.ttf -dejavu-sans-book-r-normal--0-0-0-0-p-0-iso10646-1
@@ -558,9 +582,11 @@ public sun.font.Font2D findFont2D(String name, int style, int fallback) {
 **Files to modify**: [glfw_ios.m](file:///Users/rayhan/Documents/GitHub/SKapsule-iOS/Natives/glfw_ios.m)
 
 #### Solution
+
 Re-bind the OpenGL ES framebuffer and re-attach the depth/stencil renderbuffer inside the render thread's context in `nativeMakeContextCurrent` right after `[EAGLContext setCurrentContext:gEAGLContext]`.
 
 #### Acceptance Criteria
+
 - [x] Re-bind framebuffer and re-attach depth/stencil renderbuffer in `nativeMakeContextCurrent`
 - [ ] No `Framebuffer incomplete` warning in logs
 - [ ] `depth?=true` when status is checked
@@ -574,11 +600,13 @@ Re-bind the OpenGL ES framebuffer and re-attach the depth/stencil renderbuffer i
 **Files to modify**: [glfw_ios.m](file:///Users/rayhan/Documents/GitHub/SKapsule-iOS/Natives/glfw_ios.m), [GameViewController.m](file:///Users/rayhan/Documents/GitHub/SKapsule-iOS/Natives/GameViewController.m), [GLFW.java](file:///Users/rayhan/Documents/GitHub/SKapsule-iOS/external/bootstrap/src/main/java/org/lwjgl/glfw/GLFW.java)
 
 #### Solution
+
 - Implement a thread-safe touch event ring buffer in `glfw_ios.m`.
 - Override touch methods in `GameViewController.m` to push mouse position and click events to the buffer (mapping UIKit touch coordinates to framebuffer pixels).
 - Implement `nativeDrainInput()` in `glfw_ios.m` to poll and trigger GLFW callbacks on the JVM thread.
 
 #### Acceptance Criteria
+
 - [ ] Implement input ring buffer in `glfw_ios.m`
 - [ ] Touch events mapped and pushed from `GameViewController.m`
 - [ ] JVM thread processes touches correctly via `glfwPollEvents()`
@@ -591,9 +619,11 @@ Re-bind the OpenGL ES framebuffer and re-attach the depth/stencil renderbuffer i
 **Difficulty**: Medium
 
 #### Solution
+
 Test Frenchpress launcher mode with credentials and verify that Steam Guard prompts (TOTP / Email) correctly present themselves and resume the game thread asynchronously.
 
 #### Acceptance Criteria
+
 - [ ] Steam login succeeds using valid credentials
 - [ ] Steam Guard prompt displays, submits successfully, and resumes the JVM
 
@@ -868,6 +898,7 @@ In `CTCFontConfiguration.java`, replace every `System.out.println` with `System.
 Add `System.err.println` logging at these critical points:
 
 a) In `CTCFontConfiguration` constructor — log whether `init()` succeeded and what `fontConfigFile` was found:
+
 ```java
 public CTCFontConfiguration(SunFontManager fm) {
     super(fm);
@@ -880,6 +911,7 @@ public CTCFontConfiguration(SunFontManager fm) {
 ```
 
 b) Override `getVersion()` to log whether the internal tables were populated:
+
 ```java
 @Override
 public String getVersion() {
@@ -889,6 +921,7 @@ public String getVersion() {
 ```
 
 c) In `mapFileName` — log each call to verify path resolution:
+
 ```java
 @Override
 protected String mapFileName(String fileName) {
@@ -963,6 +996,7 @@ protected void registerFontDir(String path) {
 ```
 
 And call it explicitly by adding to the CTCFontManager constructor or init path:
+
 ```java
 registerFontDir(System.getProperty("java.home") + "/lib/fonts");
 ```
@@ -994,16 +1028,17 @@ This makes `registerFontDir()` read `fonts.dir`, populate `fontNameMap`, and ens
 Deploy to device via Xcode (clean install — delete app first). Check Xcode console for `[CTCFontConfig]` and `[CTCFontManager]` stderr output.
 
 #### Expected outcomes:
+
 - If `fonts.dir` + forced `registerFontDir` works → Font NPE is fixed, login screen renders
 - If it doesn't → the `System.err` diagnostic logging will show EXACTLY where the chain breaks
 
 ### Round 17 (June 30, Gemini)
 
 - ✅ **Ticket 34 (Reopened)**: Addressed the Font NullPointerException using the three-pronged approach:
-  - Switched all `System.out.println` debug outputs to `System.err.println` in `CTCFontConfiguration` so that logs correctly route to the Xcode console on iOS.
-  - Implemented an explicit constructor override in `CTCFontManager.java` to force the invocation of `registerFontDir()` for the JRE font directory (bypassing the Linux-only restriction inside `SunFontManager.java`'s constructor).
-  - Created a new `fonts.dir` mapping file inside `assets/fonts/` and updated `scripts/stage-app-assets.sh` to stage it alongside the `.ttf` font files in the device bundle.
-  - Overrode `findFont2D()` inside `CTCFontManager.java` to return a safe physical font fallback (`DejaVu Sans`) instead of `null` if composite font resolution fails, preventing crashes.
+    - Switched all `System.out.println` debug outputs to `System.err.println` in `CTCFontConfiguration` so that logs correctly route to the Xcode console on iOS.
+    - Implemented an explicit constructor override in `CTCFontManager.java` to force the invocation of `registerFontDir()` for the JRE font directory (bypassing the Linux-only restriction inside `SunFontManager.java`'s constructor).
+    - Created a new `fonts.dir` mapping file inside `assets/fonts/` and updated `scripts/stage-app-assets.sh` to stage it alongside the `.ttf` font files in the device bundle.
+    - Overrode `findFont2D()` inside `CTCFontManager.java` to return a safe physical font fallback (`DejaVu Sans`) instead of `null` if composite font resolution fails, preventing crashes.
 - ✅ Recompiled Cacio and rebuilt payload via `make payload`. Checked staging output to verify `fonts.dir` deployment.
 
 ### Round 18 (July 05, Gemini)
@@ -1012,16 +1047,9 @@ Deploy to device via Xcode (clean install — delete app first). Check Xcode con
 - ✅ **NPE in CTCFontManager Fixed**: Added a null-safety check for `fontConfigDirs` inside `CTCFontManager.addFontToPlatformFontPath()` to prevent a startup `NullPointerException` (since `fontConfigDirs` resolves to `null` due to empty `awtfontpath` properties on iOS).
 - ✅ **Version-Aware Installer Staging Fix**: Modified `SKInstaller.m` to write the build version and commit hash to `.skapsule_installed_v2` and compare it on launch. This guarantees that new JAR updates inside the app bundle (like the Cacio NPE fix) are automatically re-staged on the next launch rather than being skipped/ignored due to installer caching.
 - ✅ **SIGSEGV Crash Fix (Render Thread)**: Fixed a SIGSEGV crash inside `GLRResourceList::addResource` (Metal translation layer for OpenGL ES on iOS) occurring when `glClear` or draw commands were executed on an unattached FBO 0.
-  - Updated `nativeMakeContextCurrent` (`glfw_ios.m`) to dynamically resolve `glBindFramebuffer` from the native `OpenGLES` framework and bind `gFramebuffer` to the thread context prior to gl4es initialization.
-  - Modified `glstate.c` in `gl4es` to query the currently bound `GL_FRAMEBUFFER_BINDING` on initialization and set `mainfbo_fbo` to it, ensuring gl4es correctly redirects FBO 0 draw/clear calls to our custom EAGL-backed framebuffer.
+    - Updated `nativeMakeContextCurrent` (`glfw_ios.m`) to dynamically resolve `glBindFramebuffer` from the native `OpenGLES` framework and bind `gFramebuffer` to the thread context prior to gl4es initialization.
+    - Modified `glstate.c` in `gl4es` to query the currently bound `GL_FRAMEBUFFER_BINDING` on initialization and set `mainfbo_fbo` to it, ensuring gl4es correctly redirects FBO 0 draw/clear calls to our custom EAGL-backed framebuffer.
 - ✅ **glGetUniformLocation/glGetAttribLocation Null Crash Fix**: Added null checks for the `name` argument inside `gl4es_glGetUniformLocation()` and `gl4es_glGetAttribLocation()` inside `program.c` (`gl4es`) to prevent SIGSEGV crashes when uniform/attribute locations are queried with a `NULL` name.
-  - Adjusted null check placement to be at the very top of both functions, before the `DBG` logging macros are executed. This prevents `printf` from dereferencing `NULL` names and corrupting the print/heap buffer.
+    - Adjusted null check placement to be at the very top of both functions, before the `DBG` logging macros are executed. This prevents `printf` from dereferencing `NULL` names and corrupting the print/heap buffer.
 - ✅ **Malloc Free/Heap Corruption Fix**: Updated `nativeMakeContextCurrent` (`glfw_ios.m`) to cache the dynamically resolved `glBindFramebuffer` function pointer using a static `dispatch_once` block and removed the `dlclose()` call on the system OpenGLES framework. This prevents library unmapping/refcount anomalies that cause malloc zone allocator corruption (`EXC_BREAKPOINT` in `_xzm_xzone_malloc_freelist_outlined`) during subsequent class loading.
 - ✅ Recompiled gl4es, rebuilt native target, and packaged IPA via `make package`.
-
-
-
-
-
-
-

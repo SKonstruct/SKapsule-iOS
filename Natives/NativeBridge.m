@@ -34,7 +34,7 @@ static NSString *_submittedCode = nil;
     NSLog(@"[NativeBridge] launchStatus: %@", message);
     if (_bootStatusHandler) {
         dispatch_async(dispatch_get_main_queue(), ^{
-            _bootStatusHandler(message);
+          _bootStatusHandler(message);
         });
     }
 }
@@ -43,17 +43,18 @@ static NSString *_submittedCode = nil;
     NSLog(@"[NativeBridge] renderReady");
     if (_renderReadyHandler) {
         dispatch_async(dispatch_get_main_queue(), ^{
-            _renderReadyHandler();
+          _renderReadyHandler();
         });
     }
 }
 
 + (NSString *)promptForDeviceCode:(BOOL)prevWrong {
-    if (!_promptDeviceCodeHandler) return @"";
+    if (!_promptDeviceCodeHandler)
+        return @"";
 
     // Dispatch the prompt to the UI thread
     dispatch_async(dispatch_get_main_queue(), ^{
-        _promptDeviceCodeHandler(prevWrong);
+      _promptDeviceCodeHandler(prevWrong);
     });
 
     // Block the JVM thread until submitCode is called
@@ -61,10 +62,11 @@ static NSString *_submittedCode = nil;
 }
 
 + (NSString *)promptForEmailCode:(NSString *)email prevWrong:(BOOL)prevWrong {
-    if (!_promptEmailCodeHandler) return @"";
+    if (!_promptEmailCodeHandler)
+        return @"";
 
     dispatch_async(dispatch_get_main_queue(), ^{
-        _promptEmailCodeHandler(email, prevWrong);
+      _promptEmailCodeHandler(email, prevWrong);
     });
 
     return [self awaitCode];

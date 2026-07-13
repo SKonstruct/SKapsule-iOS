@@ -6,14 +6,14 @@
 
 #include <dlfcn.h>
 #include <fcntl.h>
-#include <sys/stat.h>
-#include <sys/mman.h>
-#include <mach-o/loader.h>
-#include <mach-o/nlist.h>
+#include <libkern/OSCacheControl.h>
 #include <mach-o/dyld.h>
 #include <mach-o/dyld_images.h>
+#include <mach-o/loader.h>
+#include <mach-o/nlist.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
 #include <sys/syscall.h>
-#include <libkern/OSCacheControl.h>
 
 #include "utils.h"
 
@@ -29,13 +29,8 @@ void init_bypassDyldLibValidation(void) {
 #define ASM(...) __asm__(#__VA_ARGS__)
 
 // ldr x8, value; br x8; value: .ascii "\x41\x42\x43\x44\x45\x46\x47\x48"
-static char patch[] = {
-    0x88,0x00,0x00,0x58,
-    0x00,0x01,0x1f,0xd6,
-    0x1f,0x20,0x03,0xd5,
-    0x1f,0x20,0x03,0xd5,
-    0x41,0x41,0x41,0x41,0x41,0x41,0x41,0x41
-};
+static char patch[] = {0x88, 0x00, 0x00, 0x58, 0x00, 0x01, 0x1f, 0xd6, 0x1f, 0x20, 0x03, 0xd5,
+                       0x1f, 0x20, 0x03, 0xd5, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41};
 
 // Signatures to search for in dyld
 static char mmapSig[] = {0xB0, 0x18, 0x80, 0xD2, 0x01, 0x10, 0x00, 0xD4};
@@ -52,17 +47,13 @@ static void builtin_memcpy(char *target, char *source, size_t size) {
     }
 }
 
-kern_return_t builtin_vm_protect(mach_port_name_t task, mach_vm_address_t address,
-    mach_vm_size_t size, boolean_t set_max, vm_prot_t new_prot);
-ASM(_builtin_vm_protect: \n
-    mov x16, #-0xe       \n
-    svc #0x80            \n
-    ret
-);
+kern_return_t builtin_vm_protect(mach_port_name_t task, mach_vm_address_t address, mach_vm_size_t size,
+                                 boolean_t set_max, vm_prot_t new_prot);
+ASM(_builtin_vm_protect : \n mov x16, # - 0xe       \n svc #0x80            \n ret);
 
 static bool redirectFunction(char *name, void *patchAddr, void *target) {
-    kern_return_t kret = builtin_vm_protect(mach_task_self(), (vm_address_t)patchAddr,
-        sizeof(patch), false, PROT_READ | PROT_WRITE | VM_PROT_COPY);
+    kern_return_t kret = builtin_vm_protect(mach_task_self(), (vm_address_t)patchAddr, sizeof(patch), false,
+                                            PROT_READ | PROT_WRITE | VM_PROT_COPY);
     if (kret != KERN_SUCCESS) {
         NSLog(@"[DyldLVBypass] vm_protect(RW) failed for %s", name);
         return false;
@@ -72,8 +63,7 @@ static bool redirectFunction(char *name, void *patchAddr, void *target) {
     *(void **)((char *)patchAddr + 16) = target;
     sys_icache_invalidate((void *)patchAddr, sizeof(patch));
 
-    kret = builtin_vm_protect(mach_task_self(), (vm_address_t)patchAddr,
-        sizeof(patch), false, PROT_READ | PROT_EXEC);
+    kret = builtin_vm_protect(mach_task_self(), (vm_address_t)patchAddr, sizeof(patch), false, PROT_READ | PROT_EXEC);
     if (kret != KERN_SUCCESS) {
         NSLog(@"[DyldLVBypass] vm_protect(RX) failed for %s", name);
         return false;
@@ -105,12 +95,11 @@ static void *getDyldBase(void) {
     struct task_dyld_info dyld_info;
     mach_msg_type_number_t count = TASK_DYLD_INFO_COUNT;
 
-    kern_return_t ret = task_info(mach_task_self_,
-        TASK_DYLD_INFO, (task_info_t)&dyld_info, &count);
-    if (ret != KERN_SUCCESS) return NULL;
+    kern_return_t ret = task_info(mach_task_self_, TASK_DYLD_INFO, (task_info_t)&dyld_info, &count);
+    if (ret != KERN_SUCCESS)
+        return NULL;
 
-    struct dyld_all_image_infos *infos =
-        (struct dyld_all_image_infos *)dyld_info.all_image_info_addr;
+    struct dyld_all_image_infos *infos = (struct dyld_all_image_infos *)dyld_info.all_image_info_addr;
     return (void *)infos->dyldImageLoadAddress;
 }
 
@@ -153,7 +142,8 @@ static int hooked_fcntl(int fildes, int cmd, void *param) {
 
 void init_bypassDyldLibValidation(void) {
     static BOOL bypassed;
-    if (bypassed) return;
+    if (bypassed)
+        return;
     bypassed = YES;
 
     NSLog(@"[DyldLVBypass] init");
@@ -197,4 +187,4 @@ void init_bypassDyldLibValidation(void) {
     }
 }
 
-#endif // TARGET_OS_SIMULATOR
+#endif  // TARGET_OS_SIMULATOR

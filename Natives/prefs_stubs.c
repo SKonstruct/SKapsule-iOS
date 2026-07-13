@@ -1,12 +1,14 @@
-#include "jni.h"
-#include <stdio.h>
-#include <sys/file.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <stdio.h>
+#include <sys/file.h>
 #include <unistd.h>
 
-JNIEXPORT jintArray JNICALL Java_java_util_prefs_FileSystemPreferences_lockFile0(
-    JNIEnv *env, jclass cls, jstring pathObj, jint perm, jboolean shared) {
+#include "jni.h"
+
+JNIEXPORT jintArray JNICALL Java_java_util_prefs_FileSystemPreferences_lockFile0(JNIEnv *env, jclass cls,
+                                                                                 jstring pathObj, jint perm,
+                                                                                 jboolean shared) {
     const char *path = (*env)->GetStringUTFChars(env, pathObj, NULL);
     int fd = open(path, O_RDWR | O_CREAT, perm);
     (*env)->ReleaseStringUTFChars(env, pathObj, path);
@@ -25,8 +27,8 @@ JNIEXPORT jintArray JNICALL Java_java_util_prefs_FileSystemPreferences_lockFile0
 }
 
 // unlockFile0
-JNIEXPORT jint JNICALL Java_java_util_prefs_FileSystemPreferences_unlockFile0(
-    JNIEnv *env, jclass cls, jint lockHandle) {
+JNIEXPORT jint JNICALL Java_java_util_prefs_FileSystemPreferences_unlockFile0(JNIEnv *env, jclass cls,
+                                                                              jint lockHandle) {
     if (lockHandle > 0) {
         flock(lockHandle, LOCK_UN);
         close(lockHandle);
@@ -35,7 +37,7 @@ JNIEXPORT jint JNICALL Java_java_util_prefs_FileSystemPreferences_unlockFile0(
 }
 
 // chmod — set file permissions (no-op on iOS)
-JNIEXPORT jint JNICALL Java_java_util_prefs_FileSystemPreferences_chmod(
-    JNIEnv *env, jclass cls, jstring path, jint mode) {
+JNIEXPORT jint JNICALL Java_java_util_prefs_FileSystemPreferences_chmod(JNIEnv *env, jclass cls, jstring path,
+                                                                        jint mode) {
     return 0;
 }

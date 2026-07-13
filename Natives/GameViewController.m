@@ -5,10 +5,10 @@
 #import "SKInstaller.h"
 #import "utils.h"
 
-#import <QuartzCore/QuartzCore.h>
 #import <OpenGLES/EAGL.h>
 #import <OpenGLES/ES2/gl.h>
 #import <OpenGLES/ES2/glext.h>
+#import <QuartzCore/QuartzCore.h>
 
 EAGLContext *gEAGLContext = nil;
 CAEAGLLayer *gEAGLLayer = nil;
@@ -19,7 +19,9 @@ GLuint gDepthRenderbuffer = 0;
 @interface EAGLView : UIView
 @end
 @implementation EAGLView
-+ (Class)layerClass { return [CAEAGLLayer class]; }
++ (Class)layerClass {
+    return [CAEAGLLayer class];
+}
 @end
 
 typedef NS_ENUM(NSInteger, SKLoginMode);
@@ -40,17 +42,15 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
 
     // GL surface
     self.surfaceView = [[EAGLView alloc] initWithFrame:self.view.bounds];
-    self.surfaceView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    self.surfaceView.autoresizingMask = UIViewAutoresizingNone;
     self.surfaceView.backgroundColor = UIColor.blackColor;
     [self.view addSubview:self.surfaceView];
 
     gEAGLLayer = (CAEAGLLayer *)self.surfaceView.layer;
     gEAGLLayer.opaque = YES;
     gEAGLLayer.contentsScale = UIScreen.mainScreen.scale;
-    gEAGLLayer.drawableProperties = @{
-        kEAGLDrawablePropertyRetainedBacking: @(NO),
-        kEAGLDrawablePropertyColorFormat: kEAGLColorFormatRGBA8
-    };
+    gEAGLLayer.drawableProperties =
+        @{kEAGLDrawablePropertyRetainedBacking: @(NO), kEAGLDrawablePropertyColorFormat: kEAGLColorFormatRGBA8};
 
     gEAGLContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES3];
     if (!gEAGLContext) {
@@ -67,12 +67,12 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, gRenderbuffer);
 
     glGenRenderbuffers(1, &gDepthRenderbuffer);
-    
+
     GLint width, height;
     glBindRenderbuffer(GL_RENDERBUFFER, gRenderbuffer);
     glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_WIDTH, &width);
     glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_HEIGHT, &height);
-    
+
     glBindRenderbuffer(GL_RENDERBUFFER, gDepthRenderbuffer);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8_OES, width, height);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, gDepthRenderbuffer);
@@ -95,8 +95,7 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
     self.bootStatus.translatesAutoresizingMaskIntoConstraints = NO;
     [self.bootOverlay addSubview:self.bootStatus];
 
-    self.spinner = [[UIActivityIndicatorView alloc]
-        initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleLarge];
+    self.spinner = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleLarge];
     self.spinner.color = UIColor.whiteColor;
     self.spinner.translatesAutoresizingMaskIntoConstraints = NO;
     [self.spinner startAnimating];
@@ -115,61 +114,79 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
     __weak typeof(self) weakSelf = self;
 
     [SKNativeBridge setBootStatusHandler:^(NSString *message) {
-        weakSelf.bootStatus.text = message;
+      weakSelf.bootStatus.text = message;
     }];
 
     [SKNativeBridge setRenderReadyHandler:^{
-        [UIApplication sharedApplication].idleTimerDisabled = YES;
-        [UIView animateWithDuration:0.3 animations:^{
+      [UIApplication sharedApplication].idleTimerDisabled = YES;
+      [UIView animateWithDuration:0.3
+          animations:^{
             weakSelf.bootOverlay.alpha = 0;
-        } completion:^(BOOL finished) {
+          }
+          completion:^(BOOL finished) {
             [weakSelf.bootOverlay removeFromSuperview];
-        }];
+          }];
     }];
 
     [SKNativeBridge setPromptDeviceCodeHandler:^(BOOL prevWrong) {
-        [weakSelf showSteamGuardPromptWithTitle:@"Steam Guard"
-            message:prevWrong
-                ? @"Incorrect code. Enter your Steam Guard authenticator code:"
-                : @"Enter your Steam Guard authenticator code:"];
+      [weakSelf showSteamGuardPromptWithTitle:@"Steam Guard"
+                                      message:prevWrong ? @"Incorrect code. Enter your Steam Guard authenticator code:"
+                                                        : @"Enter your Steam Guard authenticator code:"];
     }];
 
     [SKNativeBridge setPromptEmailCodeHandler:^(NSString *email, BOOL prevWrong) {
-        NSString *msg = prevWrong
-            ? [NSString stringWithFormat:@"Incorrect code. Enter the code sent to %@:", email]
-            : [NSString stringWithFormat:@"Enter the Steam Guard code sent to %@:", email];
-        [weakSelf showSteamGuardPromptWithTitle:@"Steam Guard (Email)" message:msg];
+      NSString *msg = prevWrong ? [NSString stringWithFormat:@"Incorrect code. Enter the code sent to %@:", email]
+                                : [NSString stringWithFormat:@"Enter the Steam Guard code sent to %@:", email];
+      [weakSelf showSteamGuardPromptWithTitle:@"Steam Guard (Email)" message:msg];
     }];
 }
 
 // Steam Guard prompt: alerts on main thread and submits asynchronously
 - (void)showSteamGuardPromptWithTitle:(NSString *)title message:(NSString *)message {
-    UIAlertController *alert = [UIAlertController
-        alertControllerWithTitle:title message:message
-        preferredStyle:UIAlertControllerStyleAlert];
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:title
+                                                                   message:message
+                                                            preferredStyle:UIAlertControllerStyleAlert];
 
     [alert addTextFieldWithConfigurationHandler:^(UITextField *tf) {
-        tf.placeholder = @"Code";
-        tf.keyboardType = UIKeyboardTypeNumberPad;
-        tf.autocorrectionType = UITextAutocorrectionTypeNo;
+      tf.placeholder = @"Code";
+      tf.keyboardType = UIKeyboardTypeNumberPad;
+      tf.autocorrectionType = UITextAutocorrectionTypeNo;
     }];
 
-    [alert addAction:[UIAlertAction actionWithTitle:@"Submit" style:UIAlertActionStyleDefault
-        handler:^(UIAlertAction *action) {
-            NSString *code = alert.textFields.firstObject.text ?: @"";
-            [SKNativeBridge submitCode:code];
-        }]];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Submit"
+                                              style:UIAlertActionStyleDefault
+                                            handler:^(UIAlertAction *action) {
+                                              NSString *code = alert.textFields.firstObject.text ?: @"";
+                                              [SKNativeBridge submitCode:code];
+                                            }]];
 
-    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel
-        handler:^(UIAlertAction *action) {
-            [SKNativeBridge submitCode:@""];
-        }]];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel"
+                                              style:UIAlertActionStyleCancel
+                                            handler:^(UIAlertAction *action) {
+                                              [SKNativeBridge submitCode:@""];
+                                            }]];
 
     [self presentViewController:alert animated:YES completion:nil];
 }
 
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
+
+    BOOL avoidEdges = YES;
+    id val = [[NSUserDefaults standardUserDefaults] objectForKey:@"avoid_screen_edges"];
+    if (val) {
+        avoidEdges = [val boolValue];
+    }
+
+    CGRect bounds = self.view.bounds;
+    if (avoidEdges) {
+        if (@available(iOS 11.0, *)) {
+            UIEdgeInsets insets = self.view.safeAreaInsets;
+            bounds = UIEdgeInsetsInsetRect(bounds, insets);
+        }
+    }
+    self.surfaceView.frame = bounds;
+
     if (gEAGLContext) {
         [EAGLContext setCurrentContext:gEAGLContext];
         gEAGLLayer.contentsScale = UIScreen.mainScreen.scale;
@@ -181,7 +198,7 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
             GLint width, height;
             glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_WIDTH, &width);
             glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_HEIGHT, &height);
-            
+
             glBindRenderbuffer(GL_RENDERBUFFER, gDepthRenderbuffer);
             glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8_OES, width, height);
             glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, gDepthRenderbuffer);
@@ -205,21 +222,19 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
 }
 
 - (void)startJVM {
-    BOOL isSteam = (self.loginMode == 1); // SKLoginModeSteam
+    BOOL isSteam = (self.loginMode == 1);  // SKLoginModeSteam
     CGSize screenSize = self.view.bounds.size;
     CGFloat scale = UIScreen.mainScreen.scale;
     int w = (int)(screenSize.width * scale);
     int h = (int)(screenSize.height * scale);
 
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        int ret = launchJVM(self.steamUser ?: @"",
-                            self.steamPass ?: @"",
-                            isSteam, w, h);
-        NSLog(@"[GameVC] JVM exited with code %d", ret);
-        dispatch_async(dispatch_get_main_queue(), ^{
-            self.bootStatus.text = [NSString stringWithFormat:@"JVM exited (code %d)", ret];
-            [self.spinner stopAnimating];
-        });
+      int ret = launchJVM(self.steamUser ?: @"", self.steamPass ?: @"", isSteam, w, h);
+      NSLog(@"[GameVC] JVM exited with code %d", ret);
+      dispatch_async(dispatch_get_main_queue(), ^{
+        self.bootStatus.text = [NSString stringWithFormat:@"JVM exited (code %d)", ret];
+        [self.spinner stopAnimating];
+      });
     });
 }
 

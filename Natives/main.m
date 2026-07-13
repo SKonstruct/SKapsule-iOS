@@ -1,11 +1,11 @@
+#import <UIKit/UIKit.h>
 #import <mach-o/dyld.h>
 #import <spawn.h>
 #import <sys/sysctl.h>
-#import <UIKit/UIKit.h>
 
 #import "AppDelegate.h"
-#import "utils.h"
 #import "config.h"
+#import "utils.h"
 
 #include <dirent.h>
 #include <libgen.h>
@@ -15,7 +15,7 @@
 #include <string.h>
 
 #define PT_TRACE_ME 0
-#define PT_DETACH   11
+#define PT_DETACH 11
 int ptrace(int, pid_t, caddr_t, int);
 
 #define fm NSFileManager.defaultManager
@@ -35,12 +35,14 @@ static bool init_checkForJailbreak(void) {
 }
 
 static void init_setupHomeDirectory(void) {
-    setenv("HOME", [fm URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask]
-        .lastObject.path.stringByDeletingLastPathComponent.UTF8String, 1);
+    setenv("HOME",
+           [fm URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask]
+               .lastObject.path.stringByDeletingLastPathComponent.UTF8String,
+           1);
 
     BOOL isNotSandboxed = [@(getenv("HOME")).lastPathComponent isEqualToString:NSUserName()];
-    NSString *homeDir = [NSString stringWithFormat:@"%s/Documents%@", getenv("HOME"),
-        isNotSandboxed ? @"/SKapsule" : @""];
+    NSString *homeDir =
+        [NSString stringWithFormat:@"%s/Documents%@", getenv("HOME"), isNotSandboxed ? @"/SKapsule" : @""];
 
     NSError *error;
     if (![fm fileExistsAtPath:homeDir]) {
@@ -79,25 +81,24 @@ static void __attribute__((unused)) init_redirectStdio(void) {
     dup2(pfd[1], fileno(stderr));
 
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        ssize_t rsize;
-        char buf[2048];
-        while ((rsize = read(pfd[0], buf, sizeof(buf) - 1)) > 0) {
-            if (rsize < 2048) buf[rsize] = '\0';
-            [file writeData:[NSData dataWithBytes:buf length:rsize]];
-            [file synchronizeFile];
-        }
-        [file closeFile];
+      ssize_t rsize;
+      char buf[2048];
+      while ((rsize = read(pfd[0], buf, sizeof(buf) - 1)) > 0) {
+          if (rsize < 2048)
+              buf[rsize] = '\0';
+          [file writeData:[NSData dataWithBytes:buf length:rsize]];
+          [file synchronizeFile];
+      }
+      [file closeFile];
     });
 }
 
 static void init_logDeviceAndVer(void) {
     NSLog(@"[Pre-Init] SKapsule iOS INIT!");
-    NSLog(@"[Pre-Init] Version: %@-%s",
-        NSBundle.mainBundle.infoDictionary[@"CFBundleShortVersionString"], CONFIG_TYPE);
+    NSLog(@"[Pre-Init] Version: %@-%s", NSBundle.mainBundle.infoDictionary[@"CFBundleShortVersionString"], CONFIG_TYPE);
     NSLog(@"[Pre-Init] Commit: %s (%s)", CONFIG_COMMIT, CONFIG_BRANCH);
 
-    NSString *tsPath = [NSString stringWithFormat:@"%@/../_TrollStore",
-        NSBundle.mainBundle.bundlePath];
+    NSString *tsPath = [NSString stringWithFormat:@"%@/../_TrollStore", NSBundle.mainBundle.bundlePath];
     const char *type;
     if (!access(tsPath.UTF8String, F_OK)) {
         type = "TrollStore";
@@ -131,7 +132,9 @@ int main(int argc, char *argv[]) {
         NSLog(@"[Pre-init] Intercepted libjli main() callback via re-entry! Parking thread.");
         extern void register_sk_natives_if_needed(void);
         register_sk_natives_if_needed();
-        while (1) { sleep(UINT32_MAX); }
+        while (1) {
+            sleep(UINT32_MAX);
+        }
         return 0;
     }
     isMainReentered = YES;
@@ -152,8 +155,7 @@ int main(int argc, char *argv[]) {
     if (!isJITEnabled(YES) && getEntitlementValue(@"com.apple.private.security.no-sandbox")) {
         NSLog(@"[Pre-init] no-sandbox: trying to enable JIT");
         int pid;
-        int ret = posix_spawnp(&pid, argv[0], NULL, NULL,
-            (char *[]){argv[0], "", NULL}, environ);
+        int ret = posix_spawnp(&pid, argv[0], NULL, NULL, (char *[]){argv[0], "", NULL}, environ);
         if (ret == 0) {
             waitpid(pid, NULL, WUNTRACED);
             ptrace(PT_DETACH, pid, NULL, 0);

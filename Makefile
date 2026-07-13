@@ -71,6 +71,7 @@ help:
 	echo '    make clean            Clean build dirs'
 	echo '    make deploy           Install to device'
 	echo '    make check            Dump variables'
+	echo '    make format           Auto-format source files'
 	echo ''
 	echo 'Variables:'
 	echo '    RELEASE=1             Release build'
@@ -243,6 +244,11 @@ deploy: xcode-build
 	xcrun devicectl device process launch --device $(DEVICE_ID) com.skonstruct.dev.SKapsule
 	echo '[SKapsule v$(VERSION)] deploy - end'
 
+format:
+	echo '[SKapsule v$(VERSION)] format - start'
+	./scripts/format.sh
+	echo '[SKapsule v$(VERSION)] format - end'
+
 clean:
 	echo '[SKapsule v$(VERSION)] clean - start'
 	rm -rf $(WORKINGDIR)
@@ -250,4 +256,4 @@ clean:
 	rm -rf $(SOURCEDIR)/out/jre25
 	echo '[SKapsule v$(VERSION)] clean - end'
 
-.PHONY: all clean check native payload package deploy help
+.PHONY: all clean check native payload package deploy help format

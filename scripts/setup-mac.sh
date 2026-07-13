@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # setup-mac.sh
-# Automates the setup of build dependencies and Azul Zulu JDKs (8 and 25) 
+# Automates the setup of build dependencies and Azul Zulu JDKs (8 and 25)
 # in a user-local, non-administrative (non-sudo) environment on macOS.
 
 set -euo pipefail
@@ -10,7 +10,7 @@ echo "=== SKapsule macOS Dependency & Java Setup ==="
 echo
 
 # 1. Install System Dependencies via Homebrew
-if command -v brew >/dev/null 2>&1; then
+if command -v brew > /dev/null 2>&1; then
     echo "Installing system dependencies via Homebrew..."
     brew install ant maven ninja wget
     brew install ldid || true
@@ -77,11 +77,11 @@ fi
 echo
 
 # 6. Configure jenv
-if command -v jenv >/dev/null 2>&1; then
+if command -v jenv > /dev/null 2>&1; then
     echo "Registering installed Java versions with jenv..."
     jenv add "$ZULU8_DIR/Contents/Home"
     jenv add "$ZULU25_DIR/Contents/Home"
-    
+
     # Configure local workspace Java version
     echo "Setting local java version in workspace..."
     jenv local zulu64-25.0.3 || jenv local 25.0.3 || jenv local 25

@@ -61,7 +61,10 @@ target_link_libraries(SKapsule
   "-framework GameController"
   "-framework IOKit"
   "-framework Security"
+  "-framework SafariServices"
+  "-framework UniformTypeIdentifiers"
   "-ldl"
+  "-lz"
 )
 
 set_target_properties(SKapsule PROPERTIES

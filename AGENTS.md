@@ -10,7 +10,7 @@ If a request conflicts with anything below, **stop and ask** rather than guess.
 
 ## What this project is
 
-SKapsule-iOS is an unofficial iOS (arm64) port of *Spiral Knights*. It is the
+SKapsule-iOS is an unofficial iOS (arm64) port of _Spiral Knights_. It is the
 iOS counterpart of [SKapsule](https://github.com/SKonstruct/SKapsule) (Android).
 The iOS app boots a bundled JRE 25 that runs the real desktop game client, with
 native shims (gl4es, openal-soft, LWJGL, caciocavallo, frenchpress) supplying
@@ -80,11 +80,11 @@ out/artifacts/         packaged IPA output (generated, gitignored)
 - **Release:** `make all RELEASE=1`
 - **Xcode IDE Build:** The user builds and tests on-device via Xcode. **CRITICAL**: The Xcode build uses `make xcode-payload` as a post-build step. Any new stub dylibs or source files must be available through this pathway. Both the CMake and Xcode pipelines must be kept functional.
 - **Native submodules:** rebuild via the matching script in `scripts/`.
-  - `build-gl4es-ios.sh` — needs iOS SDK
-  - `build-openal-ios.sh` — needs iOS SDK
-  - `build-lwjgl3-ios.sh` — needs JDK 25 + iOS SDK + ant
-  - `build-cacio-ios.sh` — needs JDK 25 + Maven
-  - `build-frenchpress-ios.sh` — needs JDK 25 + Maven
+    - `build-gl4es-ios.sh` — needs iOS SDK
+    - `build-openal-ios.sh` — needs iOS SDK
+    - `build-lwjgl3-ios.sh` — needs JDK 25 + iOS SDK + ant
+    - `build-cacio-ios.sh` — needs JDK 25 + Maven
+    - `build-frenchpress-ios.sh` — needs JDK 25 + Maven
 
 If you cannot run the build, say so. Do not claim a change is verified when it isn't. Always run `make native` after changes to verify compilation.
 
@@ -122,7 +122,7 @@ Common types: `feat`, `fix`, `perf`, `chore`, `test`, `docs`.
 ### Objective-C (Natives/)
 
 - Match the surrounding file. Indentation, brace placement, import order.
-- **Comments: write fewer.** Only comment the *why* when non-obvious.
+- **Comments: write fewer.** Only comment the _why_ when non-obvious.
 - No `TODO(agent):` or agent-attribution markers.
 - Don't reformat code you aren't changing.
 

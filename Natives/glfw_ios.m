@@ -1,9 +1,9 @@
 #define GLES_SILENCE_DEPRECATION 1
-#import <UIKit/UIKit.h>
-#include "jni.h"
 #import <OpenGLES/EAGL.h>
 #import <OpenGLES/ES2/gl.h>
+#import <UIKit/UIKit.h>
 #import "NativeBridge.h"
+#include "jni.h"
 
 extern EAGLContext *gEAGLContext;
 extern CAEAGLLayer *gEAGLLayer;
@@ -13,7 +13,7 @@ extern GLuint gFramebuffer;
 // Basic stub implementations to prevent UnsatisfiedLinkError during JVM boot.
 
 static jint nativeDrainInput(JNIEnv *env, jclass clazz, jintArray out) {
-    return 0; // Return 0 events for now
+    return 0;  // Return 0 events for now
 }
 
 static jintArray nativeGetSurfaceSize(JNIEnv *env, jclass clazz) {
@@ -33,7 +33,8 @@ static jintArray nativeGetSurfaceSize(JNIEnv *env, jclass clazz) {
 
 static void gl4es_bring_up_once(void) {
     static BOOL initialized = NO;
-    if (initialized) return;
+    if (initialized)
+        return;
 
     NSString *gl4esPath = [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"Frameworks/libgl4es.dylib"];
     void *gl4es = dlopen(gl4esPath.UTF8String, RTLD_NOW | RTLD_GLOBAL);
@@ -61,10 +62,10 @@ static void nativeMakeContextCurrent(JNIEnv *env, jclass clazz, jlong window) {
         static void (*native_glBindFramebuffer)(GLenum, GLuint) = NULL;
         static dispatch_once_t onceToken;
         dispatch_once(&onceToken, ^{
-            void *gles = dlopen("/System/Library/Frameworks/OpenGLES.framework/OpenGLES", RTLD_NOW);
-            if (gles) {
-                native_glBindFramebuffer = dlsym(gles, "glBindFramebuffer");
-            }
+          void *gles = dlopen("/System/Library/Frameworks/OpenGLES.framework/OpenGLES", RTLD_NOW);
+          if (gles) {
+              native_glBindFramebuffer = dlsym(gles, "glBindFramebuffer");
+          }
         });
         if (native_glBindFramebuffer) {
             native_glBindFramebuffer(GL_FRAMEBUFFER, gFramebuffer);
@@ -96,14 +97,12 @@ static jboolean nativeGetGamepadState(JNIEnv *env, jclass clazz, jbyteArray outB
 }
 
 void register_glfw_natives(JNIEnv *env, jclass glfwClass) {
-    JNINativeMethod methods[] = {
-        {"nativeDrainInput", "([I)I", (void *)&nativeDrainInput},
-        {"nativeGetSurfaceSize", "()[I", (void *)&nativeGetSurfaceSize},
-        {"nativeMakeContextCurrent", "(J)V", (void *)&nativeMakeContextCurrent},
-        {"nativeSwapBuffers", "(J)V", (void *)&nativeSwapBuffers},
-        {"nativeGamepadPresent", "()Z", (void *)&nativeGamepadPresent},
-        {"nativeGetGamepadState", "([B[F)Z", (void *)&nativeGetGamepadState}
-    };
-    
-    (*env)->RegisterNatives(env, glfwClass, methods, sizeof(methods)/sizeof(methods[0]));
+    JNINativeMethod methods[] = {{"nativeDrainInput", "([I)I", (void *)&nativeDrainInput},
+                                 {"nativeGetSurfaceSize", "()[I", (void *)&nativeGetSurfaceSize},
+                                 {"nativeMakeContextCurrent", "(J)V", (void *)&nativeMakeContextCurrent},
+                                 {"nativeSwapBuffers", "(J)V", (void *)&nativeSwapBuffers},
+                                 {"nativeGamepadPresent", "()Z", (void *)&nativeGamepadPresent},
+                                 {"nativeGetGamepadState", "([B[F)Z", (void *)&nativeGetGamepadState}};
+
+    (*env)->RegisterNatives(env, glfwClass, methods, sizeof(methods) / sizeof(methods[0]));
 }

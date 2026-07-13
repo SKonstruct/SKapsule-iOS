@@ -12,10 +12,16 @@ BUILD_DIR="${BUILD_DIR:-$OUT_DIR/build}"
 BUILD_TYPE="${BUILD_TYPE:-Release}"
 
 SDKPATH="${SDKPATH:-$(xcrun --sdk iphoneos --show-sdk-path)}"
-[[ -d "$SDKPATH" ]] || { echo "ERROR: iOS SDK not found at $SDKPATH" >&2; exit 1; }
-[[ -d "$OPENAL_SRC" ]] || { echo "ERROR: openal-soft source not found at $OPENAL_SRC" >&2; exit 1; }
+[[ -d "$SDKPATH" ]] || {
+                         echo "ERROR: iOS SDK not found at $SDKPATH" >&2
+                                                                          exit 1
+}
+[[ -d "$OPENAL_SRC" ]] || {
+                            echo "ERROR: openal-soft source not found at $OPENAL_SRC" >&2
+                                                                                           exit 1
+}
 
-JOBS="${JOBS:-$(sysctl -n hw.logicalcpu 2>/dev/null || echo 4)}"
+JOBS="${JOBS:-$(sysctl -n hw.logicalcpu 2> /dev/null || echo 4)}"
 
 echo "openal-soft source: $OPENAL_SRC"
 echo "iOS SDK:            $SDKPATH"
@@ -50,7 +56,7 @@ cmake --build "$BUILD_DIR" --config "$BUILD_TYPE" --target OpenAL -j"$JOBS"
 
 SRC_LIB=""
 for cand in "$BUILD_DIR/libopenal.dylib" "$BUILD_DIR/lib/libopenal.dylib"; do
-    [[ -e "$cand" ]] && SRC_LIB="$(readlink -f "$cand" 2>/dev/null || realpath "$cand")" && break
+    [[ -e "$cand" ]] && SRC_LIB="$(readlink -f "$cand" 2> /dev/null || realpath "$cand")" && break
 done
 if [[ -z "$SRC_LIB" || ! -f "$SRC_LIB" ]]; then
     echo "ERROR: could not locate built libopenal.dylib" >&2

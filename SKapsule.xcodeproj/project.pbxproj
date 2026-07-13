@@ -77,7 +77,7 @@
 		7A6E3EF1FA97790D3DBED4C2 /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
 		84774DE3AC9D0EA9856B3228 /* xawt_fake.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = xawt_fake.m; sourceTree = "<group>"; };
 		866F2B8C858E3F619CB4129F /* prefs_stubs.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = prefs_stubs.c; sourceTree = "<group>"; };
-		8C5CDBAC8A1997AB6C168A9A /* .git */ = {isa = PBXFileReference; path = .git; sourceTree = "<group>"; };
+		8C5CDBAC8A1997AB6C168A9A /* .git */ = {isa = PBXFileReference; lastKnownFileType = text; path = .git; sourceTree = "<group>"; };
 		8E9EE76547F63608B1AFE425 /* NativeBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NativeBridge.h; sourceTree = "<group>"; };
 		938DA6D68E6BB2CDA7AF2000 /* LauncherViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = LauncherViewController.h; sourceTree = "<group>"; };
 		A74479BB3EA492E659794A0E /* utils.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = utils.h; sourceTree = "<group>"; };
@@ -90,12 +90,12 @@
 		D6DAA12FB3C03AA2DCC75C84 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		D8D6D79A6C0D2A590D790B27 /* awt_headless.dylib */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "compiled.mach-o.dylib"; path = awt_headless.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		DD33DA300A60BB5119D19241 /* config.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = config.h; sourceTree = "<group>"; };
-		E12A6B20F7908457F69DF0D6 /* SKapsule.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SKapsule.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		EB6643112C66D62A751C4972 /* LICENSE */ = {isa = PBXFileReference; path = LICENSE; sourceTree = "<group>"; };
-		EEC406F6FC46E7343D682253 /* fishhook.podspec */ = {isa = PBXFileReference; path = fishhook.podspec; sourceTree = "<group>"; };
+		E12A6B20F7908457F69DF0D6 /* SKapsule.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SKapsule.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		EB6643112C66D62A751C4972 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
+		EEC406F6FC46E7343D682253 /* fishhook.podspec */ = {isa = PBXFileReference; lastKnownFileType = text; path = fishhook.podspec; sourceTree = "<group>"; };
 		F74EF3D8B08A315F2F20FA4F /* empty.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = empty.m; sourceTree = "<group>"; };
 		FC64AF7E5F85F5D8BF89D79C /* JavaLauncher.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = JavaLauncher.h; sourceTree = "<group>"; };
-		FE7003D28950F227547F58AC /* config.h.in */ = {isa = PBXFileReference; path = config.h.in; sourceTree = "<group>"; };
+		FE7003D28950F227547F58AC /* config.h.in */ = {isa = PBXFileReference; lastKnownFileType = text; path = config.h.in; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -411,6 +411,8 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = Natives/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = SKapsule;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.adventure-games";
 				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -523,6 +525,8 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = Natives/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = SKapsule;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.adventure-games";
 				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

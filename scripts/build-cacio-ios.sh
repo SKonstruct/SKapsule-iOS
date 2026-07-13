@@ -18,13 +18,16 @@ CACIO_VERSION="1.18-SNAPSHOT"
 }
 
 if [[ -z "${JAVA_HOME:-}" ]]; then
-    export JAVA_HOME="$(jenv prefix zulu64-25.0.3 2>/dev/null || jenv prefix 25 2>/dev/null || echo "")"
+    export JAVA_HOME="$(jenv prefix zulu64-25.0.3 2> /dev/null || jenv prefix 25 2> /dev/null || echo "")"
 fi
 if [[ -n "${CACIO_JAVA_HOME:-}" ]]; then
     export JAVA_HOME="$CACIO_JAVA_HOME"
 fi
 JAVA_BIN="${JAVA_HOME:+$JAVA_HOME/bin/}java"
-command -v mvn >/dev/null 2>&1 || { echo "ERROR: 'mvn' not on PATH" >&2; exit 1; }
+command -v mvn > /dev/null 2>&1 || {
+                                    echo "ERROR: 'mvn' not on PATH" >&2
+                                                                         exit 1
+}
 
 # Verify the build JDK is 25+; the java-25 branch adapts to JDK 25 internals
 # (e.g. removed SurfaceManager) and won't compile/run correctly on older JDKs.
@@ -43,7 +46,10 @@ echo "Building cacio with JDK $JAVA_MAJOR (${JAVA_HOME:-system default})"
 mkdir -p "$OUT_DIR"
 for mod in cacio-shared cacio-tta; do
     jar="$CACIO_SRC/$mod/target/$mod-$CACIO_VERSION.jar"
-    [[ -f "$jar" ]] || { echo "ERROR: $jar missing" >&2; exit 1; }
+    [[ -f "$jar" ]] || {
+                         echo "ERROR: $jar missing" >&2
+                                                         exit 1
+    }
     cp -v "$jar" "$OUT_DIR/$mod.jar"
 done
 

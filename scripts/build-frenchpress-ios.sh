@@ -20,7 +20,10 @@ if [[ -n "${FRENCHPRESS_JAVA_HOME:-}" ]]; then
     export JAVA_HOME="$FRENCHPRESS_JAVA_HOME"
 fi
 JAVA_BIN="${JAVA_HOME:+$JAVA_HOME/bin/}java"
-command -v mvn >/dev/null 2>&1 || { echo "ERROR: 'mvn' not on PATH" >&2; exit 1; }
+command -v mvn > /dev/null 2>&1 || {
+                                    echo "ERROR: 'mvn' not on PATH" >&2
+                                                                         exit 1
+}
 
 # Verify the build JDK is 25+ since the pom compiles with --release 25.
 JAVA_MAJOR="$("$JAVA_BIN" -version 2>&1 | head -1 | sed -E 's/.*version "([0-9]+).*/\1/')"
@@ -35,7 +38,10 @@ echo "Building frenchpress with JDK $JAVA_MAJOR (${JAVA_HOME:-system default})"
 
 mkdir -p "$OUT_DIR"
 jar="$FRENCHPRESS_SRC/target/frenchpress-$FRENCHPRESS_VERSION.jar"
-[[ -f "$jar" ]] || { echo "ERROR: $jar missing" >&2; exit 1; }
+[[ -f "$jar" ]] || {
+                     echo "ERROR: $jar missing" >&2
+                                                     exit 1
+}
 
 cp -v "$jar" "$OUT_DIR/frenchpress.jar"
 

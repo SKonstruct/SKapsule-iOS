@@ -51,7 +51,7 @@ check_jdk_version() {
     return 1
 }
 
-if command -v jenv >/dev/null 2>&1; then
+if command -v jenv > /dev/null 2>&1; then
     TEMP_JDK=$(jenv prefix)
     if check_jdk_version "$TEMP_JDK"; then
         BOOT_JDK="$TEMP_JDK"
@@ -122,8 +122,8 @@ cp -R "$JDK_IMAGE" "$JRE_DEST"
 # Strip unnecessary JDK tools to save space
 rm -rf "$JRE_DEST/bin"/*
 rm -rf "$JRE_DEST/lib/src.zip"
-rm -rf "$JRE_DEST/demo" 2>/dev/null || true
-rm -rf "$JRE_DEST/man" 2>/dev/null || true
+rm -rf "$JRE_DEST/demo" 2> /dev/null || true
+rm -rf "$JRE_DEST/man" 2> /dev/null || true
 
 echo "Zipping JRE 25..."
 mkdir -p "$ROOT/Natives/resources"

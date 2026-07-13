@@ -9,18 +9,21 @@
 
 + (BOOL)isInstalled {
     const char *home = getenv("SKAPSULE_HOME");
-    if (!home) return NO;
+    if (!home)
+        return NO;
 
     NSString *manifest = [NSString stringWithFormat:@"%s/sk/getdown.txt", home];
-    if (![fm fileExistsAtPath:manifest]) return NO;
+    if (![fm fileExistsAtPath:manifest])
+        return NO;
 
     NSString *marker = [NSString stringWithFormat:@"%s/%@", home, VERSION_MARKER];
-    if (![fm fileExistsAtPath:marker]) return NO;
+    if (![fm fileExistsAtPath:marker])
+        return NO;
 
     // Verify version/commit matches current build to trigger re-staging on updates
     NSString *markerContent = [NSString stringWithContentsOfFile:marker encoding:NSUTF8StringEncoding error:nil];
-    NSString *currentVersion = [NSString stringWithFormat:@"%@-%s",
-        NSBundle.mainBundle.infoDictionary[@"CFBundleVersion"], CONFIG_COMMIT];
+    NSString *currentVersion =
+        [NSString stringWithFormat:@"%@-%s", NSBundle.mainBundle.infoDictionary[@"CFBundleVersion"], CONFIG_COMMIT];
 
     return [markerContent isEqualToString:currentVersion];
 }
@@ -46,7 +49,9 @@
     NSString *fpSrc = [bundlePath stringByAppendingPathComponent:@"libs/frenchpress.jar"];
     NSString *fpDst = [NSString stringWithFormat:@"%s/frenchpress/frenchpress.jar", home];
     [fm createDirectoryAtPath:[fpDst stringByDeletingLastPathComponent]
-        withIntermediateDirectories:YES attributes:nil error:nil];
+        withIntermediateDirectories:YES
+                         attributes:nil
+                              error:nil];
     if ([fm fileExistsAtPath:fpSrc]) {
         [fm removeItemAtPath:fpDst error:nil];
         [fm copyItemAtPath:fpSrc toPath:fpDst error:nil];
@@ -67,8 +72,8 @@
 
     // 6. Write version marker with current build info
     NSString *marker = [NSString stringWithFormat:@"%s/%@", home, VERSION_MARKER];
-    NSString *currentVersion = [NSString stringWithFormat:@"%@-%s",
-        NSBundle.mainBundle.infoDictionary[@"CFBundleVersion"], CONFIG_COMMIT];
+    NSString *currentVersion =
+        [NSString stringWithFormat:@"%@-%s", NSBundle.mainBundle.infoDictionary[@"CFBundleVersion"], CONFIG_COMMIT];
     [currentVersion writeToFile:marker atomically:YES encoding:NSUTF8StringEncoding error:nil];
 
     progress(@"Runtime ready.");
@@ -92,7 +97,8 @@
                 break;
             }
         }
-        if (!match) continue;
+        if (!match)
+            continue;
 
         NSString *src = [srcDir stringByAppendingPathComponent:file];
         NSString *dst = [dstDir stringByAppendingPathComponent:file];
@@ -111,28 +117,30 @@
 + (void)downloadManifest:(NSString *)destPath {
     NSURL *url = [NSURL URLWithString:SK_MANIFEST_URL];
     NSURLRequest *request = [NSURLRequest requestWithURL:url
-        cachePolicy:NSURLRequestReloadIgnoringLocalCacheData timeoutInterval:30];
+                                             cachePolicy:NSURLRequestReloadIgnoringLocalCacheData
+                                         timeoutInterval:30];
 
     dispatch_semaphore_t sem = dispatch_semaphore_create(0);
     __block NSData *resultData = nil;
     __block NSError *resultError = nil;
     __block NSInteger statusCode = 0;
 
-    NSURLSessionDataTask *task = [NSURLSession.sharedSession dataTaskWithRequest:request
-        completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-            resultData = data;
-            resultError = error;
-            if ([response isKindOfClass:NSHTTPURLResponse.class]) {
-                statusCode = ((NSHTTPURLResponse *)response).statusCode;
-            }
-            dispatch_semaphore_signal(sem);
-        }];
+    NSURLSessionDataTask *task =
+        [NSURLSession.sharedSession dataTaskWithRequest:request
+                                      completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+                                        resultData = data;
+                                        resultError = error;
+                                        if ([response isKindOfClass:NSHTTPURLResponse.class]) {
+                                            statusCode = ((NSHTTPURLResponse *)response).statusCode;
+                                        }
+                                        dispatch_semaphore_signal(sem);
+                                      }];
     [task resume];
     dispatch_semaphore_wait(sem, DISPATCH_TIME_FOREVER);
 
     if (resultError || statusCode < 200 || statusCode >= 300) {
-        NSLog(@"[SKInstaller] Manifest download failed: %@ (HTTP %ld)",
-            resultError.localizedDescription, (long)statusCode);
+        NSLog(@"[SKInstaller] Manifest download failed: %@ (HTTP %ld)", resultError.localizedDescription,
+              (long)statusCode);
         return;
     }
 
@@ -142,7 +150,8 @@
 
 + (NSString *)credFilePath {
     const char *home = getenv("SKAPSULE_HOME");
-    if (!home) return @"";
+    if (!home)
+        return @"";
     return [NSString stringWithFormat:@"%s/home/.local/share/frenchpress/steam.creds", home];
 }
 

@@ -3,14 +3,14 @@
 
 @implementation SceneDelegate
 
-- (void)scene:(UIScene *)scene willConnectToSession:(UISceneSession *)session
-    options:(UISceneConnectionOptions *)connectionOptions {
+- (void)scene:(UIScene *)scene
+    willConnectToSession:(UISceneSession *)session
+                 options:(UISceneConnectionOptions *)connectionOptions {
     UIWindowScene *windowScene = (UIWindowScene *)scene;
     self.window = [[UIWindow alloc] initWithWindowScene:windowScene];
 
     LauncherViewController *launcher = [[LauncherViewController alloc] init];
-    UINavigationController *nav = [[UINavigationController alloc]
-        initWithRootViewController:launcher];
+    UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:launcher];
     nav.navigationBarHidden = YES;
 
     self.window.rootViewController = nav;
