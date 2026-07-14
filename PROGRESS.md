@@ -1,81 +1,66 @@
 # SKapsule-iOS Progress
 
-## Phase 0: Basic App Setup, Architecture & Build
+Phase-level status tracker. For the detailed engineering plan on the active phase, see
+[OPUS-ROADMAP.md](OPUS-ROADMAP.md).
 
-**Status:** ✅ Complete
+## Status Summary
 
-## Phase 1: JVM Bootstrap, NativeBridge & Device Debug
+| Phase | Description                                          | Status               |
+| ----- | ----------------------------------------------------- | --------------------- |
+| 0     | Basic app setup, architecture, build                  | ✅ Complete            |
+| 1     | JVM bootstrap, NativeBridge, device debug              | ✅ Complete            |
+| 1.5   | JNI bridge & GLFW shadow-class wiring                  | ✅ Complete            |
+| 2     | OpenGL surface & rendering bridge (gl4es)              | ✅ Complete            |
+| 3     | Input bridge (touch, controls, gamepad, keyboard/mouse) | 🔄 In progress — current focus |
+| 4     | Audio (OpenAL)                                         | ✅ Complete            |
+| 5     | Steam login                                            | ✅ Complete            |
 
-**Status:** ✅ Complete (build infrastructure)
+The app boots the JVM, renders the real Spiral Knights desktop client through gl4es,
+plays audio, and logs in (Web or Steam, including Steam Guard) end-to-end on device.
+Phase 3 is the only remaining major phase before feature parity with the Android port.
 
-### Completed
+## Phase 0–2, 4, 5 — summary
 
-- [x] `Natives/dyld_bypass_validation.m` — library validation bypass for unsigned dylibs
-- [x] `Natives/NativeBridge.h` / `.m` — JVM ↔ UI bridge (boot status, Steam Guard)
-- [x] `Natives/JavaLauncher.h` / `.m` — full JVM boot via `JLI_Launch`
-- [x] `Natives/SKInstaller.m` — JAR staging, manifest download, version marker
-- [x] `Natives/GameViewController.m` — NativeBridge wiring, Steam Guard dialogs
-- [x] `bootstrap/` — Java source copied from SKapsule (4 files)
-- [x] `scripts/build-bootstrap.sh` — compile sk-bootstrap.jar
-- [x] `.vscode/launch.json` — device debug (iPhone 13 Pro)
-- [x] `.vscode/tasks.json` — build tasks (debug, release, TrollStore, deploy)
-- [x] `Makefile` deploy target via `devicectl`
-- [x] `make native` — 0 errors, 0 warnings
-- [x] `make package` — produces valid `.ipa` (49KB)
+- **Phase 0/1 (setup, JVM bootstrap):** `Natives/JavaLauncher.m` boots the bundled JRE 25
+  via `JLI_Launch`; `Natives/dyld_bypass_validation.m` allows the unsigned dylibs to load;
+  `Natives/SKInstaller.m` stages JARs/assets into the app's documents container and is
+  version-aware (re-stages on every new build rather than trusting stale cache).
+- **Phase 1.5 (JNI/GLFW wiring):** `external/bootstrap` (shared with Android) supplies
+  `SkBootstrap`/`HeadlessGetdown`/`NativeBridgePrompt`/`GLFW.java`; `Natives/glfw_ios.m`
+  registers the native side of the `GLFW` shadow class.
+- **Phase 2 (rendering):** `Natives/GameViewController.m` owns a `CAEAGLLayer`-backed
+  `EAGLContext` surface with color + depth/stencil renderbuffers, rebound per-thread in
+  `nativeMakeContextCurrent`. Fixed along the way: a render-thread SIGSEGV in gl4es's FBO 0
+  handling, a framebuffer-incomplete depth attachment, and a `glGetUniformLocation`/
+  `glGetAttribLocation` NULL-name crash.
+- **Phase 4 (audio):** `openal-soft` binds to `AVAudioSession`; LWJGL's OpenAL module loads
+  `libopenal.dylib` without sandbox/JIT issues. Music plays through the prologue and in-game.
+- **Phase 5 (Steam login):** Web and Steam login both work, including the Steam Guard
+  device-code/email-code prompt (`GameViewController.m`'s `showSteamGuardPromptWithTitle:`).
+  A main-thread deadlock in the original prompt implementation was fixed.
 
-### Remaining for full Phase 1 testing
+The font-resolution and Java2D/AWT-stub sagas that blocked the login screen for a while are
+resolved; see OPUS-ROADMAP.md's History section for a short technical summary if needed —
+the blow-by-blow debugging log has been trimmed from both files to keep them current.
 
-- [x] Adopt OpenJDK 25 environment for builds (blocked on actual JRE download from CDN)
-- [ ] Complete native submodule builds (gl4es, openal, LWJGL, frenchpress succeeded; caciocavallo17 blocked by JDK 25 FontManager API changes)
-- [ ] Bundle all assets into the .app and test on device
-- [ ] Verify JVM boots and getdown downloads SK assets
+## Phase 3: Input Bridge (current)
 
-## Phase 1.5: JNI Bridge & GLFW Context
+**Not yet implemented.** `Natives/glfw_ios.m`'s `nativeDrainInput`, `nativeGamepadPresent`,
+and `nativeGetGamepadState` are stubs that return 0/false; `Natives/GameViewController.m`
+has no touch or key-press handler overrides yet; there is no gamepad (`GCController`) code
+on iOS at all (though `GameController.framework` is already linked in `CMakeLists.txt`).
 
-**Status:** ✅ Complete (Basic Stubs)
+Key tasks (see OPUS-ROADMAP.md → **Ticket 36** for the full technical breakdown, informed by
+reading the Android reference implementation in `SKapsule` and the iOS-native input patterns
+in `Amethyst-iOS`):
 
-Key tasks:
-
-- [x] Copy `jni.h` from Amethyst-iOS (instead of creating `jni_core.h`)
-- [x] Implement `Java_com_skarm_launcher_bootstrap_SkBootstrap_*` bridge functions in `JavaLauncher.m` to fix UI hang
-- [x] Implement `register_glfw_natives` and basic native stubs in `glfw_ios.m` so the SK client doesn't crash during GL init
-
----
-
-## Phase 2: OpenGL Surface & Rendering Bridge (GL4ES)
-
-**Status:** Not started
-
-Key tasks:
-
-- Replace the placeholder `UIView` in `GameViewController` with a `CAEAGLLayer` or `GLKView`.
-- Initialize `EAGLContext` and manage renderbuffers.
-- Plumb the window/layer handle into the GLFW/GL4ES bridge so the JVM can present frames to the iOS display.
-
-## Phase 3: Input Bridge (Touch & Virtual Keyboard)
-
-**Status:** Not started
-
-Key tasks:
-
-- Override `touchesBegan:`, `touchesMoved:`, `touchesEnded:`, `touchesCancelled:` in `GameViewController`.
-- Map iOS touch coordinates to JVM/AWT mouse events (caciocavallo or GLFW injection).
-- Implement a virtual onscreen keyboard overlay for text input (login, chat).
-
-## Phase 4: Audio Integration (OpenAL)
-
-**Status:** Not started
-
-Key tasks:
-
-- Ensure `openal-soft` binds correctly to iOS `AVAudioSession`.
-- Verify LWJGL's OpenAL module successfully loads the native `libopenal.dylib` without sandbox/JIT crashes.
-
-## Phase 5: Steam Login Functional
-
-**Status:** Mostly complete (Native UI is done, blocked on JVM testing)
-
-Key tasks:
-
-- Test Steam Guard dialog integration (device code + email code prompts).
-- Verify Frenchpress credential passing through env vars.
+- [ ] **36a. Touch input** — thread-safe input ring buffer in `glfw_ios.m` (mirrors
+      `sklauncher.c`'s `input_q`), fed from `touchesBegan:`/`touchesMoved:`/`touchesEnded:`/
+      `touchesCancelled:` in `GameViewController.m`.
+- [ ] **36b. Touch controls / buttons** — on-screen action button overlay.
+- [ ] **36c. Touch joystick** — virtual dual-joystick (move + face), matching Android's
+      default layout.
+- [ ] **36d. Gamepad support** — `GCController` integration writing into the same GLFW
+      standard-layout gamepad mailbox (15 buttons / 6 axes) that touch controls also drive.
+- [ ] **36e. Keyboard/mouse support** — physical keyboard via `UIKey`/`pressesBegan:`, and
+      pointer/trackpad support where applicable.
