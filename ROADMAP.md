@@ -11,14 +11,23 @@ phase-level status table; this document has the engineering detail for the activ
 
 ## Current State
 
-The app is fully playable end-to-end on device: it boots the bundled JRE 25, runs the real
-Spiral Knights desktop client through gl4es, plays audio, and logs in (Web or Steam,
-including Steam Guard) successfully. Nothing is broken at the rendering/font/audio/login
-layer.
+The app boots the bundled JRE 25, runs the real Spiral Knights desktop client through gl4es,
+plays audio, logs in (Web or Steam, including Steam Guard), and renders gameplay end-to-end on device.
 
-**The only remaining phase is the input bridge (Ticket 36 below).** Touch, on-screen
-controls, gamepad, and physical keyboard/mouse are all unimplemented — `glfw_ios.m`'s input
-natives are stubs, and `GameViewController.m` has no touch/press handlers at all.
+**Ticket 36 is implemented and active for on-device acceptance testing.** Touch, on-screen
+controls, gamepad, and physical keyboard/mouse feed the shared GLFW-native input bridge.
+
+---
+
+## Active Work: Ticket 36 On-Device Input Validation
+
+**Priority:** 🟡 High — finalize input bridge validation across touch, gamepad, and keyboard hardware.
+**Status:** In progress — on-device verification of virtual touch controls, joysticks, and external controllers.
+
+**Tasks:**
+- Validate touch overlay & virtual d-pad/joysticks in-game.
+- Validate physical GameController / MFi gamepad binding.
+- Validate hardware keyboard and mouse input handling.
 
 ---
 
@@ -33,9 +42,14 @@ natives are stubs, and `GameViewController.m` has no touch/press handlers at all
   `EAGLContext` surface with color + depth/stencil renderbuffers. Fixed: a render-thread
   SIGSEGV in gl4es's FBO 0 handling (`nativeMakeContextCurrent` now binds the real `gFramebuffer`
   on the render thread before gl4es touches it), a framebuffer-incomplete depth attachment
-  (rebind + reattach on resize), and a `glGetUniformLocation`/`glGetAttribLocation` NULL-name
-  crash (null checks added ahead of gl4es's debug-logging macros, which were dereferencing the
-  NULL name themselves).
+  (rebind + reattach on resize), a `glGetUniformLocation`/`glGetAttribLocation` NULL-name
+  crash, and a **use-after-free heap corruption / SIGBUS crash** in gl4es buffer management
+  (`buffers.c: rebind_real_buff_arrays`, `gl4es_glBufferData`, `gl4es_glNamedBufferData`, `gl4es_glDeleteBuffers`
+  now update all VAOs in `glstate->vaos` rather than only the active one).
+- **Safe Area Layout & Surface Resolution.** Fixed safe area inset behavior: defaulted `avoidEdges` to `NO`
+  on fresh installs, and fixed surface/Cacio resolution mismatches in `glfw_ios.m` (`nativeGetSurfaceSize`
+  querying actual renderbuffer dimensions) and `GameViewController.m` (`startJVM` using `surfaceView.frame`),
+  eliminating viewport cropping and touch input offset issues when safe area avoidance is active.
 - **Fonts (cacio).** `SunFontManager` only auto-registers the JRE font directory on Linux, so
   iOS's `CTCFontManager`/`CTCFontConfiguration` needed a forced `registerFontDir()` call plus a
   hand-built `fonts.dir` XLFD-to-file mapping and a null-safe `findFont2D` fallback. This
@@ -58,7 +72,7 @@ natives are stubs, and `GameViewController.m` has no touch/press handlers at all
 ## Active Work: TICKET 36 — Input Bridge
 
 **Priority:** 🔴 Critical — needed for the game to be playable, not just watchable.
-**Status:** Not started. This is the only remaining phase.
+**Status:** Implemented; on-device validation pending.
 
 ### The unifying architectural principle (from the Android port)
 
@@ -117,7 +131,7 @@ RTrigger. **Triggers rest at −1, not 0** — reset state must set them explici
 
 ### Sub-tickets
 
-#### 36a. Touch input (core bridge) — do this first, everything else depends on it
+#### 36a. Touch input (core bridge) — implemented
 
 - Port `sklauncher.c`'s `input_q` ring buffer (mutex-guarded `int32_t[CAP][4]`, `input_push`,
   drain-on-poll) into `glfw_ios.m`. Implement `nativeDrainInput` for real (currently `return 0`).
@@ -127,13 +141,12 @@ RTrigger. **Triggers rest at −1, not 0** — reset state must set them explici
   like `sk_input_push_cursor(x, y)`, `sk_input_push_mouse_button(button, pressed)`.
 - Override `touchesBegan:`/`touchesMoved:`/`touchesEnded:`/`touchesCancelled:` in
   `GameViewController.m`. Track only the primary touch (SK's UI is single-cursor, matching
-  Android's approach — don't build multitouch cursor tracking). Coordinates from `GameViewController`'s
-  `surfaceView` are already in the EGL framebuffer's pixel space (same as Android's `SurfaceView`),
-  so no scaling is needed beyond what `viewDidLayoutSubviews` already handles for Retina.
+  Android's approach — don't build multitouch cursor tracking). UIKit reports surface coordinates
+  in points, so convert them to framebuffer pixels with `contentScaleFactor` before queueing them.
 - **Acceptance:** on-screen taps move the SK cursor and click UI elements (login screen buttons
   should become tappable).
 
-#### 36b. Touch controls / buttons
+#### 36b. Touch controls / buttons — implemented
 
 - Build a `ControlLayout`-style UIKit overlay (reference: `Amethyst-iOS/Natives/customcontrols/ControlLayout.m`
   + `ControlButton.m`), positioned over `GameViewController`'s surface view.
@@ -150,7 +163,7 @@ RTrigger. **Triggers rest at −1, not 0** — reset state must set them explici
 - **Acceptance:** on-screen buttons register presses SK's input system recognizes as gamepad
   input (bindable in SK's control settings, same as a physical controller).
 
-#### 36c. Touch joystick
+#### 36c. Touch joystick — implemented
 
 - Two virtual joysticks (move + face), UIView-based (reference: `ControlJoystick.m`), positioned
   like Android's default (`joy_move` bottom-left, `joy_face` bottom-right).
@@ -159,7 +172,7 @@ RTrigger. **Triggers rest at −1, not 0** — reset state must set them explici
 - **Acceptance:** dragging each joystick drives the corresponding gamepad axis smoothly, with a
   small deadzone (Android uses `AXIS_DEADZONE = 0.15f` as a reference starting point).
 
-#### 36d. Gamepad support
+#### 36d. Gamepad support — implemented
 
 - `GameController.framework` already linked; no CMake changes needed.
 - Register for `GCControllerDidConnectNotification`/`DidDisconnectNotification`, call
@@ -175,7 +188,7 @@ RTrigger. **Triggers rest at −1, not 0** — reset state must set them explici
 - **Acceptance:** a paired MFi/Bluetooth controller drives movement and actions in-game; SK's
   control-binding screen recognizes it as a standard gamepad.
 
-#### 36e. Keyboard/mouse support
+#### 36e. Keyboard/mouse support — implemented
 
 - Physical keyboard: override `pressesBegan:`/`pressesEnded:` (UIKit `UIPress`/`UIKey` API) on
   `GameViewController` or a dedicated first-responder view. Port `Amethyst-iOS/Natives/input/KeyboardInput.m`'s
@@ -186,31 +199,28 @@ RTrigger. **Triggers rest at −1, not 0** — reset state must set them explici
   ambiguous.
 - Typed characters: use `UIKey.characters` (as `KeyboardInput.m` does) for the `EV_CHAR` path,
   matching Android's `onCharInput`/`unicodeChar` approach — needed for login/chat text entry.
-- Mouse/trackpad: lower priority. iPadOS pointer support (`UIPointerInteraction`) for
-  external-mouse/trackpad users; push through the same `EV_CURSOR_POS`/`EV_MOUSE_BUTTON` records
-  touch already uses.
+- Mouse/trackpad: iPadOS pointer hover uses `UIHoverGestureRecognizer` for cursor movement;
+  primary-button touch events share the touch bridge's `EV_CURSOR_POS`/`EV_MOUSE_BUTTON` records.
 - **Acceptance:** an external keyboard can type into SK's login/chat fields and drive bound
   hotkeys; mouse/trackpad pointer (where available) moves the SK cursor.
 
 ### Sequencing note
 
-36a is a hard prerequisite for everything else (it's the ring buffer both the keyboard path and
-initial UI navigation depend on). 36b and 36d should be built together since they share one
-gamepad mailbox implementation — do the mailbox once. 36c can follow either. 36e (keyboard/mouse)
-is independent and can be done in parallel with 36b–36d once 36a lands.
+The implementation followed the intended ordering: 36a established the ring buffer, 36b/36d share
+one mailbox, then 36c and 36e route their events through those same structures. Device testing is
+the remaining work.
 
 ### New files
 
-Building 36b/36c's touch-control overlay will likely need new `.m`/`.h` files (a `ControlLayout`
-equivalent doesn't exist yet in this repo). Per `AGENTS.md`: **flag this before adding files** —
-new Xcode source files also require a `project.yml` (XcodeGen) update to stay buildable from the
-Xcode IDE, not just from `make native`.
+The touch-control views live in `GameViewController.m`, so no new Xcode source files were needed.
+`project.yml` and the generated Xcode project now explicitly link `GameController.framework`.
 
 ---
 
 ## Build & verification
 
-- `make native` after any change — must compile with 0 errors before moving on.
+- `make native` passes after the input-bridge implementation. Xcode compilation also passes; its
+  post-build packaging step is blocked locally by ambiguous `Apple Development` signing identities.
 - After modifying `external/bootstrap` (shared with Android): no rebuild script here, it's
   built into `sk-bootstrap.jar` via `scripts/build-bootstrap.sh`. Changes to `GLFW.java` are
   **not expected** for Ticket 36 — the protocol is already complete on the Java side.

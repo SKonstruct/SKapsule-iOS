@@ -1,23 +1,30 @@
 # SKapsule-iOS Progress
 
 Phase-level status tracker. For the detailed engineering plan on the active phase, see
-[OPUS-ROADMAP.md](OPUS-ROADMAP.md).
+[ROADMAP.md](ROADMAP.md).
 
 ## Status Summary
 
-| Phase | Description                                          | Status               |
-| ----- | ----------------------------------------------------- | --------------------- |
-| 0     | Basic app setup, architecture, build                  | ✅ Complete            |
-| 1     | JVM bootstrap, NativeBridge, device debug              | ✅ Complete            |
-| 1.5   | JNI bridge & GLFW shadow-class wiring                  | ✅ Complete            |
-| 2     | OpenGL surface & rendering bridge (gl4es)              | ✅ Complete            |
-| 3     | Input bridge (touch, controls, gamepad, keyboard/mouse) | 🔄 In progress — current focus |
-| 4     | Audio (OpenAL)                                         | ✅ Complete            |
-| 5     | Steam login                                            | ✅ Complete            |
+| Phase | Description                                             | Status                                     |
+| ----- | ------------------------------------------------------- | ------------------------------------------ |
+| 0     | Basic app setup, architecture, build                    | ✅ Complete                                |
+| 1     | JVM bootstrap, NativeBridge, device debug               | ✅ Complete                                |
+| 1.5   | JNI bridge & GLFW shadow-class wiring                   | ✅ Complete                                |
+| 2     | OpenGL surface & rendering bridge (gl4es)               | ✅ Complete                                |
+| 3     | Input bridge (touch, controls, gamepad, keyboard/mouse) | 🟡 Implemented — device validation pending |
+| 4     | Audio (OpenAL)                                          | ✅ Complete                                |
+| 5     | Steam login                                             | ✅ Complete                                |
 
 The app boots the JVM, renders the real Spiral Knights desktop client through gl4es,
-plays audio, and logs in (Web or Steam, including Steam Guard) end-to-end on device.
-Phase 3 is the only remaining major phase before feature parity with the Android port.
+plays audio, logs in (Web or Steam, including Steam Guard), and runs gameplay end-to-end on device.
+Phase 3 is implemented and ready for on-device validation across touch, controller, and keyboard hardware before declaring feature parity with the Android port.
+
+## Recent Resolution: gl4es use-after-free & Safe Area Layout
+
+- **gl4es Buffer Lifecycle Fix (2026-07-21):** Resolved memory corruption and crash during login/area load by updating `external/gl4es/src/gl/buffers.c` (`rebind_real_buff_arrays`, `gl4es_glBufferData`, `gl4es_glNamedBufferData`, `gl4es_glDeleteBuffers`). Previously, gl4es updated vertex attributes and buffer pointers only in the **active VAO** (`glstate->vao`) during buffer reallocation/deletion, leaving dangling pointers in other VAOs that referenced the same buffer. Updating all VAOs (`glstate->vaos`) eliminated the use-after-free.
+- **Avoid Screen Edges Layout & Resolution Fix:**
+  - Changed default `avoidEdges` setting to `NO` on fresh installs in [GameViewController.m](file:///Users/rayhan/Documents/GitHub/SKapsule-iOS/Natives/GameViewController.m).
+  - Fixed surface/Cacio resolution mismatch when safe area insets are enabled in [glfw_ios.m](file:///Users/rayhan/Documents/GitHub/SKapsule-iOS/Natives/glfw_ios.m) (`nativeGetSurfaceSize` querying actual renderbuffer dimensions) and [GameViewController.m](file:///Users/rayhan/Documents/GitHub/SKapsule-iOS/Natives/GameViewController.m) (`startJVM` using `surfaceView.frame`), fixing viewport cropping and touch offset issues.
 
 ## Phase 0–2, 4, 5 — summary
 
@@ -40,27 +47,28 @@ Phase 3 is the only remaining major phase before feature parity with the Android
   A main-thread deadlock in the original prompt implementation was fixed.
 
 The font-resolution and Java2D/AWT-stub sagas that blocked the login screen for a while are
-resolved; see OPUS-ROADMAP.md's History section for a short technical summary if needed —
+resolved; see ROADMAP.md's History section for a short technical summary if needed —
 the blow-by-blow debugging log has been trimmed from both files to keep them current.
 
-## Phase 3: Input Bridge (current)
+## Phase 3: Input Bridge
 
-**Not yet implemented.** `Natives/glfw_ios.m`'s `nativeDrainInput`, `nativeGamepadPresent`,
-and `nativeGetGamepadState` are stubs that return 0/false; `Natives/GameViewController.m`
-has no touch or key-press handler overrides yet; there is no gamepad (`GCController`) code
-on iOS at all (though `GameController.framework` is already linked in `CMakeLists.txt`).
+**Implemented; pending on-device acceptance testing.** `Natives/glfw_ios.m` now has the
+thread-safe GLFW event ring buffer and shared standard-layout gamepad mailbox. `GameViewController.m`
+routes direct touch, physical keyboard, pointer hover, virtual controls, and `GCController` callbacks
+through those native structures. The generated Xcode project links `GameController.framework` too.
 
-Key tasks (see OPUS-ROADMAP.md → **Ticket 36** for the full technical breakdown, informed by
+The native CMake build and Xcode compilation both pass. The Xcode package post-build step cannot
+complete on this machine because its configured `Apple Development` identity is ambiguous; deploy and
+test on device through Xcode before marking the phase complete.
+
+Key tasks (see ROADMAP.md → **Ticket 36** for the full technical breakdown, informed by
 reading the Android reference implementation in `SKapsule` and the iOS-native input patterns
 in `Amethyst-iOS`):
 
-- [ ] **36a. Touch input** — thread-safe input ring buffer in `glfw_ios.m` (mirrors
-      `sklauncher.c`'s `input_q`), fed from `touchesBegan:`/`touchesMoved:`/`touchesEnded:`/
-      `touchesCancelled:` in `GameViewController.m`.
-- [ ] **36b. Touch controls / buttons** — on-screen action button overlay.
-- [ ] **36c. Touch joystick** — virtual dual-joystick (move + face), matching Android's
-      default layout.
-- [ ] **36d. Gamepad support** — `GCController` integration writing into the same GLFW
-      standard-layout gamepad mailbox (15 buttons / 6 axes) that touch controls also drive.
-- [ ] **36e. Keyboard/mouse support** — physical keyboard via `UIKey`/`pressesBegan:`, and
-      pointer/trackpad support where applicable.
+- [x] **36a. Touch input** — primary-touch cursor/click bridge, preserving cursor-before-button ordering.
+- [x] **36b. Touch controls / buttons** — UIKit action-button overlay writing to the virtual gamepad mailbox.
+- [x] **36c. Touch joystick** — virtual move and face joysticks with a 0.15 deadzone.
+- [x] **36d. Gamepad support** — `GCController` callbacks mapped to the GLFW-standard 15-button / 6-axis mailbox.
+- [x] **36e. Keyboard/mouse support** — `UIKey` press/character routing plus pointer-hover cursor updates.
+
+Remaining acceptance checks: tap the login UI, bind and use each touch/gamepad control in-game, type in login/chat with an external keyboard, and verify external mouse or trackpad behavior on iPadOS.

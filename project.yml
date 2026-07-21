@@ -3,6 +3,37 @@ options:
   bundleIdPrefix: com.skonstruct.dev
 settings:
   DEVELOPMENT_TEAM: 87DLA8MPF5
+schemes:
+  SKapsule:
+    shared: true
+    build:
+      targets:
+        SKapsule: all
+    run:
+      config: Debug
+  SKapsule Heap Diagnostics:
+    shared: true
+    build:
+      targets:
+        SKapsule: all
+    run:
+      config: Debug
+      environmentVariables:
+        MallocScribble: '1'
+        MallocGuardEdges: '1'
+  SKapsule VBO Diagnostics:
+    shared: true
+    build:
+      targets:
+        SKapsule: all
+    run:
+      config: Debug
+      environmentVariables:
+        MallocScribble: '1'
+        MallocGuardEdges: '1'
+        LIBGL_USEVBO: '0'
+        MTL_DEBUG_LAYER: '1'
+        MTL_SHADER_VALIDATION: '1'
 targets:
   SKapsule:
     type: application
@@ -28,6 +59,8 @@ targets:
         script: |
           make xcode-payload WORKINGDIR="${BUILT_PRODUCTS_DIR}"
     dependencies:
+      - framework: GameController.framework
+        embed: false
       - target: awt_headless
         link: false
         embed: false
