@@ -88,6 +88,24 @@ out/artifacts/         packaged IPA output (generated, gitignored)
 
 If you cannot run the build, say so. Do not claim a change is verified when it isn't. Always run `make native` after changes to verify compilation.
 
+### On-device runs need JIT
+
+The bundled JRE is the AngelAuraMC JDK-25 **JIT** build, not the Zero interpreter. On
+A17+/iOS 26 the Trusted Execution Monitor enforces W^X, so the VM traps (`brk #0x69`) for
+an attached debugger to map its code pages. The user therefore launches through
+**StikDebug** with `assets/UniversalJIT26.js` imported and assigned to the bundle id —
+see [README.md](README.md). Consequences when debugging:
+
+- **Xcode's debugger cannot service the JIT trap.** A run started from Xcode dies at
+  `BreakGetJITMapping`; ask for a StikDebug launch instead.
+- Console output is unavailable in that case. Logs come from **Share Logs**:
+  `latestlog.txt`, `hs_err_pid*.log` and `vmlog-*.log` in `SKAPSULE_HOME`.
+- `gl4es` is a fork we patch (`external/gl4es`, SKonstruct/gl4es), so a rendering fix may
+  belong there rather than in `Natives/`. Rebuild with `scripts/build-gl4es-ios.sh`.
+- **When a fix lands in a jar or dylib rather than Objective-C, confirm the running build
+  actually contains it before diagnosing further.** Those are staged from `out/` and are
+  independent of the app's compiled-in commit stamp, which has been seen to go stale.
+
 ---
 
 ## Scope discipline

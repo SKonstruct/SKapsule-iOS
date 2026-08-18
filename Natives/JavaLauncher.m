@@ -19,6 +19,7 @@
 #include "jni.h"
 
 extern void register_glfw_natives(JNIEnv *env, jclass glfwClass);
+void register_sk_natives_if_needed(void);
 
 #define fm NSFileManager.defaultManager
 
@@ -32,6 +33,14 @@ static void init_loadSKEnv(void) {
 
     // Run JVM on its own thread (iOS requires main thread for UI)
     setenv("HACK_IGNORE_START_ON_FIRST_THREAD", "1", 1);
+
+    // iOS 26+ Trusted Execution Monitor. The AngelAuraMC libjvm probes for TXM by
+    // dlsym'ing DeviceHasTXM() from the host app (exported in utils.m) and, failing
+    // that, reading XNU_HAS_TXM. We set the env var too as a belt-and-suspenders
+    // fallback so the VM takes its mirror-mapped codegen path on real TXM devices.
+    if (DeviceHasJITFlags(JIT_FLAG_HAS_TXM)) {
+        setenv("XNU_HAS_TXM", "1", 1);
+    }
 }
 
 int launchJVM(NSString *steamUser, NSString *steamPass, BOOL isSteam, int width, int height) {
@@ -74,6 +83,13 @@ int launchJVM(NSString *steamUser, NSString *steamPass, BOOL isSteam, int width,
         [SKNativeBridge onLaunchStatus:@"JLI_Launch not found in JRE"];
         return 1;
     }
+
+    // Register SkBootstrap JNI natives on a background thread once the VM is up.
+    // main() no longer parks the libjli re-entry (it forwards into JLI_Launch), so
+    // registration can't happen there anymore.
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+      register_sk_natives_if_needed();
+    });
 
     // Build JVM args — translated from sklauncher.c
     int margc = -1;
@@ -149,12 +165,51 @@ int launchJVM(NSString *steamUser, NSString *steamPass, BOOL isSteam, int width,
     margv[++margc] = "--enable-native-access=ALL-UNNAMED";
 
     // HotSpot options
-    margv[++margc] = "-XstartOnFirstThread";
+    // NOTE: -XstartOnFirstThread is intentionally NOT passed. On this JIT JRE it
+    // drives the macOS launcher's first-thread marshaling; SK's GL runs off the
+    // main thread (org.lwjgl.glfw.checkThread0=false), and the libjli main()
+    // re-entry is forwarded back into JLI_Launch (see main.m) rather than parked.
     margv[++margc] = "-XX:-CreateCoredumpOnCrash";
-    margv[++margc] = "-XX:+SuppressFatalErrorMessage";
+    // Write the HotSpot crash report into SKAPSULE_HOME (Documents) so it can be
+    // retrieved via Files / Share Logs — the default lands in the container tmp,
+    // which isn't user-accessible.
+    margv[++margc] = [NSString stringWithFormat:@"-XX:ErrorFile=%s/hs_err_pid%%p.log", home].UTF8String;
     margv[++margc] = "-XX:+UnlockExperimentalVMOptions";
     margv[++margc] = "-XX:+DisablePrimordialThreadGuardPages";
-    // Remove verbose OS tracing — re-enable with -Xlog:os=trace for debugging
+    // SerialGC, matching KnightLauncher's default for this same game (it exposes
+    // G1/Parallel/ZGC only as opt-in). Two reasons:
+    //  1. G1 crashed on this JRE when entering Haven — SIGSEGV on a GC worker in
+    //     G1CodeRootSetHashTable::bulk_remove, walking a corrupt bucket chain in the
+    //     per-region nmethod table. That path is only reached from
+    //     unload_classes_and_code -> bulk_unregister_nmethods, which G1 runs after
+    //     unloading LambdaForm hidden classes during zone load. Serial/Parallel have
+    //     no G1CodeRootSet at all (nmethods live on one global ScavengableNMethods
+    //     list), so those frames cannot execute. Class unloading still works, so the
+    //     code cache and metaspace are still reclaimed.
+    //  2. SK's live set is small (~200MB in Haven), which is what Serial suits.
+    margv[++margc] = "-XX:+UseSerialGC";
+    // Also from KnightLauncher. SK holds textures/models behind soft references and
+    // the default (1000 ms per MB of free heap) retains them far too long for a phone.
+    margv[++margc] = "-XX:SoftRefLRUPolicyMSPerMB=10";
+    // GC / class-unload / code-cache log next to the hs_err file, so Share Logs picks
+    // it up. Cheap, and it is how we confirm the GC change above behaves on-device.
+    margv[++margc] = [NSString stringWithFormat:@"-Xlog:gc,class+unload=info,codecache=info:file=%s/vmlog-%%p.log:uptime,level,tags:filecount=3,filesize=4M", home].UTF8String;
+    // iOS 26+ Trusted Execution Monitor forbids plain RWX JIT pages. This JRE
+    // build's mirror-mapped CodeCache (separate RW-write / RX-execute views of the
+    // same physical pages) is the W^X-compliant path it needs. Matches Amethyst-iOS.
+    if (NSProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26) {
+        margv[++margc] = "-XX:+MirrorMappedCodeCache";
+    }
+    // UseCompressedClassPointers is broken on Java 25 in a jailed iOS address
+    // space: without the extended-virtual-addressing entitlement the compressed
+    // class space lands too high to encode with shift 0 and the VM aborts at
+    // compressedKlass.cpp. Disable it unless that entitlement is present. Matches
+    // Amethyst-iOS.
+    if (!getEntitlementValue(@"com.apple.developer.kernel.extended-virtual-addressing")) {
+        margv[++margc] = "-XX:-UseCompressedClassPointers";
+    }
+    // -XX:+SuppressFatalErrorMessage intentionally omitted while bringing up the
+    // JIT VM so HotSpot's crash report reaches the console. Re-add once stable.
 
     // Caciocavallo AWT bridge
     NSString *cacioDir = [NSString stringWithFormat:@"%s/cacio", home];

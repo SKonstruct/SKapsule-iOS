@@ -68,6 +68,12 @@ stage "$REPO_ROOT/assets/fontconfig.properties" \
     echo "  (create assets/fontconfig.properties)"
 
 echo
+echo "=== JIT script (StikJIT, iOS 26 TXM) ==="
+stage "$REPO_ROOT/assets/UniversalJIT26.js" \
+      "$APP_DIR/UniversalJIT26.js" ||
+    echo "  (assets/UniversalJIT26.js missing)"
+
+echo
 echo "=== LWJGL Modules ==="
 LWJGL_MODS="$REPO_ROOT/out/lwjgl3/lwjgl-3.4.1-ios-modules.zip"
 if [[ -f "$LWJGL_MODS" ]]; then

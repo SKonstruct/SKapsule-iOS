@@ -131,11 +131,18 @@ jre: native
 		-miphoneos-version-min=14.0 \
 		-o $(WORKINGDIR)/libprefs.dylib \
 		$(SOURCEDIR)/Natives/prefs_stubs.c; \
+	echo "[SKapsule] Building libawt_xawt.dylib stub..."; \
+	xcrun -sdk iphoneos clang -shared -arch arm64 \
+		-isysroot $$(xcrun --sdk iphoneos --show-sdk-path) \
+		-miphoneos-version-min=14.0 \
+		-o $(WORKINGDIR)/libawt_xawt.dylib \
+		$(SOURCEDIR)/Natives/awt_xawt/xawt_fake.m; \
 	rm -rf $(SOURCEDIR)/out/jre25/{ASSEMBLY_EXCEPTION,bin,include,jre,legal,LICENSE,man,THIRD_PARTY_README,lib/{ct.sym,jspawnhelper,libjsig.dylib,src.zip,tools.jar}} 2>/dev/null || true; \
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/SKapsule.app/jre25); \
 	cp -R $(SOURCEDIR)/out/jre25/* $(WORKINGDIR)/SKapsule.app/jre25/ 2>/dev/null || true; \
 	cp $(WORKINGDIR)/libawt_headless.dylib $(WORKINGDIR)/SKapsule.app/jre25/lib/libawt_headless.dylib 2>/dev/null || true; \
 	cp $(WORKINGDIR)/libprefs.dylib $(WORKINGDIR)/SKapsule.app/jre25/lib/libprefs.dylib 2>/dev/null || true; \
+	cp $(WORKINGDIR)/libawt_xawt.dylib $(WORKINGDIR)/SKapsule.app/jre25/lib/libawt_xawt.dylib 2>/dev/null || true; \
 	rm -rf $(WORKINGDIR)/SKapsule.app/lib $(WORKINGDIR)/SKapsule.app/conf $(WORKINGDIR)/SKapsule.app/jre25/lib/server/lib $(WORKINGDIR)/SKapsule.app/jre25/lib/server/conf; \
 	ln -sfn jre25/lib $(WORKINGDIR)/SKapsule.app/lib; \
 	ln -sfn jre25/conf $(WORKINGDIR)/SKapsule.app/conf; \
@@ -203,11 +210,18 @@ xcode-payload:
 		-miphoneos-version-min=14.0 \
 		-o $(WORKINGDIR)/libprefs.dylib \
 		$(SOURCEDIR)/Natives/prefs_stubs.c; \
+	echo "[SKapsule] Building libawt_xawt.dylib stub..."; \
+	xcrun -sdk iphoneos clang -shared -arch arm64 \
+		-isysroot $$(xcrun --sdk iphoneos --show-sdk-path) \
+		-miphoneos-version-min=14.0 \
+		-o $(WORKINGDIR)/libawt_xawt.dylib \
+		$(SOURCEDIR)/Natives/awt_xawt/xawt_fake.m; \
 	rm -rf $(SOURCEDIR)/out/jre25/{ASSEMBLY_EXCEPTION,bin,include,jre,legal,LICENSE,man,THIRD_PARTY_README,lib/{ct.sym,jspawnhelper,libjsig.dylib,src.zip,tools.jar}} 2>/dev/null || true; \
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/SKapsule.app/jre25); \
 	cp -R $(SOURCEDIR)/out/jre25/* $(WORKINGDIR)/SKapsule.app/jre25/ 2>/dev/null || true; \
 	cp $(WORKINGDIR)/libawt_headless.dylib $(WORKINGDIR)/SKapsule.app/jre25/lib/libawt_headless.dylib 2>/dev/null || true; \
 	cp $(WORKINGDIR)/libprefs.dylib $(WORKINGDIR)/SKapsule.app/jre25/lib/libprefs.dylib 2>/dev/null || true; \
+	cp $(WORKINGDIR)/libawt_xawt.dylib $(WORKINGDIR)/SKapsule.app/jre25/lib/libawt_xawt.dylib 2>/dev/null || true; \
 	rm -rf $(WORKINGDIR)/SKapsule.app/lib $(WORKINGDIR)/SKapsule.app/conf $(WORKINGDIR)/SKapsule.app/jre25/lib/server/lib $(WORKINGDIR)/SKapsule.app/jre25/lib/server/conf; \
 	ln -sfn jre25/lib $(WORKINGDIR)/SKapsule.app/lib; \
 	ln -sfn jre25/conf $(WORKINGDIR)/SKapsule.app/conf; \

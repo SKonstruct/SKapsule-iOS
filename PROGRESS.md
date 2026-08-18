@@ -14,10 +14,30 @@ Phase-level status tracker. For the detailed engineering plan on the active phas
 | 3     | Input bridge (touch, controls, gamepad, keyboard/mouse) | 🟡 Implemented — device validation pending |
 | 4     | Audio (OpenAL)                                          | ✅ Complete                                |
 | 5     | Steam login                                             | ✅ Complete                                |
+| 6     | iOS 26 JIT bring-up (TXM / StikDebug)                   | ✅ Complete                                |
+| 7     | Render fidelity & in-game stability                     | 🟡 Fixes landed — validation pending       |
 
 The app boots the JVM, renders the real Spiral Knights desktop client through gl4es,
 plays audio, logs in (Web or Steam, including Steam Guard), and runs gameplay end-to-end on device.
 Phase 3 is implemented and ready for on-device validation across touch, controller, and keyboard hardware before declaring feature parity with the Android port.
+
+## Recent Resolution: iOS 26 JIT bring-up (2026-08-15)
+
+The bundled JRE is now the AngelAuraMC JDK-25 **JIT** build, replacing the Zero
+interpreter. On A17+/iOS 26 the Trusted Execution Monitor enforces W^X in hardware, so
+the VM traps (`brk #0x69`) for an attached debugger to map its code pages; `StikDebug`
+running `assets/UniversalJIT26.js` services that. See [README.md](README.md) for the
+end-user setup flow and [ROADMAP.md](ROADMAP.md) for the engineering detail.
+
+Boot chain fixed along the way: compressed-class-pointer abort → missing
+`libawt_xawt.dylib` → `java.awt.Font.initIDs` → `GLFWNativeCocoa` → FFM upcall stubs.
+That last one is worth remembering: LWJGL's `GLFW*Callback` classes build a Java FFM
+(Panama) upcall stub in their constructor, and emitting it crashed the mirror-mapped
+code cache (`SIGBUS`/`BUS_ADRALN` in `UpcallLinker::make_upcall_stub`). Since SK's GLFW
+is fully shadowed, nothing ever calls those stubs natively, so `sk-bootstrap.jar` now
+shadows the callback classes to skip `org.lwjgl.system.Callback` entirely.
+
+**Working on-device:** Steam auth, character select, the lobby, audio, and touch input.
 
 ## Recent Resolution: gl4es use-after-free & Safe Area Layout
 

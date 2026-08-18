@@ -426,6 +426,8 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
 @property (nonatomic, strong) UIActivityIndicatorView *spinner;
 @property (nonatomic, strong) UITouch *primaryTouch;
 @property (nonatomic, assign) BOOL jvmKicked;
+@property (nonatomic, strong) UIAlertController *jitWaitAlert;
+@property (nonatomic, assign) BOOL jitWaitCancelled;
 @end
 
 @implementation GameViewController
@@ -810,7 +812,72 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
     [UIApplication sharedApplication].idleTimerDisabled = NO;
 }
 
+static BOOL skJITReady(void) {
+    // isJITEnabled is TXM-aware: on iOS 26 TXM devices it only reports ready when
+    // a debugger (StikJIT) running the JIT script is attached to service the VM's
+    // brk codegen syscalls; a plain attached debugger (e.g. Xcode lldb) is not
+    // enough there and would crash at BreakGetJITMapping.
+    return isJITEnabled(NO);
+}
+
 - (void)startJVM {
+    if (skJITReady() || [[NSUserDefaults standardUserDefaults] boolForKey:@"debug_skip_wait_jit"]) {
+        [self launchJVMNow];
+    } else {
+        [self waitForJITThenLaunch];
+    }
+}
+
+- (void)waitForJITThenLaunch {
+    self.bootStatus.text = @"Waiting for JIT…";
+    [self.spinner startAnimating];
+
+    // Nudge StikJIT to enable JIT for us. On TXM devices you must first import
+    // UniversalJIT26.js into StikJIT (Tools) and assign it to SKapsule; this URL
+    // only triggers the enable. If StikJIT isn't installed the open is a no-op.
+    NSURL *enableURL = skJITEnableURL();
+    if (enableURL) {
+        [[UIApplication sharedApplication] openURL:enableURL options:@{} completionHandler:nil];
+    }
+
+    UIAlertController *alert = [UIAlertController
+        alertControllerWithTitle:@"Waiting for JIT"
+                         message:@"Spiral Knights needs JIT. Enable it for SKapsule in StikJIT (import + assign "
+                                 @"UniversalJIT26.js once, then Enable JIT) and the game will continue automatically."
+                  preferredStyle:UIAlertControllerStyleAlert];
+    __weak typeof(self) weakSelf = self;
+    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel"
+                                              style:UIAlertActionStyleCancel
+                                            handler:^(UIAlertAction *action) {
+                                              __strong typeof(weakSelf) self = weakSelf;
+                                              if (!self) return;
+                                              self.jitWaitCancelled = YES;
+                                              self.jitWaitAlert = nil;
+                                              [self dismissViewControllerAnimated:YES completion:nil];
+                                            }]];
+    self.jitWaitAlert = alert;
+    [self presentViewController:alert animated:YES completion:nil];
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+      while (!skJITReady()) {
+          __strong typeof(weakSelf) self = weakSelf;
+          if (!self || self.jitWaitCancelled) return;
+          usleep(200 * 1000);
+      }
+      dispatch_async(dispatch_get_main_queue(), ^{
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self || self.jitWaitCancelled) return;
+        [self.jitWaitAlert dismissViewControllerAnimated:YES completion:nil];
+        self.jitWaitAlert = nil;
+        [self launchJVMNow];
+      });
+    });
+}
+
+- (void)launchJVMNow {
+    self.bootStatus.text = @"Launching Spiral Knights…";
+    [self.spinner startAnimating];
+
     BOOL isSteam = (self.loginMode == 1);  // SKLoginModeSteam
     CGSize surfaceSize = self.surfaceView.frame.size;
     CGFloat scale = gEAGLLayer.contentsScale;

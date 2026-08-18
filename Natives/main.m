@@ -4,6 +4,7 @@
 #import <sys/sysctl.h>
 
 #import "AppDelegate.h"
+#import "JavaLauncher.h"
 #import "config.h"
 #import "utils.h"
 
@@ -58,12 +59,47 @@ static void init_setupHomeDirectory(void) {
     setenv("SKAPSULE_HOME", realpath(homeDir.UTF8String, NULL), 1);
 }
 
+// Keep only the `keep` newest files whose name starts with `prefix`. The JVM names
+// its crash reports and -Xlog output per-pid (hs_err_pid<N>.log, vmlog-<N>.log), so
+// nothing ever overwrites them and Share Logs would otherwise keep exporting runs
+// from weeks ago. Pruning at launch rather than at exit is deliberate: the previous
+// run's crash report has to survive the relaunch, since that is when it gets shared.
+static void prune_logs(NSString *home, NSString *prefix, NSUInteger keep) {
+    NSMutableArray<NSString *> *matches = [NSMutableArray array];
+    for (NSString *name in [fm contentsOfDirectoryAtPath:home error:nil]) {
+        if ([name hasPrefix:prefix]) {
+            [matches addObject:name];
+        }
+    }
+    if (matches.count <= keep) {
+        return;
+    }
+    // Newest first, so everything from index `keep` on is surplus.
+    [matches sortUsingComparator:^NSComparisonResult(NSString *a, NSString *b) {
+        NSDate *da = [fm attributesOfItemAtPath:[home stringByAppendingPathComponent:a]
+                                          error:nil].fileModificationDate;
+        NSDate *db = [fm attributesOfItemAtPath:[home stringByAppendingPathComponent:b]
+                                          error:nil].fileModificationDate;
+        if (!da || !db) {
+            return NSOrderedSame;
+        }
+        return [db compare:da];
+    }];
+    for (NSUInteger i = keep; i < matches.count; i++) {
+        [fm removeItemAtPath:[home stringByAppendingPathComponent:matches[i]] error:nil];
+    }
+}
+
 static void __attribute__((unused)) init_redirectStdio(void) {
     NSString *home = @(getenv("SKAPSULE_HOME"));
     NSString *currName = [home stringByAppendingPathComponent:@"latestlog.txt"];
     NSString *oldName = [home stringByAppendingPathComponent:@"latestlog.old.txt"];
     [fm removeItemAtPath:oldName error:nil];
     [fm moveItemAtPath:currName toPath:oldName error:nil];
+
+    // Same two-generation retention latestlog gets, applied to the per-pid JVM logs.
+    prune_logs(home, @"hs_err_pid", 3);
+    prune_logs(home, @"vmlog-", 3);
 
     [fm createFileAtPath:currName contents:nil attributes:nil];
     NSFileHandle *file = [NSFileHandle fileHandleForWritingAtPath:currName];
@@ -74,6 +110,13 @@ static void __attribute__((unused)) init_redirectStdio(void) {
 
     setvbuf(stdout, 0, _IOLBF, 0);
     setvbuf(stderr, 0, _IONBF, 0);
+
+    // Tee: keep a copy of the original stdout so console output (Xcode /
+    // Console.app) still works, while also writing everything to latestlog.txt so
+    // the launcher's "Share Logs" / "Save Logs" can capture non-Xcode (StikJIT)
+    // launches.
+    static int origOut;
+    origOut = dup(fileno(stdout));
 
     static int pfd[2];
     pipe(pfd);
@@ -86,6 +129,9 @@ static void __attribute__((unused)) init_redirectStdio(void) {
       while ((rsize = read(pfd[0], buf, sizeof(buf) - 1)) > 0) {
           if (rsize < 2048)
               buf[rsize] = '\0';
+          if (origOut >= 0) {
+              write(origOut, buf, rsize);
+          }
           [file writeData:[NSData dataWithBytes:buf length:rsize]];
           [file synchronizeFile];
       }
@@ -127,17 +173,17 @@ static void init_setupGameDirs(void) {
 }
 
 int main(int argc, char *argv[]) {
-    static BOOL isMainReentered = NO;
-    if (isMainReentered) {
-        NSLog(@"[Pre-init] Intercepted libjli main() callback via re-entry! Parking thread.");
-        extern void register_sk_natives_if_needed(void);
-        register_sk_natives_if_needed();
-        while (1) {
-            sleep(UINT32_MAX);
-        }
-        return 0;
+    // libjli's macOS/iOS launcher re-invokes main() (via apple_main) on the
+    // thread that must run the VM's main class. Once launchJVM has resolved
+    // JLI_Launch, forward that re-entry straight back into it so the main class
+    // actually runs on this thread — the launcher's JAVA_STARTED_ON_FIRST_THREAD
+    // guard prevents further recursion. Parking here instead deadlocks the
+    // launch. Mirrors Amethyst-iOS.
+    if (pJLI_Launch) {
+        NSLog(@"[Pre-init] libjli main() re-entry — forwarding into JLI_Launch");
+        return pJLI_Launch(argc, (const char **)argv, 0, NULL, 0, NULL, "25-internal", "25", "java", "openjdk", 0, 1, 0,
+                           1);
     }
-    isMainReentered = YES;
 
     if (argc == 2 && strlen(argv[1]) == 0) {
         // Child process for JIT enablement via PT_TRACE_ME
@@ -147,9 +193,10 @@ int main(int argc, char *argv[]) {
 
     isJailbroken = init_checkForJailbreak();
     init_setupHomeDirectory();
-    // init_redirectStdio(); // Temporarily disabled so logs show up in Xcode console
+    init_redirectStdio();  // tees console output to latestlog.txt for Share/Save Logs
     init_logDeviceAndVer();
     init_setupGameDirs();
+    skStageJITScriptToDocuments();  // make the JIT script importable in StikJIT
 
     // If sandbox is disabled (TrollStore), enable JIT via PT_TRACE_ME
     if (!isJITEnabled(YES) && getEntitlementValue(@"com.apple.private.security.no-sandbox")) {

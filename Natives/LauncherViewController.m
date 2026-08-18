@@ -20,6 +20,10 @@ typedef NS_ENUM(NSInteger, SKLoginMode) {
 @property (nonatomic, strong) UIActivityIndicatorView *spinner;
 @property (nonatomic, assign) BOOL runtimeReady;
 
+// JIT status pill (tap to enable via StikJIT)
+@property (nonatomic, strong) UIButton *jitStatusButton;
+@property (nonatomic, strong) NSTimer *jitStatusTimer;
+
 // Sidebar & Dimming Overlay
 @property (nonatomic, strong) UIView *dimmingView;
 @property (nonatomic, strong) UIView *sidebarView;
@@ -127,6 +131,28 @@ typedef NS_ENUM(NSInteger, SKLoginMode) {
         self.btnLaunch.tintColor = UIColor.whiteColor;
     }
     [self.view addSubview:self.btnLaunch];
+
+    // 4b. JIT status pill (tap to enable JIT via StikJIT before playing)
+    self.jitStatusButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    self.jitStatusButton.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightSemibold];
+    self.jitStatusButton.titleLabel.lineBreakMode = NSLineBreakByClipping;
+    self.jitStatusButton.layer.cornerRadius = 16;
+    self.jitStatusButton.layer.borderWidth = 1;
+    self.jitStatusButton.clipsToBounds = YES;
+    self.jitStatusButton.translatesAutoresizingMaskIntoConstraints = NO;
+    // Icon<->title gap added via contentEdgeInsets and cancelled in the title/image
+    // insets so the button's intrinsic width stays correct (a bare titleEdgeInsets
+    // shifts the label without widening the button, which clips it).
+    const CGFloat spacing = 6;
+    self.jitStatusButton.contentEdgeInsets = UIEdgeInsetsMake(8, 16 + spacing / 2, 8, 16 + spacing / 2);
+    self.jitStatusButton.imageEdgeInsets = UIEdgeInsetsMake(0, -spacing / 2, 0, spacing / 2);
+    self.jitStatusButton.titleEdgeInsets = UIEdgeInsetsMake(0, spacing / 2, 0, -spacing / 2);
+    [self.jitStatusButton setContentCompressionResistancePriority:UILayoutPriorityRequired
+                                                          forAxis:UILayoutConstraintAxisHorizontal];
+    [self.jitStatusButton addTarget:self
+                             action:@selector(onEnableJITPressed)
+                   forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:self.jitStatusButton];
 
     // 5. Setup Status & Spinner
     self.setupStatus = [[UILabel alloc] init];
@@ -316,7 +342,10 @@ typedef NS_ENUM(NSInteger, SKLoginMode) {
 
         // Setup status / spinner
         [self.spinner.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
-        [self.spinner.topAnchor constraintEqualToAnchor:self.btnLaunch.bottomAnchor constant:24],
+        [self.jitStatusButton.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+        [self.jitStatusButton.topAnchor constraintEqualToAnchor:self.btnLaunch.bottomAnchor constant:16],
+
+        [self.spinner.topAnchor constraintEqualToAnchor:self.jitStatusButton.bottomAnchor constant:16],
 
         [self.setupStatus.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
         [self.setupStatus.topAnchor constraintEqualToAnchor:self.spinner.bottomAnchor constant:8],
@@ -358,11 +387,79 @@ typedef NS_ENUM(NSInteger, SKLoginMode) {
     [self setButtonsEnabled:NO];
     [self fetchPlayerCount];
     [self ensureRuntime];
+
+    // Refresh the JIT pill whenever we come back from StikJIT.
+    [NSNotificationCenter.defaultCenter addObserver:self
+                                           selector:@selector(refreshJITStatus)
+                                               name:UIApplicationDidBecomeActiveNotification
+                                             object:nil];
+    [self refreshJITStatus];
 }
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     [self updateLogoutButtonVisibility];
+    [self refreshJITStatus];
+    // Poll while visible so the pill flips to "enabled" the moment JIT is granted.
+    [self.jitStatusTimer invalidate];
+    self.jitStatusTimer = [NSTimer scheduledTimerWithTimeInterval:1.5
+                                                           target:self
+                                                         selector:@selector(refreshJITStatus)
+                                                         userInfo:nil
+                                                          repeats:YES];
+}
+
+- (void)viewDidDisappear:(BOOL)animated {
+    [super viewDidDisappear:animated];
+    [self.jitStatusTimer invalidate];
+    self.jitStatusTimer = nil;
+}
+
+- (void)dealloc {
+    [self.jitStatusTimer invalidate];
+    [NSNotificationCenter.defaultCenter removeObserver:self];
+}
+
+#pragma mark - JIT status
+
+- (void)refreshJITStatus {
+    BOOL enabled = isJITEnabled(NO);
+    UIColor *green = [UIColor colorWithRed:0.30 green:0.78 blue:0.42 alpha:1.0];
+    UIColor *amber = [UIColor colorWithRed:0.95 green:0.62 blue:0.20 alpha:1.0];
+    UIColor *color = enabled ? green : amber;
+
+    [self.jitStatusButton setTitle:(enabled ? @"JIT enabled" : @"Enable JIT") forState:UIControlStateNormal];
+    [self.jitStatusButton setTitleColor:color forState:UIControlStateNormal];
+    self.jitStatusButton.tintColor = color;
+    self.jitStatusButton.layer.borderColor = [color colorWithAlphaComponent:0.6].CGColor;
+    self.jitStatusButton.backgroundColor = [color colorWithAlphaComponent:0.12];
+    if (@available(iOS 13.0, *)) {
+        NSString *icon = enabled ? @"checkmark.seal.fill" : @"bolt.slash.fill";
+        [self.jitStatusButton setImage:[UIImage systemImageNamed:icon] forState:UIControlStateNormal];
+    }
+    self.jitStatusButton.enabled = !enabled;  // nothing to do once enabled
+}
+
+- (void)onEnableJITPressed {
+    if (isJITEnabled(NO)) {
+        return;
+    }
+    NSURL *url = skJITEnableURL();
+    if (!url) {
+        return;
+    }
+    [[UIApplication sharedApplication]
+                  openURL:url
+                  options:@{}
+        completionHandler:^(BOOL success) {
+          if (!success) {
+              dispatch_async(dispatch_get_main_queue(), ^{
+                [self showAlertWithTitle:@"StikJIT not found"
+                                 message:@"Install StikJIT (with a paired device) to enable JIT, then tap \"Enable "
+                                         @"JIT\" again. JIT is required to run Spiral Knights."];
+              });
+          }
+        }];
 }
 
 - (UIButton *)createSidebarButtonWithTitle:(NSString *)title iconName:(NSString *)iconName action:(SEL)action {
@@ -431,6 +528,17 @@ typedef NS_ENUM(NSInteger, SKLoginMode) {
     NSString *oldLogPath = [home stringByAppendingPathComponent:@"latestlog.old.txt"];
     if ([fileManager fileExistsAtPath:oldLogPath]) {
         [items addObject:[NSURL fileURLWithPath:oldLogPath]];
+    }
+
+    // Include HotSpot crash reports (-XX:ErrorFile writes hs_err_pid*.log here) and
+    // the VM GC/code-cache logs (-Xlog writes vmlog-*.log here).
+    for (NSString *name in [fileManager contentsOfDirectoryAtPath:home error:nil]) {
+        BOOL isCrashReport = [name hasPrefix:@"hs_err_pid"] && [name hasSuffix:@".log"];
+        // No suffix test: -Xlog rotation appends an index (vmlog-<pid>.log.0).
+        BOOL isVMLog = [name hasPrefix:@"vmlog-"];
+        if (isCrashReport || isVMLog) {
+            [items addObject:[NSURL fileURLWithPath:[home stringByAppendingPathComponent:name]]];
+        }
     }
 
     if (items.count > 0) {

@@ -1,8 +1,8 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#define CONFIG_BRANCH "main"
-#define CONFIG_COMMIT "3ce12b8"
+#define CONFIG_BRANCH ""
+#define CONFIG_COMMIT ""
 
 /* #undef CONFIG_RELEASE */
 #ifdef CONFIG_RELEASE
