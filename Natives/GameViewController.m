@@ -4,15 +4,21 @@
 #import "NativeBridge.h"
 #import "SKInstaller.h"
 #import "utils.h"
+#import "SKTouchControlOverlay.h"
+#import "SKKeyboardBridge.h"
 
 #import <OpenGLES/EAGL.h>
 #import <OpenGLES/ES2/gl.h>
 #import <OpenGLES/ES2/glext.h>
 #import <QuartzCore/QuartzCore.h>
 #include <math.h>
+#include <mach/mach.h>
+#include <os/proc.h>
 #import <GameController/GameController.h>
 
 extern void sk_input_push_cursor(int x, int y);
+extern void sk_input_push_framebuffer_size(int width, int height);
+extern void sk_gl_request_resize(void);
 extern void sk_input_push_mouse_button(int button, BOOL pressed);
 extern void sk_input_push_key(int key, int action, int modifiers);
 extern void sk_input_push_char(int codepoint);
@@ -49,240 +55,6 @@ enum {
 };
 
 static const CGFloat SKAxisDeadzone = 0.15;
-
-@interface SKTouchButton : UIView
-- (instancetype)initWithTitle:(NSString *)title button:(NSInteger)button axis:(BOOL)axis toggle:(BOOL)toggle;
-@end
-
-@interface SKTouchJoystick : UIView
-- (instancetype)initWithAxisX:(NSInteger)axisX axisY:(NSInteger)axisY;
-@end
-
-@interface SKTouchControlsView : UIView
-@end
-
-@implementation SKTouchButton {
-    NSInteger _button;
-    BOOL _axis;
-    BOOL _toggle;
-    BOOL _pressed;
-    BOOL _toggled;
-    UILabel *_label;
-}
-
-- (instancetype)initWithTitle:(NSString *)title button:(NSInteger)button axis:(BOOL)axis toggle:(BOOL)toggle {
-    self = [super initWithFrame:CGRectZero];
-    if (!self) return nil;
-
-    _button = button;
-    _axis = axis;
-    _toggle = toggle;
-    self.opaque = NO;
-    self.multipleTouchEnabled = NO;
-    self.layer.cornerRadius = 12;
-    self.layer.borderWidth = 1;
-    self.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.28].CGColor;
-
-    _label = [[UILabel alloc] initWithFrame:CGRectZero];
-    _label.text = title;
-    _label.textColor = UIColor.whiteColor;
-    _label.font = [UIFont systemFontOfSize:13 weight:UIFontWeightSemibold];
-    _label.textAlignment = NSTextAlignmentCenter;
-    _label.adjustsFontSizeToFitWidth = YES;
-    _label.minimumScaleFactor = 0.65;
-    _label.numberOfLines = 2;
-    [self addSubview:_label];
-    [self refreshAppearance];
-    return self;
-}
-
-- (void)layoutSubviews {
-    [super layoutSubviews];
-    _label.frame = CGRectInset(self.bounds, 4, 3);
-    self.layer.cornerRadius = MIN(self.bounds.size.width, self.bounds.size.height) * 0.24;
-}
-
-- (void)refreshAppearance {
-    self.backgroundColor = (_pressed || _toggled) ? [UIColor colorWithWhite:0.48 alpha:0.80]
-                                                   : [UIColor colorWithWhite:0.12 alpha:0.60];
-}
-
-- (void)sendPressed:(BOOL)pressed {
-    if (_axis) {
-        sk_gamepad_set_axis((int)_button, pressed ? 1.0f : -1.0f);
-    } else {
-        sk_gamepad_set_button((int)_button, pressed);
-    }
-}
-
-- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    _pressed = YES;
-    if (_toggle) {
-        _toggled = !_toggled;
-        [self sendPressed:_toggled];
-    } else {
-        [self sendPressed:YES];
-    }
-    [self refreshAppearance];
-}
-
-- (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    _pressed = NO;
-    if (!_toggle) [self sendPressed:NO];
-    [self refreshAppearance];
-}
-
-- (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    [self touchesEnded:touches withEvent:event];
-}
-
-@end
-
-@implementation SKTouchJoystick {
-    NSInteger _axisX;
-    NSInteger _axisY;
-    UITouch *_touch;
-    CGPoint _knob;
-}
-
-- (instancetype)initWithAxisX:(NSInteger)axisX axisY:(NSInteger)axisY {
-    self = [super initWithFrame:CGRectZero];
-    if (!self) return nil;
-
-    _axisX = axisX;
-    _axisY = axisY;
-    self.opaque = NO;
-    self.multipleTouchEnabled = NO;
-    return self;
-}
-
-- (void)layoutSubviews {
-    [super layoutSubviews];
-    if (!_touch) _knob = CGPointMake(CGRectGetMidX(self.bounds), CGRectGetMidY(self.bounds));
-}
-
-- (void)drawRect:(CGRect)rect {
-    CGFloat radius = MIN(self.bounds.size.width, self.bounds.size.height) * 0.5;
-    CGPoint center = CGPointMake(CGRectGetMidX(self.bounds), CGRectGetMidY(self.bounds));
-    [[UIColor colorWithWhite:0.12 alpha:0.40] setFill];
-    [[UIBezierPath bezierPathWithOvalInRect:CGRectMake(center.x - radius, center.y - radius, radius * 2, radius * 2)] fill];
-    CGFloat knobRadius = radius * 0.40;
-    [[UIColor colorWithWhite:0.62 alpha:0.80] setFill];
-    [[UIBezierPath bezierPathWithOvalInRect:CGRectMake(_knob.x - knobRadius, _knob.y - knobRadius,
-                                                        knobRadius * 2, knobRadius * 2)] fill];
-}
-
-- (void)reset {
-    _touch = nil;
-    _knob = CGPointMake(CGRectGetMidX(self.bounds), CGRectGetMidY(self.bounds));
-    sk_gamepad_set_axis((int)_axisX, 0.0f);
-    sk_gamepad_set_axis((int)_axisY, 0.0f);
-    [self setNeedsDisplay];
-}
-
-- (void)updateForTouch:(UITouch *)touch {
-    CGPoint point = [touch locationInView:self];
-    CGPoint center = CGPointMake(CGRectGetMidX(self.bounds), CGRectGetMidY(self.bounds));
-    CGFloat radius = MIN(self.bounds.size.width, self.bounds.size.height) * 0.5;
-    CGFloat maxDistance = radius * 0.6;
-    CGFloat dx = point.x - center.x;
-    CGFloat dy = point.y - center.y;
-    CGFloat distance = hypot(dx, dy);
-    if (distance > maxDistance && distance > 0.0) {
-        dx *= maxDistance / distance;
-        dy *= maxDistance / distance;
-    }
-    _knob = CGPointMake(center.x + dx, center.y + dy);
-    float x = dx / maxDistance;
-    float y = dy / maxDistance;
-    sk_gamepad_set_axis((int)_axisX, fabsf(x) < SKAxisDeadzone ? 0.0f : x);
-    sk_gamepad_set_axis((int)_axisY, fabsf(y) < SKAxisDeadzone ? 0.0f : y);
-    [self setNeedsDisplay];
-}
-
-- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    if (_touch) return;
-    _touch = touches.anyObject;
-    [self updateForTouch:_touch];
-}
-
-- (void)touchesMoved:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    if (_touch && [touches containsObject:_touch]) [self updateForTouch:_touch];
-}
-
-- (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    if (_touch && [touches containsObject:_touch]) [self reset];
-}
-
-- (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    if (_touch && [touches containsObject:_touch]) [self reset];
-}
-
-@end
-
-@implementation SKTouchControlsView {
-    SKTouchJoystick *_moveJoystick;
-    SKTouchJoystick *_faceJoystick;
-    NSArray<SKTouchButton *> *_buttons;
-}
-
-- (instancetype)initWithFrame:(CGRect)frame {
-    self = [super initWithFrame:frame];
-    if (!self) return nil;
-
-    self.opaque = NO;
-    _moveJoystick = [[SKTouchJoystick alloc] initWithAxisX:SKGamepadAxisLeftX axisY:SKGamepadAxisLeftY];
-    _faceJoystick = [[SKTouchJoystick alloc] initWithAxisX:SKGamepadAxisRightX axisY:SKGamepadAxisRightY];
-    [self addSubview:_moveJoystick];
-    [self addSubview:_faceJoystick];
-
-    _buttons = @[
-        [[SKTouchButton alloc] initWithTitle:@"Strafe" button:SKGamepadButtonRightThumb axis:NO toggle:YES],
-        [[SKTouchButton alloc] initWithTitle:@"Defend" button:SKGamepadAxisLeftTrigger axis:YES toggle:NO],
-        [[SKTouchButton alloc] initWithTitle:@"Attack" button:SKGamepadAxisRightTrigger axis:YES toggle:NO],
-        [[SKTouchButton alloc] initWithTitle:@"Dodge" button:SKGamepadButtonLeftThumb axis:NO toggle:NO],
-        [[SKTouchButton alloc] initWithTitle:@"Bash" button:SKGamepadButtonY axis:NO toggle:NO],
-        [[SKTouchButton alloc] initWithTitle:@"↑" button:SKGamepadButtonLeftBumper axis:NO toggle:NO],
-        [[SKTouchButton alloc] initWithTitle:@"↓" button:SKGamepadButtonRightBumper axis:NO toggle:NO],
-        [[SKTouchButton alloc] initWithTitle:@"A1" button:SKGamepadButtonA axis:NO toggle:NO],
-        [[SKTouchButton alloc] initWithTitle:@"A2" button:SKGamepadButtonB axis:NO toggle:NO],
-        [[SKTouchButton alloc] initWithTitle:@"A3" button:SKGamepadButtonX axis:NO toggle:NO],
-        [[SKTouchButton alloc] initWithTitle:@"I1" button:SKGamepadButtonDpadUp axis:NO toggle:NO],
-        [[SKTouchButton alloc] initWithTitle:@"I2" button:SKGamepadButtonDpadRight axis:NO toggle:NO],
-        [[SKTouchButton alloc] initWithTitle:@"I3" button:SKGamepadButtonDpadDown axis:NO toggle:NO],
-        [[SKTouchButton alloc] initWithTitle:@"I4" button:SKGamepadButtonDpadLeft axis:NO toggle:NO],
-    ];
-    for (SKTouchButton *button in _buttons) [self addSubview:button];
-    return self;
-}
-
-- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
-    UIView *view = [super hitTest:point withEvent:event];
-    return view == self ? nil : view;
-}
-
-- (void)layoutSubviews {
-    [super layoutSubviews];
-    CGFloat minDimension = MIN(self.bounds.size.width, self.bounds.size.height);
-    CGFloat joystickSize = MAX(104.0, MIN(160.0, minDimension * 0.40));
-    CGFloat buttonSize = MAX(40.0, MIN(70.0, minDimension * 0.15));
-    void (^place)(UIView *, CGFloat, CGFloat, CGFloat) = ^(UIView *view, CGFloat x, CGFloat y, CGFloat size) {
-      view.bounds = CGRectMake(0, 0, size, size);
-      view.center = CGPointMake(self.bounds.size.width * x, self.bounds.size.height * y);
-    };
-
-    place(_moveJoystick, 0.16, 0.72, joystickSize);
-    place(_faceJoystick, 0.84, 0.72, joystickSize);
-    const CGPoint positions[] = {
-        {0.29, 0.72}, {0.70, 0.72}, {0.70, 0.55}, {0.78, 0.43}, {0.89, 0.43}, {0.95, 0.55}, {0.95, 0.86},
-        {0.29, 0.90}, {0.36, 0.90}, {0.43, 0.90}, {0.50, 0.90}, {0.57, 0.90}, {0.64, 0.90}, {0.71, 0.90},
-    };
-    for (NSUInteger i = 0; i < _buttons.count; i++) {
-        place(_buttons[i], positions[i].x, positions[i].y, buttonSize);
-    }
-}
-
-@end
 
 EAGLContext *gEAGLContext = nil;
 CAEAGLLayer *gEAGLLayer = nil;
@@ -418,9 +190,14 @@ static BOOL push_key_event(UIKey *key, int action) {
 
 typedef NS_ENUM(NSInteger, SKLoginMode);
 
-@interface GameViewController ()
+@interface GameViewController () <SKTouchControlOverlayDelegate>
 @property (nonatomic, strong) UIView *surfaceView;
-@property (nonatomic, strong) SKTouchControlsView *touchControls;
+@property (nonatomic, strong) SKTouchControlOverlay *touchControls;
+@property (nonatomic, strong) UIButton *editLayoutButton;
+@property (nonatomic, strong) UIButton *keyboardButton;
+@property (nonatomic, strong) SKKeyboardBridge *keyboardBridge;
+@property (nonatomic, assign) CGSize lastDrawableSize;
+@property (nonatomic, assign) CGFloat renderScaleFactor;
 @property (nonatomic, strong) UILabel *bootStatus;
 @property (nonatomic, strong) UIView *bootOverlay;
 @property (nonatomic, strong) UIActivityIndicatorView *spinner;
@@ -428,6 +205,7 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
 @property (nonatomic, assign) BOOL jvmKicked;
 @property (nonatomic, strong) UIAlertController *jitWaitAlert;
 @property (nonatomic, assign) BOOL jitWaitCancelled;
+@property (nonatomic, strong) NSTimer *heapWatchdog;
 @end
 
 @implementation GameViewController
@@ -447,7 +225,19 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
 
     gEAGLLayer = (CAEAGLLayer *)self.surfaceView.layer;
     gEAGLLayer.opaque = YES;
-    gEAGLLayer.contentsScale = UIScreen.mainScreen.scale;
+    // Render scale is a framebuffer divisor: render smaller and let CoreAnimation upscale.
+    // It has to be in place before the first renderbufferStorage below, or SK asks
+    // nativeGetSurfaceSize during init, gets the full-resolution size, and lays its HUD out
+    // for a framebuffer that no longer exists.
+    //
+    // Set it through the view's contentScaleFactor, never on the layer: UIKit re-applies
+    // contentScaleFactor to layer.contentsScale whenever the view joins a window or lays
+    // out, so a value written straight to the layer here is silently reset to the screen
+    // scale and the game comes up at full resolution.
+    self.renderScaleFactor = UIScreen.mainScreen.scale * [SKTouchLayout loadLayout].renderScale;
+    self.surfaceView.contentScaleFactor = self.renderScaleFactor;
+    NSLog(@"[gl] render scale %.2f -> contentsScale %.2f",
+          [SKTouchLayout loadLayout].renderScale, self.renderScaleFactor);
     gEAGLLayer.drawableProperties =
         @{kEAGLDrawablePropertyRetainedBacking: @(NO), kEAGLDrawablePropertyColorFormat: kEAGLColorFormatRGBA8};
 
@@ -460,10 +250,17 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
     glGenRenderbuffers(1, &gRenderbuffer);
     glBindRenderbuffer(GL_RENDERBUFFER, gRenderbuffer);
 
-    self.touchControls = [[SKTouchControlsView alloc] initWithFrame:self.view.bounds];
-    self.touchControls.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    // Sized to the surface rather than the view: with "avoid screen edges" on they differ,
+    // and controls laid out against the view would sit outside the game.
+    self.touchControls = [[SKTouchControlOverlay alloc] initWithFrame:self.surfaceView.frame];
+    self.touchControls.delegate = self;
     [self.view addSubview:self.touchControls];
-    sk_gamepad_set_virtual_active(YES);
+
+    self.keyboardBridge = [[SKKeyboardBridge alloc] initWithFrame:CGRectZero];
+    [self.view addSubview:self.keyboardBridge];
+
+    self.editLayoutButton = [self chromeButtonWithTitle:@"⚙" action:@selector(onToggleEditLayout)];
+    self.keyboardButton = [self chromeButtonWithTitle:@"Keyboard" action:@selector(onToggleKeyboard)];
 
     UIHoverGestureRecognizer *hover = [[UIHoverGestureRecognizer alloc] initWithTarget:self action:@selector(handlePointerHover:)];
     [self.surfaceView addGestureRecognizer:hover];
@@ -487,6 +284,8 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER, gDepthRenderbuffer);
 
     glBindRenderbuffer(GL_RENDERBUFFER, gRenderbuffer);
+    self.lastDrawableSize = CGSizeMake(width, height);
+    [EAGLContext setCurrentContext:nil];
 
     // Boot overlay (shown while getdown runs)
     self.bootOverlay = [[UIView alloc] initWithFrame:self.view.bounds];
@@ -668,16 +467,29 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
     gamepad.rightThumbstickButton.pressedChangedHandler = nil;
 }
 
-- (void)handlePointerHover:(UIHoverGestureRecognizer *)hover {
-    CGPoint point = [hover locationInView:self.surfaceView];
-    CGFloat scale = self.surfaceView.contentScaleFactor;
+/// Points -> framebuffer pixels. Read from the size recorded when the drawable was last
+/// built, never by querying GL: this runs on the main thread for every touch move and
+/// hover, while SK's render thread has gEAGLContext current. Two threads issuing commands
+/// into one EAGLContext corrupts the driver's heap -- it is what made every libmalloc
+/// "corruption of free block" abort land in AppleMetalGLRenderer.
+- (CGFloat)pointToPixelScale {
+    CGFloat width = self.surfaceView.bounds.size.width;
+    if (width <= 0 || self.lastDrawableSize.width <= 0)
+        return self.surfaceView.contentScaleFactor;
+    return self.lastDrawableSize.width / width;
+}
+
+- (void)pushCursorAtPoint:(CGPoint)point {
+    CGFloat scale = [self pointToPixelScale];
     sk_input_push_cursor((int)lround(point.x * scale), (int)lround(point.y * scale));
 }
 
+- (void)handlePointerHover:(UIHoverGestureRecognizer *)hover {
+    [self pushCursorAtPoint:[hover locationInView:self.surfaceView]];
+}
+
 - (void)sendCursorForTouch:(UITouch *)touch {
-    CGPoint point = [touch locationInView:self.surfaceView];
-    CGFloat scale = self.surfaceView.contentScaleFactor;
-    sk_input_push_cursor((int)lround(point.x * scale), (int)lround(point.y * scale));
+    [self pushCursorAtPoint:[touch locationInView:self.surfaceView]];
 }
 
 - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
@@ -740,6 +552,9 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
       tf.placeholder = @"Code";
       tf.keyboardType = UIKeyboardTypeNumberPad;
       tf.autocorrectionType = UITextAutocorrectionTypeNo;
+      // Lets iOS offer the code straight from Messages, and password managers offer their
+      // stored TOTP for the Steam entry.
+      tf.textContentType = UITextContentTypeOneTimeCode;
     }];
 
     [alert addAction:[UIAlertAction actionWithTitle:@"Submit"
@@ -758,6 +573,55 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
     [self presentViewController:alert animated:YES completion:nil];
 }
 
+/// UIKit's safe area is far too generous for a fullscreen game: in landscape it applies the
+/// sensor-housing inset to *both* sides for symmetry and reserves the whole home-indicator
+/// strip, which on an iPhone 15 Pro costs 118 of 2556 px horizontally and 63 px vertically
+/// for nothing. Inset the sensor-housing edge only (so the surface runs right up to the
+/// Dynamic Island with no gap) and give the other three edges a small corner allowance.
+///
+/// A rect inset by ~0.29 * cornerRadius exactly touches the corner arc; the Android port
+/// uses radius/3 (0.33) and stays fully clear. We deliberately go under that, trading a few
+/// clipped corner pixels for a lot of rendered ones -- which is what the edges are for.
+- (UIEdgeInsets)gameSafeAreaInsets {
+    // Along an edge's middle the display curve clips nothing -- only the corners do -- so
+    // the long edges can be inset far less than the short ones. 8pt on the sides matches
+    // what looks right on device; 2pt top and bottom keeps the corners from eating HUD
+    // while reclaiming the strip that was going to waste.
+    static const CGFloat kSideAllowance = 8.0f;
+    static const CGFloat kEndAllowance = 2.0f;
+
+    // UIKit's inset on the sensor-housing side clears the housing *and* adds its own
+    // margin, which shows up as a visible gap between the Dynamic Island and the game.
+    // That margin is ~11pt on Island devices (portrait: island ends ~48pt down, safe area
+    // is 59pt). Give it back. Clamped so a device with a smaller inset can't go negative.
+    static const CGFloat kHousingMargin = 11.0f;
+
+    UIEdgeInsets insets = UIEdgeInsetsZero;
+    if (@available(iOS 11.0, *)) insets = self.view.safeAreaInsets;
+
+    UIInterfaceOrientation orientation = UIInterfaceOrientationUnknown;
+    if (@available(iOS 13.0, *)) orientation = self.view.window.windowScene.interfaceOrientation;
+
+    // UIInterfaceOrientation is defined against the *device* orientation it corresponds to,
+    // which inverts the reading its name suggests: LandscapeRight == UIDeviceOrientation-
+    // LandscapeLeft == home-button edge on the right, so the top of the device -- and with
+    // it the sensor housing -- is on the LEFT. Confirmed on device; getting this backwards
+    // paints the game under the Dynamic Island, which is the whole thing this avoids.
+    CGFloat housing = MAX(MAX(insets.left, insets.right) - kHousingMargin, 0.0f);
+    CGFloat left = kSideAllowance, right = kSideAllowance;
+    if (orientation == UIInterfaceOrientationLandscapeRight) {
+        left = housing;
+    } else if (orientation == UIInterfaceOrientationLandscapeLeft) {
+        right = housing;
+    } else {
+        // Orientation not known yet (first layout pass): keep both sides clear rather than
+        // guessing wrong and painting under the island.
+        left = right = housing;
+    }
+
+    return UIEdgeInsetsMake(MAX(insets.top, kEndAllowance), left, kEndAllowance, right);
+}
+
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
 
@@ -769,16 +633,35 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
 
     CGRect bounds = self.view.bounds;
     if (avoidEdges) {
-        if (@available(iOS 11.0, *)) {
-            UIEdgeInsets insets = self.view.safeAreaInsets;
-            bounds = UIEdgeInsetsInsetRect(bounds, insets);
-        }
+        bounds = UIEdgeInsetsInsetRect(bounds, [self gameSafeAreaInsets]);
     }
     self.surfaceView.frame = bounds;
 
-    if (gEAGLContext) {
+    self.touchControls.frame = bounds;
+    [self layoutChromeButtons];
+
+    // Rebuilding the drawable is GL work on the main thread. That is only safe before SK's
+    // render thread takes gEAGLContext; afterwards the two would be issuing commands into
+    // one context, which corrupts the driver's heap. The scale is applied once at layer
+    // creation (see viewDidLoad), so in practice there is nothing to do here after boot.
+    // Re-assert on every layout: UIKit resets it from the screen scale behind our back.
+    // Cheap, not a GL call, safe at any point in the session.
+    if (self.renderScaleFactor > 0)
+        self.surfaceView.contentScaleFactor = self.renderScaleFactor;
+
+    if (gEAGLContext && !self.jvmKicked) {
         [EAGLContext setCurrentContext:gEAGLContext];
-        gEAGLLayer.contentsScale = UIScreen.mainScreen.scale;
+        CGFloat contentsScale = self.renderScaleFactor;
+
+        // Rebuilding the renderbuffer re-enters layout, so bail unless the target actually
+        // moved -- otherwise this spins forever.
+        CGSize target = CGSizeMake(round(bounds.size.width * contentsScale), round(bounds.size.height * contentsScale));
+        if (CGSizeEqualToSize(target, self.lastDrawableSize)) {
+            [EAGLContext setCurrentContext:nil];
+            return;
+        }
+        self.lastDrawableSize = target;
+
         glBindRenderbuffer(GL_RENDERBUFFER, gRenderbuffer);
         [gEAGLContext renderbufferStorage:GL_RENDERBUFFER fromDrawable:gEAGLLayer];
 
@@ -794,6 +677,10 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
             glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER, gDepthRenderbuffer);
             glBindRenderbuffer(GL_RENDERBUFFER, gRenderbuffer);
         }
+
+        // Hand the context back: anything else running on the main thread must not inherit
+        // the renderer's context.
+        [EAGLContext setCurrentContext:nil];
     }
 }
 
@@ -879,10 +766,14 @@ static BOOL skJITReady(void) {
     [self.spinner startAnimating];
 
     BOOL isSteam = (self.loginMode == 1);  // SKLoginModeSteam
+    // Deliberately the unscaled screen scale: this sizes Cacio's virtual AWT screen
+    // (dialogs, cursor), which must not shrink with the render-scale divisor.
     CGSize surfaceSize = self.surfaceView.frame.size;
-    CGFloat scale = gEAGLLayer.contentsScale;
+    CGFloat scale = UIScreen.mainScreen.scale;
     int w = (int)(surfaceSize.width * scale);
     int h = (int)(surfaceSize.height * scale);
+
+    [self startHeapWatchdog];
 
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
       int ret = launchJVM(self.steamUser ?: @"", self.steamPass ?: @"", isSteam, w, h);
@@ -892,6 +783,146 @@ static BOOL skJITReady(void) {
         [self.spinner stopAnimating];
       });
     });
+}
+
+// Three crashes in this port have been the same disease with a different victim each
+// time (G1's nmethod table, the GL driver's object table, then libmalloc's own freelist,
+// which trapped with "memory corruption of free block"). Walking the zone on a timer
+// brackets the corruption to a 5s window so it can be correlated with the game log.
+#pragma mark - Chrome buttons
+
+static NSString *const kChromePrefsKey = @"game_chrome_prefs";
+static const CGFloat kChromeDragSlop = 20.0f;
+
+- (UIButton *)chromeButtonWithTitle:(NSString *)title action:(SEL)action {
+    UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
+    [button setTitle:title forState:UIControlStateNormal];
+    [button setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+    button.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
+    button.backgroundColor = [UIColor colorWithWhite:0 alpha:0.55];
+    button.layer.cornerRadius = 8;
+    button.contentEdgeInsets = UIEdgeInsetsMake(6, 12, 6, 12);
+    [button addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];
+    [button sizeToFit];
+
+    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleChromeDrag:)];
+    [button addGestureRecognizer:pan];
+
+    [self.view addSubview:button];
+    return button;
+}
+
+- (void)chromePositionForKey:(NSString *)key defaultX:(CGFloat)dx defaultY:(CGFloat)dy into:(CGPoint *)out {
+    NSDictionary *prefs = [[NSUserDefaults standardUserDefaults] dictionaryForKey:kChromePrefsKey];
+    NSNumber *x = prefs[[key stringByAppendingString:@"_x"]];
+    NSNumber *y = prefs[[key stringByAppendingString:@"_y"]];
+    out->x = x ? x.doubleValue : dx;
+    out->y = y ? y.doubleValue : dy;
+}
+
+- (void)layoutChromeButtons {
+    CGRect bounds = self.surfaceView.frame;
+    if (CGRectIsEmpty(bounds)) return;
+
+    CGFloat alpha = MAX(self.touchControls.layout.globalOpacity, 0.2);
+    CGPoint fraction;
+
+    [self chromePositionForKey:@"gear" defaultX:0.94 defaultY:0.06 into:&fraction];
+    self.editLayoutButton.center = CGPointMake(CGRectGetMinX(bounds) + bounds.size.width * fraction.x,
+                                               CGRectGetMinY(bounds) + bounds.size.height * fraction.y);
+    self.editLayoutButton.alpha = alpha;
+
+    [self chromePositionForKey:@"kb" defaultX:0.78 defaultY:0.06 into:&fraction];
+    self.keyboardButton.center = CGPointMake(CGRectGetMinX(bounds) + bounds.size.width * fraction.x,
+                                             CGRectGetMinY(bounds) + bounds.size.height * fraction.y);
+    self.keyboardButton.alpha = alpha;
+}
+
+- (void)handleChromeDrag:(UIPanGestureRecognizer *)pan {
+    // Only movable while laying out controls, so a mis-swipe during play still presses.
+    if (!self.touchControls.isEditing) return;
+
+    UIView *button = pan.view;
+    CGPoint translation = [pan translationInView:self.view];
+    if (hypot(translation.x, translation.y) < kChromeDragSlop && pan.state != UIGestureRecognizerStateEnded) return;
+
+    if (pan.state == UIGestureRecognizerStateChanged) {
+        button.center = CGPointMake(button.center.x + translation.x, button.center.y + translation.y);
+        [pan setTranslation:CGPointZero inView:self.view];
+    } else if (pan.state == UIGestureRecognizerStateEnded || pan.state == UIGestureRecognizerStateCancelled) {
+        [self persistChromePosition:button];
+    }
+}
+
+- (void)persistChromePosition:(UIView *)button {
+    CGRect bounds = self.surfaceView.frame;
+    if (CGRectIsEmpty(bounds)) return;
+    NSString *key = (button == self.editLayoutButton) ? @"gear" : @"kb";
+
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSMutableDictionary *prefs = [([defaults dictionaryForKey:kChromePrefsKey] ?: @{}) mutableCopy];
+    prefs[[key stringByAppendingString:@"_x"]] = @((button.center.x - CGRectGetMinX(bounds)) / bounds.size.width);
+    prefs[[key stringByAppendingString:@"_y"]] = @((button.center.y - CGRectGetMinY(bounds)) / bounds.size.height);
+    [defaults setObject:prefs forKey:kChromePrefsKey];
+}
+
+- (void)onToggleEditLayout {
+    [self.touchControls toggleEditMode];
+    [self.editLayoutButton setTitle:self.touchControls.isEditing ? @"Done" : @"⚙" forState:UIControlStateNormal];
+    [self.editLayoutButton sizeToFit];
+    [self layoutChromeButtons];
+}
+
+- (void)onToggleKeyboard {
+    [self.keyboardBridge toggle];
+}
+
+- (void)touchOverlay:(SKTouchControlOverlay *)overlay didChangeRenderScale:(CGFloat)renderScale {
+    self.renderScaleFactor = UIScreen.mainScreen.scale * renderScale;
+    // contentScaleFactor is a UIKit property, not GL -- safe on the main thread, and it is
+    // what CoreAnimation hands to renderbufferStorage:fromDrawable:.
+    self.surfaceView.contentScaleFactor = self.renderScaleFactor;
+
+    CGSize bounds = self.surfaceView.bounds.size;
+    self.lastDrawableSize = CGSizeMake(round(bounds.width * self.renderScaleFactor),
+                                       round(bounds.height * self.renderScaleFactor));
+
+    // The rebuild itself has to happen on the thread that owns the context. Before the JVM
+    // is up there is no render thread yet, so do it inline via the layout path instead.
+    if (self.jvmKicked)
+        sk_gl_request_resize();
+    else
+        [self.view setNeedsLayout];
+}
+
+- (void)startHeapWatchdog {
+    if (self.heapWatchdog) return;
+    __weak typeof(self) weakSelf = self;
+    __block int tick = 0;
+    // 1s while the scene loads -- every corruption crash so far has landed inside the
+    // first ~10s of GL activity, and a 5s period barely sampled that window at all.
+    self.heapWatchdog = [NSTimer scheduledTimerWithTimeInterval:1.0
+                                                        repeats:YES
+                                                          block:^(NSTimer *timer) {
+        if (!weakSelf) { [timer invalidate]; return; }
+        ++tick;
+        BOOL settled = tick > 60;
+        if (settled && (tick % 5)) return;
+
+        task_vm_info_data_t info;
+        mach_msg_type_number_t count = TASK_VM_INFO_COUNT;
+        if (task_info(mach_task_self(), TASK_VM_INFO, (task_info_t)&info, &count) == KERN_SUCCESS) {
+            NSLog(@"[mem] t=%ds footprint=%lluMB available=%lluMB", tick,
+                  (unsigned long long)(info.phys_footprint >> 20),
+                  (unsigned long long)(os_proc_available_memory() >> 20));
+        }
+    }];
+}
+
+- (void)didReceiveMemoryWarning {
+    [super didReceiveMemoryWarning];
+    NSLog(@"[mem] *** memory warning, available=%lluMB ***",
+          (unsigned long long)(os_proc_available_memory() >> 20));
 }
 
 - (BOOL)prefersStatusBarHidden {
@@ -915,6 +946,7 @@ static BOOL skJITReady(void) {
 }
 
 - (void)dealloc {
+    [self.heapWatchdog invalidate];
     [NSNotificationCenter.defaultCenter removeObserver:self];
     for (GCController *controller in GCController.controllers) {
         [self unregisterController:controller];

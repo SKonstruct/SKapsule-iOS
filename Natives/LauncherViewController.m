@@ -31,6 +31,10 @@ typedef NS_ENUM(NSInteger, SKLoginMode) {
 @property (nonatomic, strong) UIButton *btnLogout;
 @property (nonatomic, strong) UIView *logoutDivider;
 @property (nonatomic, strong) UISwitch *avoidEdgesSwitch;
+@property (nonatomic, strong) UIButton *ramMinusButton;
+@property (nonatomic, strong) UIButton *ramPlusButton;
+@property (nonatomic, strong) UILabel *ramValueLabel;
+@property (nonatomic, strong) UILabel *ramFreeLabel;
 @property (nonatomic, assign) BOOL sidebarOpen;
 @end
 
@@ -219,11 +223,6 @@ typedef NS_ENUM(NSInteger, SKLoginMode) {
                                                      action:@selector(onShareLogs)];
     [stackView addArrangedSubview:btnShare];
 
-    UIButton *btnSave = [self createSidebarButtonWithTitle:@"Save Logs"
-                                                  iconName:@"square.and.arrow.down"
-                                                    action:@selector(onSaveLogs)];
-    [stackView addArrangedSubview:btnSave];
-
     UIButton *btnDownloadMods = [self createSidebarButtonWithTitle:@"Download Modpack"
                                                           iconName:@"icloud.and.arrow.down"
                                                             action:@selector(onDownloadMods)];
@@ -311,6 +310,42 @@ typedef NS_ENUM(NSInteger, SKLoginMode) {
 
     [stackView addArrangedSubview:avoidRow];
 
+    // Max RAM stepper
+    UIView *ramRow = [[UIView alloc] init];
+    ramRow.translatesAutoresizingMaskIntoConstraints = NO;
+
+    UILabel *ramLabel = [[UILabel alloc] init];
+    ramLabel.text = @"Max RAM";
+    ramLabel.textColor = UIColor.whiteColor;
+    ramLabel.font = [UIFont systemFontOfSize:14];
+    ramLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [ramRow addSubview:ramLabel];
+
+    self.ramMinusButton = [self ramStepperWithTitle:@"\u2212" action:@selector(onRamDecrease)];
+    self.ramPlusButton = [self ramStepperWithTitle:@"+" action:@selector(onRamIncrease)];
+
+    self.ramValueLabel = [[UILabel alloc] init];
+    self.ramValueLabel.textColor = UIColor.whiteColor;
+    self.ramValueLabel.font = [UIFont systemFontOfSize:14];
+    self.ramValueLabel.textAlignment = NSTextAlignmentCenter;
+    self.ramValueLabel.translatesAutoresizingMaskIntoConstraints = NO;
+
+    UIStackView *ramStepper = [[UIStackView alloc] initWithArrangedSubviews:@[
+        self.ramMinusButton, self.ramValueLabel, self.ramPlusButton
+    ]];
+    ramStepper.axis = UILayoutConstraintAxisHorizontal;
+    ramStepper.spacing = 4;
+    ramStepper.translatesAutoresizingMaskIntoConstraints = NO;
+    [ramRow addSubview:ramStepper];
+    [stackView addArrangedSubview:ramRow];
+
+    self.ramFreeLabel = [[UILabel alloc] init];
+    self.ramFreeLabel.textColor = [UIColor colorWithWhite:0.67 alpha:1.0];
+    self.ramFreeLabel.font = [UIFont systemFontOfSize:12];
+    self.ramFreeLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [stackView addArrangedSubview:self.ramFreeLabel];
+    [self refreshRamLabels];
+
     // Layout Constraints
     self.sidebarTrailingConstraint = [self.sidebarView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor
                                                                                      constant:280];
@@ -381,7 +416,14 @@ typedef NS_ENUM(NSInteger, SKLoginMode) {
         [avoidLabel.centerYAnchor constraintEqualToAnchor:avoidRow.centerYAnchor],
         [self.avoidEdgesSwitch.trailingAnchor constraintEqualToAnchor:avoidRow.trailingAnchor constant:-8],
         [self.avoidEdgesSwitch.centerYAnchor constraintEqualToAnchor:avoidRow.centerYAnchor],
-        [avoidRow.heightAnchor constraintEqualToConstant:50]
+        [avoidRow.heightAnchor constraintEqualToConstant:50],
+
+        [ramLabel.leadingAnchor constraintEqualToAnchor:ramRow.leadingAnchor constant:8],
+        [ramLabel.centerYAnchor constraintEqualToAnchor:ramRow.centerYAnchor],
+        [ramStepper.trailingAnchor constraintEqualToAnchor:ramRow.trailingAnchor constant:-8],
+        [ramStepper.centerYAnchor constraintEqualToAnchor:ramRow.centerYAnchor],
+        [self.ramValueLabel.widthAnchor constraintEqualToConstant:76],
+        [ramRow.heightAnchor constraintEqualToConstant:50]
     ]];
 
     [self setButtonsEnabled:NO];
@@ -491,6 +533,44 @@ typedef NS_ENUM(NSInteger, SKLoginMode) {
                      }];
 }
 
+- (UIButton *)ramStepperWithTitle:(NSString *)title action:(SEL)action {
+    UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
+    [button setTitle:title forState:UIControlStateNormal];
+    [button setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+    [button setTitleColor:[UIColor colorWithWhite:1.0 alpha:0.3] forState:UIControlStateDisabled];
+    button.titleLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightMedium];
+    button.layer.borderWidth = 1;
+    button.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.3].CGColor;
+    button.layer.cornerRadius = 8;
+    button.translatesAutoresizingMaskIntoConstraints = NO;
+    [button addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];
+    [NSLayoutConstraint activateConstraints:@[
+        [button.widthAnchor constraintEqualToConstant:44],
+        [button.heightAnchor constraintEqualToConstant:36],
+    ]];
+    return button;
+}
+
+- (void)onRamDecrease {
+    sk_ram_set_mb(sk_ram_get_mb() - SK_RAM_STEP_MB);
+    [self refreshRamLabels];
+}
+
+- (void)onRamIncrease {
+    sk_ram_set_mb(sk_ram_get_mb() + SK_RAM_STEP_MB);
+    [self refreshRamLabels];
+}
+
+- (void)refreshRamLabels {
+    int current = sk_ram_get_mb();
+    int max = sk_ram_max_mb();
+    self.ramValueLabel.text = [NSString stringWithFormat:@"%d MB", current];
+    self.ramMinusButton.enabled = current > SK_RAM_MIN_MB;
+    self.ramPlusButton.enabled = current < max;
+    self.ramFreeLabel.text = [NSString stringWithFormat:@"%d MB available, %d MB max",
+                              sk_ram_available_mb(), max];
+}
+
 - (void)onSegmentChanged:(UISegmentedControl *)sender {
     [self updateSegmentedTextStyles];
     NSString *mode = (sender.selectedSegmentIndex == 1) ? @"Steam" : @"Web";
@@ -552,31 +632,6 @@ typedef NS_ENUM(NSInteger, SKLoginMode) {
         [self presentViewController:activityVC animated:YES completion:nil];
     } else {
         [self showAlertWithTitle:@"No Logs" message:@"No log files found yet. Launch the game first."];
-    }
-}
-
-- (void)onSaveLogs {
-    const char *homeEnv = getenv("SKAPSULE_HOME");
-    if (!homeEnv) {
-        [self showAlertWithTitle:@"No Logs" message:@"SKapsule home directory is not set."];
-        return;
-    }
-    NSString *home = [NSString stringWithUTF8String:homeEnv];
-    NSString *logPath = [home stringByAppendingPathComponent:@"latestlog.txt"];
-
-    if ([[NSFileManager defaultManager] fileExistsAtPath:logPath]) {
-        NSURL *logURL = [NSURL fileURLWithPath:logPath];
-        if (@available(iOS 14.0, *)) {
-            UIDocumentPickerViewController *picker =
-                [[UIDocumentPickerViewController alloc] initForExportingURLs:@[logURL] asCopy:YES];
-            [self presentViewController:picker animated:YES completion:nil];
-        } else {
-            UIDocumentPickerViewController *picker =
-                [[UIDocumentPickerViewController alloc] initWithURL:logURL inMode:UIDocumentPickerModeExportToService];
-            [self presentViewController:picker animated:YES completion:nil];
-        }
-    } else {
-        [self showAlertWithTitle:@"No Logs" message:@"No log file found yet. Launch the game first."];
     }
 }
 
@@ -716,14 +771,24 @@ typedef NS_ENUM(NSInteger, SKLoginMode) {
                                                     @"directly to the game and never stored by SKapsule."
                                      preferredStyle:UIAlertControllerStyleAlert];
 
+    // textContentType is what puts a password manager in the QuickType bar. The pair has to
+    // be username + password on adjacent fields for AutoFill to offer a credential rather
+    // than a plain "Passwords" shortcut.
     [alert addTextFieldWithConfigurationHandler:^(UITextField *tf) {
       tf.placeholder = @"Steam username";
       tf.autocapitalizationType = UITextAutocapitalizationTypeNone;
       tf.autocorrectionType = UITextAutocorrectionTypeNo;
+      tf.spellCheckingType = UITextSpellCheckingTypeNo;
+      tf.keyboardType = UIKeyboardTypeASCIICapable;
+      tf.textContentType = UITextContentTypeUsername;
     }];
     [alert addTextFieldWithConfigurationHandler:^(UITextField *tf) {
       tf.placeholder = @"Steam password";
       tf.secureTextEntry = YES;
+      tf.autocapitalizationType = UITextAutocapitalizationTypeNone;
+      tf.autocorrectionType = UITextAutocorrectionTypeNo;
+      tf.spellCheckingType = UITextSpellCheckingTypeNo;
+      tf.textContentType = UITextContentTypePassword;
     }];
 
     [alert

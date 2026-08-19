@@ -33,6 +33,9 @@ add_executable(SKapsule
   SKZipUtils.m
   SKModManager.m
   GameViewController.m
+  SKTouchControls.m
+  SKTouchControlOverlay.m
+  SKKeyboardBridge.m
   JavaLauncher.m
   glfw_ios.m
   NativeBridge.m
@@ -53,6 +56,22 @@ set_target_properties(prefs PROPERTIES PREFIX "lib")
 
 
 target_compile_options(SKapsule PRIVATE -fobjc-arc -Wno-deprecated-declarations -DGLES_SILENCE_DEPRECATION=1)
+
+# SK_ASAN=ON links the AddressSanitizer runtime into the app itself, so it is loaded and
+# interposing malloc from process start rather than whenever LWJGL dlopens libgl4es.
+# Diagnostic build only; pair with SK_ASAN=1 on scripts/build-gl4es-ios.sh.
+option(SK_ASAN "Link the AddressSanitizer runtime for heap diagnosis" OFF)
+if(SK_ASAN)
+  execute_process(
+    COMMAND bash -c "find $(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang -name libclang_rt.asan_ios_dynamic.dylib | head -1"
+    OUTPUT_VARIABLE SK_ASAN_LIB OUTPUT_STRIP_TRAILING_WHITESPACE)
+  if(SK_ASAN_LIB)
+    message(STATUS "AddressSanitizer runtime: ${SK_ASAN_LIB}")
+    target_link_libraries(SKapsule "${SK_ASAN_LIB}")
+  else()
+    message(FATAL_ERROR "SK_ASAN=ON but libclang_rt.asan_ios_dynamic.dylib was not found")
+  endif()
+endif()
 
 target_link_libraries(SKapsule
   "-framework CoreFoundation"

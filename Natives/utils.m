@@ -4,6 +4,7 @@
 #import <dlfcn.h>
 #import <mach-o/dyld.h>
 #import <sys/mman.h>
+#import <os/proc.h>
 #import <sys/sysctl.h>
 #import <unistd.h>
 
@@ -180,4 +181,40 @@ NSString *getSelectedJavaHome(int minVersion) {
 
     NSLog(@"[Utils] No JRE 25 found for iOS");
     return nil;
+}
+
+// --- Java heap cap ------------------------------------------------------------
+
+static NSString *const kMaxRamKey = @"max_ram_mb";
+
+int sk_ram_max_mb(void) {
+    int half = (int)((NSProcessInfo.processInfo.physicalMemory >> 20) / 2);
+    int stepped = half / SK_RAM_STEP_MB * SK_RAM_STEP_MB;
+    if (stepped < SK_RAM_MIN_MB) return SK_RAM_MIN_MB;
+    if (stepped > 4096) return 4096;
+    return stepped;
+}
+
+int sk_ram_available_mb(void) {
+    // os_proc_available_memory is what actually bounds us: the app's remaining jetsam
+    // allowance, not the device's free page count.
+    size_t available = os_proc_available_memory();
+    if (available > 0) return (int)(available >> 20);
+    return (int)(NSProcessInfo.processInfo.physicalMemory >> 20);
+}
+
+int sk_ram_get_mb(void) {
+    id val = [NSUserDefaults.standardUserDefaults objectForKey:kMaxRamKey];
+    int mb = val ? [val intValue] : SK_RAM_DEFAULT_MB;
+    int max = sk_ram_max_mb();
+    if (mb < SK_RAM_MIN_MB) mb = SK_RAM_MIN_MB;
+    if (mb > max) mb = max;
+    return mb;
+}
+
+void sk_ram_set_mb(int mb) {
+    int max = sk_ram_max_mb();
+    if (mb < SK_RAM_MIN_MB) mb = SK_RAM_MIN_MB;
+    if (mb > max) mb = max;
+    [NSUserDefaults.standardUserDefaults setInteger:mb forKey:kMaxRamKey];
 }

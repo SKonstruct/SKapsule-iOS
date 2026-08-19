@@ -1,306 +1,239 @@
 # SKapsule-iOS Engineering Roadmap
 
-Authoritative technical plan for SKapsule-iOS. [PROGRESS.md](PROGRESS.md) has the
-phase-level status table; this document has the engineering detail for the active phase.
+Engineering detail for the active work. [PROGRESS.md](PROGRESS.md) has the phase-level
+status table; [README.md](README.md) has the end-user setup.
 
-> Historical debugging logs (font resolution, framebuffer binding, AWT stub sagas, etc.)
-> have been trimmed. See **History** below for a short summary of what was fixed. Full
-> detail lives in git history / PR descriptions if ever needed again.
+Resolved sagas are condensed to their conclusions. Full detail is in git history.
 
 ---
 
 ## Current State
 
-The app boots the bundled JRE 25, runs the real Spiral Knights desktop client through gl4es,
-plays audio, logs in (Web or Steam, including Steam Guard), and renders gameplay end-to-end on device.
+The app boots the bundled JRE 25, runs the real Spiral Knights desktop client through
+gl4es, plays audio, logs in (Web or Steam, including Steam Guard), and reaches gameplay
+on device. The runtime is the AngelAuraMC JDK-25 **JIT** build, so on-device runs require
+StikDebug with `UniversalJIT26.js` assigned to the bundle id.
 
-**Ticket 36 is implemented and active for on-device acceptance testing.** Touch, on-screen
-controls, gamepad, and physical keyboard/mouse feed the shared GLFW-native input bridge.
-
-The runtime is now the AngelAuraMC JDK-25 **JIT** build; on-device runs require StikDebug
-with `UniversalJIT26.js` assigned to the bundle id (see [README.md](README.md)).
-
----
-
-## Active Work: In-game stability & render fidelity
-
-**Priority:** 🔴 Highest — the game reaches the lobby but crashed entering Haven, and
-offscreen render targets were being silently degraded.
-
-### Haven crash — G1 code-root corruption (fixed, pending validation)
-
-`hs_err_pid54169.log`: `SIGSEGV` on a GC worker in
-`G1CodeRootSetHashTable::bulk_remove → ConcurrentHashTable::do_bulk_delete_locked_for`.
-The faulting instruction was `LDR X10,[X10,#8]` with `X10=0x555` — a garbage `next`
-pointer in a bucket chain, i.e. G1's per-region nmethod table was corrupt. It is only
-reached from `unload_classes_and_code → bulk_unregister_nmethods`, which G1 runs after
-unloading `LambdaForm` hidden classes — 8 of them were unloaded ~1s before the crash
-during zone load.
-
-Findings worth keeping:
-
-- No upstream JDK bug matches this shape, so there is no fixed version to move to.
-  `G1CodeRootSet`'s `ConcurrentHashTable` was introduced by JDK-8315503 and the bulk
-  removal path by JDK-8317007; later changes (JDK-8375622, JDK-8358342) are refactors
-  and performance work, not correctness fixes, and are not in 25u.
-- The corrupt nodes are plain C-heap `malloc` (`mtGC`), **not** code cache, so
-  `-XX:+MirrorMappedCodeCache` is an unlikely culprit (~30%).
-- **Fix:** `-XX:+UseSerialGC`. Serial/Parallel have no `G1CodeRootSet` — nmethods live on
-  a single global `ScavengableNMethods` list — so those frames structurally cannot run,
-  while class unloading still reclaims metaspace and code cache. This also matches
-  KnightLauncher, which ships `-XX:+UseSerialGC` as its default for this game and offers
-  G1/Parallel/ZGC only as opt-in. Paired with `-XX:SoftRefLRUPolicyMSPerMB=10` (also from
-  KnightLauncher) since SK caches textures/models behind soft references.
-- Rejected: `-XX:-UseCodeCacheFlushing` (verified it does not remove this path) and
-  `-XX:-ClassUnloading` (works, but then no nmethod is ever freed → unbounded code cache).
-- If a crash of this shape recurs in *non-GC* frames, it is generic C-heap corruption from
-  the port rather than a GC bug: re-run with `-XX:NativeMemoryTracking=summary`, whose
-  malloc header canaries fault on the *corrupting* write instead of a downstream reader.
-
-### gl4es missed GLES 3 core formats (fixed, pending validation)
-
-The game logged `Framebuffer incomplete. [status=36061 (GL_FRAMEBUFFER_UNSUPPORTED),
-color?=true, depth?=false, depthBits?=true, stencil?=true]` repeatedly.
-
-`GetHardwareExtensions()` detects optional capabilities by string-matching ES2-era `OES`
-extension names. iOS gives us an **ES3** context (`GameViewController.m` requests
-`kEAGLRenderingAPIOpenGLES3`), where `packed_depth_stencil`, `depth24` and `rgb8_rgba8`
-are *core* and therefore not advertised as extensions — so all three stayed 0. The boot
-log makes this visible: only four `Extension … detected and used` lines appear. Effects:
-
-- `glRenderbufferStorage` split `GL_DEPTH24_STENCIL8` into `DEPTH_COMPONENT16` plus a
-  separate `STENCIL_INDEX8` buffer. Apple GPUs require *packed* depth-stencil and reject
-  that pair — the FBO failure above.
-- `GL_RGB8`/`GL_RGBA8` render targets were downgraded to `RGB565`/`RGBA4` → banding.
-
-**Fix** (gl4es fork, `src/glx/hardext.c`): probe `glGetString(GL_VERSION)` and re-enable
-the three caps on an ES3 context, gated on the version string so the ES2 fallback path
-still works; `LIBGL_NOES3CORE=1` opts out. Also fixed an inverted test in
-`framebuffers.c`'s `GL_RGBA` renderbuffer branch, which chose `RGBA8` precisely when the
-driver lacked it — latent until `rgba8` could be set.
-
-Deliberately **not** forced: `esversion`, `npot`, `rgtex`, `elementuint`, `depthtex` —
-each changes ES2 codegen or sampling behavior and risks new regressions.
-
-**Next:** re-catalog remaining visual artifacts after this lands; some may be gl4es
-shader-translation issues unrelated to render-target formats.
-
-### Known footgun: the Pre-Init commit stamp goes stale
-
-`Natives/config.h` is generated by `configure_file` (`Natives/CMakeLists.txt:4`) but is
-also checked in, and `configure_file` only runs when CMake *configures*, not on every
-build. The `[Pre-Init] Commit:` line therefore reports whatever HEAD was at the last
-configure, which has already cost one debugging round (a fix was wrongly believed missing
-from a build). Until this is reworked, **do not use that line to decide whether a build
-contains a change** — jars and dylibs are staged from `out/` independently of it.
+The long-running heap corruption (2026-08-15 → 08-19) is **fixed** — see *Root cause*
+below. Remaining work is validation and the visual/UX gaps listed under *Known gaps*.
 
 ---
 
-## Active Work: Ticket 36 On-Device Input Validation
+## Invariants
 
-**Priority:** 🟡 High — finalize input bridge validation across touch, gamepad, and keyboard hardware.
-**Status:** In progress — on-device verification of virtual touch controls, joysticks, and external controllers.
+Each of these cost at least one debugging round. Breaking one reintroduces a crash that
+looks like something else entirely.
 
-**Tasks:**
-- Validate touch overlay & virtual d-pad/joysticks in-game.
-- Validate physical GameController / MFi gamepad binding.
-- Validate hardware keyboard and mouse input handling.
+### GL threading — `Natives/GameViewController.m`
+
+- **GL may only be issued from the main thread before SK's render thread starts**
+  (`self.jvmKicked`). SK's render thread holds `gEAGLContext` (`glfw_ios.m:200`, `:224`);
+  two threads issuing into one EAGLContext corrupts the Apple driver's own heap. The
+  drawable is built once in `viewDidLoad` and never resized afterwards.
+- **`[EAGLContext setCurrentContext:nil]` on every exit** from a main-thread GL block, so
+  nothing later inherits the renderer's context.
+- **Never query GL for the drawable size.** `pointToPixelScale` runs per touch-move; it
+  reads `self.lastDrawableSize`.
+
+### Surface geometry — `Natives/GameViewController.m`
+
+- **`UIView.contentScaleFactor`, never `layer.contentsScale`.** UIKit re-applies
+  `contentScaleFactor` to the layer whenever the view joins a window or lays out, so a
+  render scale written straight to `gEAGLLayer` is silently reset to the screen scale.
+  Re-assert it on every layout.
+- **Render scale must be applied before the first `renderbufferStorage`**, or
+  `nativeGetSurfaceSize` reports full resolution to SK at init and the HUD is laid out for
+  a framebuffer that no longer exists. It is a framebuffer divisor (matching Android's
+  `SurfaceHolder.setFixedSize`), not a DPI or Cacio change; `-Dcacio.managed.screensize`
+  stays at the **unscaled** screen size.
+- **Safe area is hand-rolled in `gameSafeAreaInsets`**, not `view.safeAreaInsets`. UIKit
+  mirrors the sensor-housing inset onto *both* sides, adds ~11pt of margin beyond the
+  housing, and reserves the whole home-indicator strip. We inset the housing edge only
+  (minus that margin), 8pt on the side edges and 2pt on the long edges — the display curve
+  clips only at corners, not along an edge's middle.
+- `UIInterfaceOrientationLandscapeRight` means the sensor housing is on the **left** (the
+  enum is defined against the device orientation, inverting the reading its name suggests).
+- **Live drawable resizes go through the render thread.** The resolution slider sets
+  `contentScaleFactor` on the main thread (UIKit, not GL) and raises a flag;
+  `nativeSwapBuffers` performs the `renderbufferStorage:fromDrawable:` at end-of-frame on
+  the thread that owns the context, then pushes `sk_input_push_framebuffer_size` so SK
+  re-lays out its HUD. That event is pushed **only** for a deliberate resize — it makes the
+  Three Rings renderer rebuild render targets (`GLFW.java:93-98` fires both the
+  framebuffer-size and window-size callbacks), which is not something to do at launch or
+  per slider tick.
+
+### gl4es
+
+- **`gl4es_glDetachShader`'s `if(glprogram->linked) return;` early-out is load-bearing**
+  despite being spec-incorrect. gl4es keeps raw `shader_t*` in `last_vert`/`last_frag` and
+  never clears them, so a real detach frees a shader the program still reads
+  (`fpe.c:494`). Leaking the shader is the lesser bug. Fix `last_vert`/`last_frag` and
+  `glprogram->attach[]` first if this is ever revisited.
+- **`kh_foreach`'s second parameter is the key, not the bucket index.** Never pass it to
+  `kh_del`. See *Root cause*.
 
 ---
 
-## History (completed work, condensed)
+## Root cause of the heap corruption (fixed 2026-08-19)
 
-- **JVM boot & staging.** `JavaLauncher.m` boots the bundled JRE 25 via `JLI_Launch`.
-  `dyld_bypass_validation.m` allows the unsigned dylibs (gl4es, openal-soft, cacio, etc.) to
-  load under JIT/codesign restrictions. `SKInstaller.m` stages JARs/assets into the app's
-  documents container and is version-aware, so a rebuilt JAR is always re-staged rather than
-  served from stale cache.
-- **Rendering (gl4es/EGL-equivalent).** `GameViewController.m` owns a `CAEAGLLayer`-backed
-  `EAGLContext` surface with color + depth/stencil renderbuffers. Fixed: a render-thread
-  SIGSEGV in gl4es's FBO 0 handling (`nativeMakeContextCurrent` now binds the real `gFramebuffer`
-  on the render thread before gl4es touches it), a framebuffer-incomplete depth attachment
-  (rebind + reattach on resize), a `glGetUniformLocation`/`glGetAttribLocation` NULL-name
-  crash, and a **use-after-free heap corruption / SIGBUS crash** in gl4es buffer management
-  (`buffers.c: rebind_real_buff_arrays`, `gl4es_glBufferData`, `gl4es_glNamedBufferData`, `gl4es_glDeleteBuffers`
-  now update all VAOs in `glstate->vaos` rather than only the active one).
-- **Safe Area Layout & Surface Resolution.** Fixed safe area inset behavior: defaulted `avoidEdges` to `NO`
-  on fresh installs, and fixed surface/Cacio resolution mismatches in `glfw_ios.m` (`nativeGetSurfaceSize`
-  querying actual renderbuffer dimensions) and `GameViewController.m` (`startJVM` using `surfaceView.frame`),
-  eliminating viewport cropping and touch input offset issues when safe area avoidance is active.
-- **Fonts (cacio).** `SunFontManager` only auto-registers the JRE font directory on Linux, so
-  iOS's `CTCFontManager`/`CTCFontConfiguration` needed a forced `registerFontDir()` call plus a
-  hand-built `fonts.dir` XLFD-to-file mapping and a null-safe `findFont2D` fallback. This
-  resolved a persistent `Font.getFont2D()` NPE that left the login screen blank.
-- **AWT / Java2D.** `awt_stubs.c` replaces the JRE's `libawt_headless.dylib`; getting its
-  exported symbol set exactly right took two passes — over-stubbing shadowed real
-  `libawt.dylib` rendering-loop registration (`MaskBlit` `InternalError`), under-stubbing then
-  produced `UnsatisfiedLinkError` for platform-backend `initIDs` symbols not present in either
-  real library. Both are resolved.
-- **Steam login.** `showSteamGuardPromptWithTitle:` originally nested a nested
-  `dispatch_async(main_queue)` behind a `dispatch_semaphore_wait` also on the main queue —
-  a self-deadlock. Fixed to present directly on the main thread and resume asynchronously via
-  `[SKNativeBridge submitCode:]`. Web and Steam login (device-code and email-code Steam Guard)
-  both verified working end-to-end on device.
-- **Audio.** `openal-soft` binds to `AVAudioSession` and LWJGL's OpenAL module loads
-  `libopenal.dylib` without sandbox/JIT issues; no further work needed.
+`clear_program` used `kh_foreach`'s key as a bucket index:
+
+```c
+kh_foreach(glprogram->uniform, k, m,
+    free(m->name); free(m);
+    kh_del(uniformlist, glprogram->uniform, k);   // k is the uniform's LOCATION
+)
+```
+
+So on every relink each `uniform_t` was freed while **its own bucket stayed live** holding
+a dangling pointer, and `kh_del` marked whatever unrelated bucket sat at
+`index == location`. `fill_program`'s sampler-init loop then walks every live bucket and
+does `memset((char*)cache + m->cache_offs, 0xff, m->cache_size)` through freed memory —
+an **arbitrary-offset heap write**, and the writer behind every libmalloc "corruption of
+free block" abort. The same stale entries fed the `strlen(NULL)` crash in
+`gl4es_glGetUniformLocation`.
+
+Fixed by iterating bucket indices directly in both the uniform and attribloc loops. The
+other `kh_foreach` sites (`fpe.c:292,512,589,613`, `program.c:672`) only read the value.
+
+It hid for so long because upstream never *read* the stale pointer — `fill_program`
+unconditionally overwrote `kh_value`, leaking but never touching it. Adding `kh_put`
+return-value handling (as a leak fix) started reading and `free()`ing it, which is what
+finally gave AddressSanitizer something to catch.
+
+### Ruled out — do not re-chase
+
+| theory | how it was excluded |
+| --- | --- |
+| stack smash | gl4es built `-fstack-protector-strong`; no canary ever fired |
+| transposed-matrix overflow | real bug, fixed (`tmp[16]` scratch sized for one matrix while the loop wrote `count`), but shipped before a crash that still reproduced |
+| `texunits` overflow | real bug, bounded against `MAX_TEX`, but shipped before a crash that still reproduced |
+| ES3 capability flags | every read site audited: `elementuint` changes no buffer arithmetic; `npot=3` unlocks an overflow only under `LIBGL_TEXCOPY`, unset here; `depthtex` has an OOB *read* gated on non-default `glPixelTransfer` |
+| main-thread GL race | real bug, fixed (see Invariants), but not the corruption |
+| `malloc_zone_check` | blind on iOS 27's xzone allocator — reported nothing all session while libmalloc aborted seconds later |
 
 ---
 
-## Active Work: TICKET 36 — Input Bridge
+## Diagnostics
 
-**Priority:** 🔴 Critical — needed for the game to be playable, not just watchable.
-**Status:** Implemented; on-device validation pending.
+### AddressSanitizer
 
-### The unifying architectural principle (from the Android port)
+```sh
+SK_ASAN=1 ./scripts/build-gl4es-ios.sh    # + uncomment OTHER_LDFLAGS in project.yml
+```
 
-SKapsule's Android implementation (`SKapsule/launcher/`) treats **touch, virtual on-screen
-controls, and a physical gamepad as three producers feeding two shared native data
-structures**, and Spiral Knights itself never knows which one it's hearing from:
+`scripts/stage-app-assets.sh` copies the runtime into `Frameworks/` when gl4es carries the
+dependency. Reports reach `latestlog.txt` via the stdio tee. Three prerequisites:
 
-1. A **mouse/keyboard event queue** (cursor position, mouse button, scroll, key transitions,
-   typed characters) — used for UI/menu navigation and text entry.
-2. A **gamepad mailbox** (15 buttons + 6 axes, GLFW's standard gamepad layout) — used for
-   gameplay (movement, combat). Touch joystick/button writes and physical-gamepad writes land
-   in the *same* struct; SK just sees "a gamepad is connected" whenever either source is active
-   (`gamepad_active() = present || virtual_present`).
+- **The app must link the runtime**, not the dlopen'd gl4es — arriving late aborts with
+  *"Interceptors are not working"*. `project.yml` links it into `SKapsule.debug.dylib`,
+  which dyld loads before `main()`. Linker flag only; app code stays uninstrumented.
+- **Nothing may call `malloc_zone_check`** — ASan leaves that zone callback unimplemented
+  and aborts with *"CHECK failed: sanitizer_malloc_mac.inc"*.
+- Options come from `__asan_default_options()` in `Natives/main.m`, since `ASAN_OPTIONS`
+  cannot be set for a sideloaded app. Signal handling is left to the JVM.
 
-This is the correct model to replicate on iOS — not three independent input paths bolted onto
-GLFW.java three separate ways. GLFW.java (shared bootstrap, already complete, **no changes
-needed there**) already expects exactly this: a 4-int-record ring buffer for queue #1, and a
-`byte[15]`/`float[6]` poll for queue #2.
+Expect ~2-3x slower. Diagnostic only.
 
-### Reference implementations (read before writing code)
+### Footguns
 
-| Concern | Android reference (`SKapsule/`) | iOS-native reference (`Amethyst-iOS/`) | What SKapsule-iOS needs |
-| --- | --- | --- | --- |
-| Wire protocol / contract | `external/bootstrap/.../GLFW.java` (shared, already ports to iOS) | — | Nothing — already done |
-| Input ring buffer (native) | `launcher/app/src/main/cpp/sklauncher.c`: `input_q` struct, `input_push()`, `glfw_drain_input_impl()` | `Natives/input_bridge_v3.m`: `events[]` + `sendData()` (different design — direct GLFW callback invocation, not applicable 1:1) | Port `sklauncher.c`'s ring-buffer design into `glfw_ios.m`, keyed to the same `EV_*` constants |
-| Gamepad mailbox (native) | `sklauncher.c`: `gamepad` struct, `glfw_gamepad_present_impl`, `glfw_get_gamepad_state_impl` | — | Port the same mailbox design into `glfw_ios.m` |
-| Touch → input queue | `GameActivity.kt`: `wireTouchInput()` (`SurfaceView.setOnTouchListener`) | `Amethyst-iOS/Natives/SurfaceViewController.m`: `sendTouchPoint:withEvent:` (grab-mode cursor, different UX model — SK doesn't use FPS-style mouse capture) | Override `touchesBegan:/Moved:/Ended:/Cancelled:` in `GameViewController.m`, push cursor-pos + mouse-button events, matching Android's down/move/up model (not Amethyst's grab/relative model) |
-| Touch controls & joystick (UI) | `launcher/app/src/main/java/.../touch/`: `TouchControlModels.kt` (percent-based `ControlNode` data model, JSON-persisted via Gson, default dual-joystick + 7-button layout), `TouchControlOverlay.kt` (editable overlay with drag/resize/opacity panel), `TouchControlViews.kt` (canvas-drawn `TouchJoystickView`/button views) | `Amethyst-iOS/Natives/customcontrols/`: `ControlLayout.m` (UIView container, loads a layout dict/JSON file), `ControlButton.m`, `ControlJoystick.m` | Build a UIKit `ControlLayout`-style overlay; can reuse Android's percent-based `ControlNode` *model* conceptually (not code — different languages) for a consistent default layout across platforms |
-| Gamepad (`GCController`) | `GameActivity.kt`: `InputDevice`/`MotionEvent` (Android controller API, not applicable) | `Amethyst-iOS/Natives/input/ControllerInput.m`: `registerControllerCallbacks:` — per-button `GCExtendedGamepad` handlers | Directly portable pattern — but write into the GLFW standard-layout mailbox (buttons/axes) instead of Amethyst's remap-to-keyboard-keys approach, since SKapsule-iOS's GLFW.java already expects a standard gamepad poll |
-| Physical keyboard | `GameActivity.kt`: `glfwKeyCode()` (Android `KeyEvent.KEYCODE_*` → GLFW keycode table), `handleKeyboard()` | `Amethyst-iOS/Natives/input/KeyboardInput.m`: `keycodeTable[]` (`UIKeyboardHIDUsage*` → GLFW keycode table), `sendKeyEvent:down:` | Directly portable pattern — override `pressesBegan:`/`pressesEnded:` in `GameViewController.m` (or a dedicated responder), port `KeyboardInput.m`'s HID-usage table, push `EV_KEY` + `EV_CHAR` via the ring buffer instead of Amethyst's direct-callback model |
+- **The `[Pre-Init] Commit:` line goes stale.** `Natives/config.h` is generated by
+  `configure_file` but also checked in, and only regenerates when CMake *configures*. Do
+  not use it to decide whether a build contains a change — jars and dylibs stage from
+  `out/` independently.
+- **The "SKapsule Heap Diagnostics" scheme does nothing.** Its `MallocScribble` /
+  `MallocGuardEdges` only apply when launching from Xcode, and Xcode's debugger cannot
+  service the JIT trap.
 
-`GameController.framework` is **already linked** in `Natives/CMakeLists.txt` — no build-system
-change needed for 36d.
+---
 
-### Wire protocol reference (authoritative — from `external/bootstrap/.../GLFW.java`)
+## Known gaps
 
-**Queue #1 — mouse/keyboard ring buffer**, drained via `nativeDrainInput(int[] out)`. Each
-record is 4 ints `[type, a, b, c]`:
+- **gl4es ES3 core capabilities** (`npot`, `elementuint`, `depthtex`, `rgtex`) are forced
+  on ES3 contexts alongside the renderbuffer formats. They change codegen and sampling
+  paths, so bisect here first if new visual artifacts appear; `LIBGL_NOES3CORE=1` disables
+  the whole block.
+- No scroll-wheel producer on either platform (`EV_SCROLL` is handled but never pushed),
+  so SK inventory/chat lists cannot be scrolled by touch.
+- No right/middle click and no long-press→right-click, on either platform.
+- `GCController` thumbstick Y is up-positive while touch joysticks derive Y from screen
+  coords (down-positive) — verify on device.
+- The input queue drops the *newest* records when full (`glfw_ios.m`), which for keys means
+  a lost release and a stuck key.
+- UI follow-ups: `onToggleKeyboard` doesn't restore the VC as first responder (hardware
+  keyboard dies after one show/hide); `handleChromeDrag` doesn't clamp, so a gear button
+  dragged off-screen is unrecoverable; cancelling the "Waiting for JIT" alert leaves
+  `bootOverlay` with no dismiss path.
 
-| Type | Value | Meaning |
-| --- | --- | --- |
-| `EV_CURSOR_POS` | 1 | `a`=x, `b`=y (framebuffer px, y-down, top-left origin) |
-| `EV_MOUSE_BUTTON` | 2 | `a`=button (0=left), `b`=action (1=press, 0=release) |
-| `EV_SCROLL` | 3 | `a`=delta (±1) |
-| `EV_KEY` | 4 | `a`=GLFW keycode, `b`=action (1=press, 2=repeat, 0=release), `c`=mods |
-| `EV_CHAR` | 5 | `a`=Unicode codepoint |
+---
 
-Android's touch handler always emits a cursor-pos record before a button record so
-`glfwGetCursorPos()` is correct by the time SK's button callback fires — replicate this
-ordering.
+## Touch parity with Android
 
-**Queue #2 — gamepad mailbox**, polled via `nativeGamepadPresent()` / `nativeGetGamepadState(byte[15], float[6])`.
-Standard GLFW gamepad layout — buttons 0–14: A, B, X, Y, LB, RB, Back, Start, Guide, L3, R3,
-DPad-Up, DPad-Right, DPad-Down, DPad-Left. Axes 0–5: LeftX, LeftY, RightX, RightY, LTrigger,
-RTrigger. **Triggers rest at −1, not 0** — reset state must set them explicitly, not `memset`.
+Ported from `SKapsule/launcher/.../touch/`. **Keep the two in sync** — the layout schema,
+default node table and slider ranges are meant to stay comparable, so a change to one
+usually belongs in the other.
 
-### Sub-tickets
+- `Natives/SKTouchControls.{h,m}` — percent-based node model + `SKTouchLayout`
+  (`globalOpacity`, `controlsEnabled`, `actionBarVisible`, `renderScale`, nodes),
+  JSON-persisted in `NSUserDefaults`. All 16 Android default nodes including `btn_esc`
+  (GLFW 256). `scale`/`renderScale` clamp on load so an older schema can't decode to 0.
+- `Natives/SKTouchControlOverlay.{h,m}` — edit mode, per-node visible/scale, opacity and
+  resolution sliders, **Show Controls** / **Show Action Bar**, double-tap-confirm Reset.
+  Every appearance change re-asserts `sk_gamepad_set_virtual_active(controlsEnabled)`, or a
+  latched `Strafe` toggle has no reset path. Right stick presses axis 5 and holds the last
+  aim direction 200 ms on release. **Deadzone applies to physical sticks only.**
+- `Natives/SKKeyboardBridge.{h,m}` — offscreen `UIKeyInput` first responder.
+- `GameViewController.m` — ⚙ / Keyboard chrome buttons (draggable in edit mode, 20 pt slop,
+  persisted in `game_chrome_prefs`); the overlay is sized to `surfaceView`, not `self.view`.
 
-#### 36a. Touch input (core bridge) — implemented
+---
 
-- Port `sklauncher.c`'s `input_q` ring buffer (mutex-guarded `int32_t[CAP][4]`, `input_push`,
-  drain-on-poll) into `glfw_ios.m`. Implement `nativeDrainInput` for real (currently `return 0`).
-- Add plain C entry points (no JNI needed on the write side — `GameViewController.m` and
-  `glfw_ios.m` are both native code in the same target, unlike Android where Kotlin UI code has
-  to cross a JNI boundary via `NativeBridge.kt`'s `external fun`s into `sklauncher.c`). Something
-  like `sk_input_push_cursor(x, y)`, `sk_input_push_mouse_button(button, pressed)`.
-- Override `touchesBegan:`/`touchesMoved:`/`touchesEnded:`/`touchesCancelled:` in
-  `GameViewController.m`. Track only the primary touch (SK's UI is single-cursor, matching
-  Android's approach — don't build multitouch cursor tracking). UIKit reports surface coordinates
-  in points, so convert them to framebuffer pixels with `contentScaleFactor` before queueing them.
-- **Acceptance:** on-screen taps move the SK cursor and click UI elements (login screen buttons
-  should become tappable).
+## History (condensed)
 
-#### 36b. Touch controls / buttons — implemented
-
-- Build a `ControlLayout`-style UIKit overlay (reference: `Amethyst-iOS/Natives/customcontrols/ControlLayout.m`
-  + `ControlButton.m`), positioned over `GameViewController`'s surface view.
-- Each button press writes into the **gamepad mailbox** (36d's data structure), not the mouse
-  queue — matching Android's `TouchControlOverlay`/`onGamepadButton` model. This means 36b and
-  36d share one native mailbox implementation; do 36d's mailbox plumbing as part of this ticket
-  even if `GCController` wiring comes later.
-- Also needs `sk_gamepad_set_virtual_active(BOOL)` (Android's `onVirtualGamepadConnected`) so SK
-  treats the pad as connected while touch controls are up, even with no physical controller —
-  otherwise button/axis writes are silently dropped by the `gamepad_active()` check.
-- Default button layout: reference Android's `TouchControlModels.createDefaultLayout()` for
-  a reasonable starting set (attack/ability buttons, item slots, strafe/dodge/defend/weapon-swap),
-  though exact placement should be tuned for iOS screen sizes independently.
-- **Acceptance:** on-screen buttons register presses SK's input system recognizes as gamepad
-  input (bindable in SK's control settings, same as a physical controller).
-
-#### 36c. Touch joystick — implemented
-
-- Two virtual joysticks (move + face), UIView-based (reference: `ControlJoystick.m`), positioned
-  like Android's default (`joy_move` bottom-left, `joy_face` bottom-right).
-- Feed into the same gamepad mailbox axes: `GP_AXIS_LEFT_X/Y` for move, `GP_AXIS_RIGHT_X/Y` for
-  face/aim.
-- **Acceptance:** dragging each joystick drives the corresponding gamepad axis smoothly, with a
-  small deadzone (Android uses `AXIS_DEADZONE = 0.15f` as a reference starting point).
-
-#### 36d. Gamepad support — implemented
-
-- `GameController.framework` already linked; no CMake changes needed.
-- Register for `GCControllerDidConnectNotification`/`DidDisconnectNotification`, call
-  `sk_gamepad_set_physical_active(BOOL)` (mirrors Android's `onGamepadConnected`) on change.
-- Port the handler-registration pattern from `Amethyst-iOS/Natives/input/ControllerInput.m`'s
-  `registerControllerCallbacks:` — one `GCExtendedGamepad` button/thumbstick handler block per
-  input — but write directly into the GLFW-standard mailbox slot (buttons 0–14 / axes 0–5) rather
-  than Amethyst's approach of remapping each button through a JSON keybind file to a keyboard key.
-  SKapsule-iOS doesn't need that indirection because SK already reads a native gamepad via
-  `glfwGetGamepadState`, exactly like the Android build.
-- Trigger axes (`LT`/`RT`) rest at **−1**, matching Android's `GP_AXIS_LTRIGGER`/`RTRIGGER`
-  convention — don't leave them at 0 on connect/reset.
-- **Acceptance:** a paired MFi/Bluetooth controller drives movement and actions in-game; SK's
-  control-binding screen recognizes it as a standard gamepad.
-
-#### 36e. Keyboard/mouse support — implemented
-
-- Physical keyboard: override `pressesBegan:`/`pressesEnded:` (UIKit `UIPress`/`UIKey` API) on
-  `GameViewController` or a dedicated first-responder view. Port `Amethyst-iOS/Natives/input/KeyboardInput.m`'s
-  `keycodeTable[]` (`UIKeyboardHIDUsage*` → GLFW keycode, already GLFW-standard and directly
-  reusable) — but push through **this project's** `EV_KEY`/`EV_CHAR` ring-buffer records rather
-  than Amethyst's direct-GLFW-callback model. Cross-check against Android's `glfwKeyCode()` table
-  in `GameActivity.kt` (same target GLFW keycodes, different source enum) if any mapping is
-  ambiguous.
-- Typed characters: use `UIKey.characters` (as `KeyboardInput.m` does) for the `EV_CHAR` path,
-  matching Android's `onCharInput`/`unicodeChar` approach — needed for login/chat text entry.
-- Mouse/trackpad: iPadOS pointer hover uses `UIHoverGestureRecognizer` for cursor movement;
-  primary-button touch events share the touch bridge's `EV_CURSOR_POS`/`EV_MOUSE_BUTTON` records.
-- **Acceptance:** an external keyboard can type into SK's login/chat fields and drive bound
-  hotkeys; mouse/trackpad pointer (where available) moves the SK cursor.
-
-### Sequencing note
-
-The implementation followed the intended ordering: 36a established the ring buffer, 36b/36d share
-one mailbox, then 36c and 36e route their events through those same structures. Device testing is
-the remaining work.
-
-### New files
-
-The touch-control views live in `GameViewController.m`, so no new Xcode source files were needed.
-`project.yml` and the generated Xcode project now explicitly link `GameController.framework`.
+- **JVM boot & staging.** `JavaLauncher.m` boots JRE 25 via `JLI_Launch`;
+  `dyld_bypass_validation.m` allows the unsigned dylibs; `SKInstaller.m` stages
+  JARs/assets version-aware so a rebuilt JAR is never served from stale cache.
+- **iOS 26 JIT bring-up.** Boot chain fixed: compressed-class-pointer abort → missing
+  `libawt_xawt.dylib` → `java.awt.Font.initIDs` → `GLFWNativeCocoa` → FFM upcall stubs.
+  The last one matters: LWJGL's `GLFW*Callback` classes build a Panama upcall stub in
+  their constructor, which crashed the mirror-mapped code cache. SK's GLFW is fully
+  shadowed, so `sk-bootstrap.jar` shadows the callback classes to skip
+  `org.lwjgl.system.Callback` entirely.
+- **Rendering.** `CAEAGLLayer`-backed `EAGLContext` with color + depth/stencil
+  renderbuffers. Fixed: a render-thread SIGSEGV in gl4es's FBO 0 handling, a
+  framebuffer-incomplete depth attachment, a `glGetUniformLocation` NULL-name crash, and a
+  use-after-free in gl4es buffer management (`buffers.c` now updates all VAOs in
+  `glstate->vaos`, not just the active one).
+- **gl4es GLES 3 core formats.** `GetHardwareExtensions()` detects capabilities by
+  string-matching ES2-era `OES` names, but on an ES3 context `packed_depth_stencil`,
+  `depth24` and `rgb8_rgba8` are *core* and never advertised — so all three stayed 0,
+  splitting `GL_DEPTH24_STENCIL8` (which Apple GPUs reject) and downgrading RGB8/RGBA8 to
+  RGB565/RGBA4. Now probed from `glGetString(GL_VERSION)`.
+- **Fonts (cacio).** `SunFontManager` only auto-registers the JRE font directory on Linux,
+  so iOS needed a forced `registerFontDir()`, a hand-built `fonts.dir` XLFD mapping and a
+  null-safe `findFont2D` fallback.
+- **AWT / Java2D.** `awt_stubs.c` replaces `libawt_headless.dylib`; its exported symbol set
+  had to be exact — over-stubbing shadowed real rendering-loop registration, under-stubbing
+  produced `UnsatisfiedLinkError` on platform-backend `initIDs`.
+- **Steam login.** A self-deadlock in `showSteamGuardPromptWithTitle:` (nested
+  `dispatch_async(main_queue)` behind a main-queue semaphore wait) fixed; Web and Steam
+  login including Steam Guard verified on device.
+- **Input bridge (Ticket 36).** Touch, on-screen controls, gamepad and keyboard/mouse all
+  feed two shared native structures — a 4-int-record event ring buffer and a GLFW
+  standard-layout gamepad mailbox — so SK never knows which producer it is hearing. Wire
+  protocol is in `external/bootstrap/.../GLFW.java`; trigger axes rest at **−1**, not 0.
 
 ---
 
 ## Build & verification
 
-- `make native` passes after the input-bridge implementation. Xcode compilation also passes; its
-  post-build packaging step is blocked locally by ambiguous `Apple Development` signing identities.
-- After modifying `external/bootstrap` (shared with Android): no rebuild script here, it's
-  built into `sk-bootstrap.jar` via `scripts/build-bootstrap.sh`. Changes to `GLFW.java` are
-  **not expected** for Ticket 36 — the protocol is already complete on the Java side.
-- Deploy to device via Xcode for on-device testing; `make package` for a distributable `.ipa`.
-- Per `AGENTS.md`: one PR per sub-ticket (36a, 36b, etc.) where practical rather than one giant
-  input-bridge PR — each is independently testable.
+```sh
+make native                      # CMake build of the native app
+./scripts/build-gl4es-ios.sh     # -> out/gl4es/libgl4es.dylib
+make package                     # -> .ipa in out/artifacts/
+```
+
+Deploy to device via Xcode; the post-build phase re-runs `make xcode-payload`. Adding a
+source file under `Natives/` needs `xcodegen generate` — `project.yml` globs the directory,
+but `SKapsule.xcodeproj` is checked in and no build step regenerates it, so a missing run
+shows up as `Undefined symbol: _OBJC_CLASS_$_…` long after `make native` passed.

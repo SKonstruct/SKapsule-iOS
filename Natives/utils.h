@@ -29,3 +29,17 @@ NSURL *skJITEnableURL(void);
 NSString *skStageJITScriptToDocuments(void);
 
 NSString *getSelectedJavaHome(int minVersion);
+
+/// Java heap cap, shared by the launcher's RAM setting UI and the JVM launch.
+/// SK's live set peaks around 300MB, so the JVM's own ergonomics (a fraction of device
+/// RAM) commit far more than it ever needs; KnightLauncher ships a fixed 512M for this
+/// game. Stepped in 128MB, upper-bounded at half of physical RAM so the heap can't crowd
+/// the JIT mapping and textures into a jetsam kill.
+#define SK_RAM_MIN_MB 512
+#define SK_RAM_STEP_MB 128
+#define SK_RAM_DEFAULT_MB 768
+
+int sk_ram_max_mb(void);
+int sk_ram_available_mb(void);
+int sk_ram_get_mb(void);
+void sk_ram_set_mb(int mb);

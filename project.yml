@@ -53,6 +53,12 @@ targets:
       ENABLE_USER_SCRIPT_SANDBOXING: NO
       INFOPLIST_FILE: 'Natives/Info.plist'
       OTHER_CFLAGS: '-DGLES_SILENCE_DEPRECATION=1'
+      # To diagnose heap corruption again, uncomment this and rebuild gl4es with
+      # SK_ASAN=1 ./scripts/build-gl4es-ios.sh. It links the AddressSanitizer runtime into
+      # the app so it is loaded from process start -- without it ASan arrives when LWJGL
+      # dlopens the instrumented libgl4es and aborts with "Interceptors are not working".
+      # Linker only: the app's own code stays uninstrumented.
+      # OTHER_LDFLAGS: '$(inherited) -fsanitize=address'
     postBuildScripts:
       - name: Stage JRE and Assets
         basedOnDependencyAnalysis: false

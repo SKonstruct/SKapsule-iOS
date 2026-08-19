@@ -1,6 +1,7 @@
 #define GLES_SILENCE_DEPRECATION 1
 #import <OpenGLES/EAGL.h>
 #import <OpenGLES/ES2/gl.h>
+#import <OpenGLES/ES2/glext.h>   // GL_DEPTH24_STENCIL8_OES
 #import <UIKit/UIKit.h>
 #import "NativeBridge.h"
 #include <pthread.h>
@@ -13,6 +14,7 @@ extern EAGLContext *gEAGLContext;
 extern CAEAGLLayer *gEAGLLayer;
 extern GLuint gRenderbuffer;
 extern GLuint gFramebuffer;
+extern GLuint gDepthRenderbuffer;
 
 // Input is produced on UIKit/GameController threads and drained on SK's main
 // loop thread by GLFW.java. Keep the wire format in sync with GLFW.java.
@@ -21,6 +23,7 @@ extern GLuint gFramebuffer;
 #define EV_SCROLL 3
 #define EV_KEY 4
 #define EV_CHAR 5
+#define EV_FRAMEBUFFER_SIZE 6
 
 #define INPUT_Q_CAP 2048
 static struct {
@@ -83,6 +86,10 @@ void sk_input_push_key(int key, int action, int modifiers) {
 
 void sk_input_push_char(int codepoint) {
     input_push(EV_CHAR, codepoint, 0, 0);
+}
+
+void sk_input_push_framebuffer_size(int width, int height) {
+    input_push(EV_FRAMEBUFFER_SIZE, width, height, 0);
 }
 
 void sk_gamepad_set_virtual_active(BOOL active) {
@@ -215,10 +222,47 @@ static void nativeMakeContextCurrent(JNIEnv *env, jclass clazz, jlong window) {
 
 static BOOL gRenderReadyFired = NO;
 
+// Rebuilding the drawable is GL work, and this context belongs to SK's render thread --
+// doing it from the main thread is undefined behaviour that corrupts the driver's heap.
+// The resolution slider therefore only raises this flag; the resize happens below, at the
+// end of a frame, on the thread that owns the context.
+static atomic_int gResizePending;
+
+void sk_gl_request_resize(void) {
+    atomic_store_explicit(&gResizePending, 1, memory_order_release);
+}
+
+static void apply_pending_resize(void) {
+    glBindRenderbuffer(GL_RENDERBUFFER, gRenderbuffer);
+    [gEAGLContext renderbufferStorage:GL_RENDERBUFFER fromDrawable:gEAGLLayer];
+
+    GLint width = 0, height = 0;
+    glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_WIDTH, &width);
+    glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_HEIGHT, &height);
+
+    if (gDepthRenderbuffer) {
+        glBindFramebuffer(GL_FRAMEBUFFER, gFramebuffer);
+        glBindRenderbuffer(GL_RENDERBUFFER, gDepthRenderbuffer);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8_OES, width, height);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, gDepthRenderbuffer);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER, gDepthRenderbuffer);
+        glBindRenderbuffer(GL_RENDERBUFFER, gRenderbuffer);
+    }
+
+    // Tell SK the framebuffer changed so it re-lays out its HUD and render targets. The
+    // callback runs on this same thread when GLFW.java drains the queue, so it is safe to
+    // let it rebuild GL objects. Only ever pushed for a deliberate resolution change.
+    if (width > 0 && height > 0) sk_input_push_framebuffer_size((int)width, (int)height);
+}
+
 static void nativeSwapBuffers(JNIEnv *env, jclass clazz, jlong window) {
     [EAGLContext setCurrentContext:gEAGLContext];
     glBindRenderbuffer(GL_RENDERBUFFER, gRenderbuffer);
     [gEAGLContext presentRenderbuffer:GL_RENDERBUFFER];
+
+    // After the present, so the frame just shown was rendered at the old size.
+    if (atomic_exchange_explicit(&gResizePending, 0, memory_order_acquire))
+        apply_pending_resize();
 
     if (!gRenderReadyFired) {
         gRenderReadyFired = YES;

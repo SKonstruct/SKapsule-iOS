@@ -90,6 +90,19 @@ static void prune_logs(NSString *home, NSString *prefix, NSUInteger keep) {
     }
 }
 
+// ASan reads its configuration from ASAN_OPTIONS, which cannot be set for a sideloaded
+// iOS app, so supply it through the documented weak hook instead. The signal handlers are
+// all left to the JVM: it installs its own for SIGSEGV/SIGBUS and fights ASan otherwise.
+// Heap errors are reported through ASan's own instrumentation, which needs no signals.
+const char *__asan_default_options(void);
+const char *__asan_default_options(void) {
+    return "detect_leaks=0"
+           ":handle_segv=0:handle_sigbus=0:handle_sigfpe=0:handle_sigill=0"
+           ":allow_user_segv_handler=1"
+           ":abort_on_error=0:halt_on_error=1:print_stacktrace=1"
+           ":malloc_context_size=30";
+}
+
 static void __attribute__((unused)) init_redirectStdio(void) {
     NSString *home = @(getenv("SKAPSULE_HOME"));
     NSString *currName = [home stringByAppendingPathComponent:@"latestlog.txt"];
@@ -97,7 +110,9 @@ static void __attribute__((unused)) init_redirectStdio(void) {
     [fm removeItemAtPath:oldName error:nil];
     [fm moveItemAtPath:currName toPath:oldName error:nil];
 
-    // Same two-generation retention latestlog gets, applied to the per-pid JVM logs.
+    // The JVM names them per-pid so they never overwrite each other and would otherwise
+    // pile up forever. Keep three: a crash is often only diagnosable next to the runs
+    // either side of it.
     prune_logs(home, @"hs_err_pid", 3);
     prune_logs(home, @"vmlog-", 3);
 
@@ -113,7 +128,7 @@ static void __attribute__((unused)) init_redirectStdio(void) {
 
     // Tee: keep a copy of the original stdout so console output (Xcode /
     // Console.app) still works, while also writing everything to latestlog.txt so
-    // the launcher's "Share Logs" / "Save Logs" can capture non-Xcode (StikJIT)
+    // the launcher's "Share Logs" can capture non-Xcode (StikJIT)
     // launches.
     static int origOut;
     origOut = dup(fileno(stdout));
@@ -132,8 +147,11 @@ static void __attribute__((unused)) init_redirectStdio(void) {
           if (origOut >= 0) {
               write(origOut, buf, rsize);
           }
+          // Deliberately no synchronizeFile: an fsync per <=2KB chunk turned a few MB of
+          // log text into 1073 MB of actual disk writes in one 8-minute session, which
+          // tripped iOS's daily disk-write limit. write(2) already hands the data to the
+          // kernel, so it survives a process crash -- which is all "Share Logs" needs.
           [file writeData:[NSData dataWithBytes:buf length:rsize]];
-          [file synchronizeFile];
       }
       [file closeFile];
     });
@@ -193,7 +211,7 @@ int main(int argc, char *argv[]) {
 
     isJailbroken = init_checkForJailbreak();
     init_setupHomeDirectory();
-    init_redirectStdio();  // tees console output to latestlog.txt for Share/Save Logs
+    init_redirectStdio();  // tees console output to latestlog.txt for Share Logs
     init_logDeviceAndVer();
     init_setupGameDirs();
     skStageJITScriptToDocuments();  // make the JIT script importable in StikJIT

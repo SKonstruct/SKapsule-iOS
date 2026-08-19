@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		006B5AB3D45FDE34B350884D /* prefs_stubs.c in Sources */ = {isa = PBXBuildFile; fileRef = 866F2B8C858E3F619CB4129F /* prefs_stubs.c */; };
+		023B82EFA475643CA3AC63F9 /* SKTouchControlOverlay.m in Sources */ = {isa = PBXBuildFile; fileRef = A04898E138F528F41BBF5B91 /* SKTouchControlOverlay.m */; };
 		0249A9C9C90015426942BD8E /* GameViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = D213F0E8EEF4381DFE622FBF /* GameViewController.m */; };
 		06F32A40195F29A38EEA2B75 /* empty.m in Sources */ = {isa = PBXBuildFile; fileRef = F74EF3D8B08A315F2F20FA4F /* empty.m */; };
 		12DE5F6025708BE38E4CFB9A /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 68C5F0BF52335C919C72490A /* AppDelegate.m */; };
@@ -23,6 +24,7 @@
 		7600E21B6E5090AA0ABCF1F7 /* fishhook.c in Sources */ = {isa = PBXBuildFile; fileRef = 4B911D1568CD0DE81D45E719 /* fishhook.c */; };
 		7D535318FBE7FC713000B878 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CCF840D1FBF1E2F94CC86EBF /* Assets.xcassets */; };
 		81DB249991868B43A01D5325 /* utils.m in Sources */ = {isa = PBXBuildFile; fileRef = 4ABDACF22A6AA55B724B388E /* utils.m */; };
+		8F6F555C3B86E11BA5DAF7E6 /* SKKeyboardBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = B70BEB3A08DE8E2A4B9AAB39 /* SKKeyboardBridge.m */; };
 		978739D1F01DAEE113A94CEF /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 2FBF045EA58960ED19A7C1F0 /* main.m */; };
 		A3EC2DD7C6C90499E3BF478F /* config.h.in in Resources */ = {isa = PBXBuildFile; fileRef = FE7003D28950F227547F58AC /* config.h.in */; };
 		B35ADB85955D5FD717080F40 /* LauncherViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 10D3EEFEE3ECCBCC4E43BFF0 /* LauncherViewController.m */; };
@@ -33,6 +35,7 @@
 		E692E54A8170D862C6CDD7AD /* JavaLauncher.m in Sources */ = {isa = PBXBuildFile; fileRef = 7509064C9612D6BC5DD29650 /* JavaLauncher.m */; };
 		EA35344B6E4F2A50377BCD18 /* NativeBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = 741BFD72FAF843F281C68E7A /* NativeBridge.m */; };
 		F3B4129DCA02CFB6D81080ED /* glfw_ios.m in Sources */ = {isa = PBXBuildFile; fileRef = 2EEDEAC375E5B6361AC3C4C4 /* glfw_ios.m */; };
+		FD174F6904B891149EB10939 /* SKTouchControls.m in Sources */ = {isa = PBXBuildFile; fileRef = 72ACFF64E221393C399B8B96 /* SKTouchControls.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -63,9 +66,11 @@
 		10D3EEFEE3ECCBCC4E43BFF0 /* LauncherViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = LauncherViewController.m; sourceTree = "<group>"; };
 		1427DC5800DE4375F0F08968 /* GameViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GameViewController.h; sourceTree = "<group>"; };
 		1D696DEA9413425697E370C7 /* awt_xawt.dylib */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "compiled.mach-o.dylib"; path = awt_xawt.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
+		25E3956AF3F2D5127455A185 /* SKKeyboardBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SKKeyboardBridge.h; sourceTree = "<group>"; };
 		2EEDEAC375E5B6361AC3C4C4 /* glfw_ios.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = glfw_ios.m; sourceTree = "<group>"; };
 		2FACF0E1D1C4B9035412632A /* SKInstaller.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SKInstaller.h; sourceTree = "<group>"; };
 		2FBF045EA58960ED19A7C1F0 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
+		356C47238DDFB2DBC0461B34 /* SKTouchControls.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SKTouchControls.h; sourceTree = "<group>"; };
 		3860F7BEDF92809A48BDB35B /* SceneDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SceneDelegate.m; sourceTree = "<group>"; };
 		424B9EBCDD3EBD841FA9ACEC /* CODE_OF_CONDUCT.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CODE_OF_CONDUCT.md; sourceTree = "<group>"; };
 		43E367B195EAA9C671AD26FE /* jni.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = jni.h; sourceTree = "<group>"; };
@@ -74,6 +79,8 @@
 		68C5F0BF52335C919C72490A /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
 		694B3D7E5A5DDDB5E6C5C317 /* SceneDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SceneDelegate.h; sourceTree = "<group>"; };
 		6E84F1721BED6B371EB2B603 /* SKZipUtils.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SKZipUtils.h; sourceTree = "<group>"; };
+		716AFD9944C4426B16ED10E5 /* SKTouchControlOverlay.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SKTouchControlOverlay.h; sourceTree = "<group>"; };
+		72ACFF64E221393C399B8B96 /* SKTouchControls.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SKTouchControls.m; sourceTree = "<group>"; };
 		73706EE631C12186CF3B22F3 /* awt_stubs.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = awt_stubs.c; sourceTree = "<group>"; };
 		741BFD72FAF843F281C68E7A /* NativeBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = NativeBridge.m; sourceTree = "<group>"; };
 		7509064C9612D6BC5DD29650 /* JavaLauncher.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = JavaLauncher.m; sourceTree = "<group>"; };
@@ -86,9 +93,11 @@
 		8C5CDBAC8A1997AB6C168A9A /* .git */ = {isa = PBXFileReference; path = .git; sourceTree = "<group>"; };
 		8E9EE76547F63608B1AFE425 /* NativeBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NativeBridge.h; sourceTree = "<group>"; };
 		938DA6D68E6BB2CDA7AF2000 /* LauncherViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = LauncherViewController.h; sourceTree = "<group>"; };
+		A04898E138F528F41BBF5B91 /* SKTouchControlOverlay.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SKTouchControlOverlay.m; sourceTree = "<group>"; };
 		A74479BB3EA492E659794A0E /* utils.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = utils.h; sourceTree = "<group>"; };
 		AF179EB4850BD8983431E311 /* SKInstaller.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SKInstaller.m; sourceTree = "<group>"; };
 		AF476662EB209A1AF30CE47F /* awt.dylib */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "compiled.mach-o.dylib"; path = awt.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
+		B70BEB3A08DE8E2A4B9AAB39 /* SKKeyboardBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SKKeyboardBridge.m; sourceTree = "<group>"; };
 		BC9812E93F8AA6921EF87ACF /* fishhook.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = fishhook.h; sourceTree = "<group>"; };
 		C1C866ED8F4BE69C85B9C261 /* SKModManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SKModManager.h; sourceTree = "<group>"; };
 		C5A3E19B66F96254F249FB84 /* dyld_bypass_validation.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = dyld_bypass_validation.m; sourceTree = "<group>"; };
@@ -168,8 +177,14 @@
 				3860F7BEDF92809A48BDB35B /* SceneDelegate.m */,
 				2FACF0E1D1C4B9035412632A /* SKInstaller.h */,
 				AF179EB4850BD8983431E311 /* SKInstaller.m */,
+				25E3956AF3F2D5127455A185 /* SKKeyboardBridge.h */,
+				B70BEB3A08DE8E2A4B9AAB39 /* SKKeyboardBridge.m */,
 				C1C866ED8F4BE69C85B9C261 /* SKModManager.h */,
 				7A33F77D0C19BF2CF6A46A71 /* SKModManager.m */,
+				716AFD9944C4426B16ED10E5 /* SKTouchControlOverlay.h */,
+				A04898E138F528F41BBF5B91 /* SKTouchControlOverlay.m */,
+				356C47238DDFB2DBC0461B34 /* SKTouchControls.h */,
+				72ACFF64E221393C399B8B96 /* SKTouchControls.m */,
 				6E84F1721BED6B371EB2B603 /* SKZipUtils.h */,
 				E8DC5FE13732EB6D70FD62A1 /* SKZipUtils.m */,
 				A74479BB3EA492E659794A0E /* utils.h */,
@@ -389,7 +404,10 @@
 				B35ADB85955D5FD717080F40 /* LauncherViewController.m in Sources */,
 				EA35344B6E4F2A50377BCD18 /* NativeBridge.m in Sources */,
 				BB2CF1D6605B390FD0ABE875 /* SKInstaller.m in Sources */,
+				8F6F555C3B86E11BA5DAF7E6 /* SKKeyboardBridge.m in Sources */,
 				477E3673FE42DCA38029BA8F /* SKModManager.m in Sources */,
+				023B82EFA475643CA3AC63F9 /* SKTouchControlOverlay.m in Sources */,
+				FD174F6904B891149EB10939 /* SKTouchControls.m in Sources */,
 				60FB49B067D39C5E838FBB0B /* SKZipUtils.m in Sources */,
 				6A3466DBD9E08B57B575115C /* SceneDelegate.m in Sources */,
 				47BC0B686B1F30FBA5C727F9 /* awt_stubs.c in Sources */,

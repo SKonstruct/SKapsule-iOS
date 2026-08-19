@@ -87,6 +87,8 @@ check:
 	echo "BUILD_TYPE = $(CMAKE_BUILD_TYPE)"
 	echo "JOBS       = $(JOBS)"
 
+SK_ASAN ?= OFF
+
 native:
 	echo '[SKapsule v$(VERSION)] native - start'
 	mkdir -p $(WORKINGDIR)
@@ -99,6 +101,7 @@ native:
 		-DCMAKE_OSX_ARCHITECTURES=arm64 \
 		-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
 		-DCMAKE_C_FLAGS="-arch arm64" \
+		-DSK_ASAN=$(SK_ASAN) \
 		-DCONFIG_BRANCH="$(BRANCH)" \
 		-DCONFIG_COMMIT="$(COMMIT)" \
 		-DCONFIG_RELEASE=$(RELEASE) \

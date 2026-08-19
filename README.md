@@ -59,6 +59,10 @@ Some components are built separately and are consumed from `out/`:
 ./scripts/build-bootstrap.sh   # -> out/bootstrap/sk-bootstrap.jar
 ```
 
+Adding a source file under `Natives/` also needs `xcodegen generate`: `project.yml` globs
+the directory, but `SKapsule.xcodeproj` is checked in and nothing regenerates it during a
+build, so a missed run surfaces as a link error long after `make native` passed.
+
 ## Troubleshooting
 
 Use **Share Logs** in the launcher sidebar. It collects everything useful:
@@ -69,9 +73,9 @@ Use **Share Logs** in the launcher sidebar. It collects everything useful:
 | `hs_err_pid*.log` | HotSpot crash report, if the JVM died |
 | `vmlog-*.log` | GC, class-unloading and code-cache logging |
 
-The JVM names the last two per-pid, so they never overwrite each other; the launcher
-prunes each to the 3 newest at startup. Pruning happens on launch rather than on exit,
-so a crash report always survives the relaunch you share it from.
+The JVM names the last two per-pid, so they never overwrite each other; the launcher prunes
+each to the 3 newest at startup. Pruning happens on launch rather than on exit, so a crash
+report always survives the relaunch you share it from.
 
 These are captured even when launching outside Xcode, which is the normal case since the
 game must be started via StikDebug.
@@ -81,6 +85,8 @@ game must be started via StikDebug.
 - **The JIT pill never turns green** — the script probably isn't assigned to SKapsule's
   bundle id (step 3 above). StikDebug's own log should show it allocating a JIT page.
 - **Game is running but unplayably slow** — it launched without JIT.
+- **The HUD is tiny** — Resolution in the ⚙ panel is a framebuffer divisor; lower it and
+  relaunch. It applies at launch, not immediately.
 
 ## Related projects
 

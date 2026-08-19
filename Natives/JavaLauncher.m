@@ -97,12 +97,7 @@ int launchJVM(NSString *steamUser, NSString *steamPass, BOOL isSteam, int width,
 
     margv[++margc] = [NSString stringWithFormat:@"%@/bin/java", javaHome].UTF8String;
 
-    // Memory: auto-allocate 25% of physical RAM (no increased-memory entitlement assumed)
-    int allocMB = (int)((NSProcessInfo.processInfo.physicalMemory >> 20) * 0.25);
-    if (allocMB < 256)
-        allocMB = 256;
-    if (allocMB > 2048)
-        allocMB = 2048;
+    int allocMB = sk_ram_get_mb();
     NSLog(@"[JavaLauncher] Max RAM: %d MB", allocMB);
     margv[++margc] = "-Xms128M";
     margv[++margc] = [NSString stringWithFormat:@"-Xmx%dM", allocMB].UTF8String;
@@ -174,6 +169,11 @@ int launchJVM(NSString *steamUser, NSString *steamPass, BOOL isSteam, int width,
     // retrieved via Files / Share Logs — the default lands in the container tmp,
     // which isn't user-accessible.
     margv[++margc] = [NSString stringWithFormat:@"-XX:ErrorFile=%s/hs_err_pid%%p.log", home].UTF8String;
+    // NMT brackets every os::malloc with canaries and validates them on free. The
+    // 2026-08-19 12:14 crash tripped over a corrupted free block from inside a JVM
+    // os::malloc, so a stray write into JVM C-heap gets caught here with the block's own
+    // allocation site instead of taking down a random later victim.
+    margv[++margc] = "-XX:NativeMemoryTracking=summary";
     margv[++margc] = "-XX:+UnlockExperimentalVMOptions";
     margv[++margc] = "-XX:+DisablePrimordialThreadGuardPages";
     // SerialGC, matching KnightLauncher's default for this same game (it exposes

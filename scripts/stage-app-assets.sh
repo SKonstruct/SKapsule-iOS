@@ -23,6 +23,19 @@ stage "$REPO_ROOT/out/gl4es/libgl4es.dylib" \
       "$APP_DIR/Frameworks/libgl4es.dylib" ||
     echo "  (run ./scripts/build-gl4es-ios.sh first)"
 
+# The AddressSanitizer runtime, only when gl4es was built against it (SK_ASAN=1). Its
+# @rpath load command resolves from here, so without this the app will not launch at all.
+if otool -L "$APP_DIR/Frameworks/libgl4es.dylib" 2> /dev/null | grep -q asan; then
+    echo
+    echo "=== libclang_rt.asan_ios_dynamic.dylib ==="
+    # `|| true`: this script runs under `set -euo pipefail`, and find returning non-zero
+    # (it does under Xcode's script phase) would otherwise abort the whole staging step.
+    ASAN_LIB="$(find "$(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang" \
+        -name libclang_rt.asan_ios_dynamic.dylib 2> /dev/null | head -1 || true)"
+    stage "$ASAN_LIB" "$APP_DIR/Frameworks/libclang_rt.asan_ios_dynamic.dylib" ||
+        echo "  (AddressSanitizer runtime not found in the Xcode toolchain)"
+fi
+
 echo
 echo "=== libopenal.dylib ==="
 stage "$REPO_ROOT/out/openal/libopenal.dylib" \
