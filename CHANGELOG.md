@@ -4,7 +4,7 @@ Notable changes per release. Versions are the git tags the IPAs are built from
 (`v1.0.0` → `SKapsule.ipa` on that release). Before releasing, rename **Unreleased** to the new
 version: the Release workflow publishes that section as the release notes.
 
-## Unreleased
+## 1.0.0
 
 First public release.
 
