@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+	<dict>
+		<key>CFBundleDevelopmentRegion</key>
+		<string>en</string>
+		<key>CFBundleDisplayName</key>
+		<string>SKapsule</string>
+		<key>CFBundleExecutable</key>
+		<string>SKapsule</string>
+		<key>CFBundleIconName</key>
+		<string>AppIcon</string>
+		<key>CFBundleIdentifier</key>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+		<key>CFBundleInfoDictionaryVersion</key>
+		<string>6.0</string>
+		<key>CFBundleName</key>
+		<string>SKapsule</string>
+		<key>CFBundlePackageType</key>
+		<string>APPL</string>
+		<key>CFBundleShortVersionString</key>
+		<string>1.0.0</string>
+		<key>CFBundleVersion</key>
+		<string>1</string>
+		<key>LSRequiresIPhoneOS</key>
+		<true />
+		<key>UIApplicationSceneManifest</key>
+		<dict>
+			<key>UIApplicationSupportsMultipleScenes</key>
+			<false />
+			<key>UISceneConfigurations</key>
+			<dict>
+				<key>UIWindowSceneSessionRoleApplication</key>
+				<array>
+					<dict>
+						<key>UISceneConfigurationName</key>
+						<string>Default Configuration</string>
+						<key>UISceneDelegateClassName</key>
+						<string>SceneDelegate</string>
+					</dict>
+				</array>
+			</dict>
+		</dict>
+		<key>UILaunchStoryboardName</key>
+		<string>LaunchScreen</string>
+		<!-- KnightLauncher's announcement service (the home-screen news card) listens
+		     on port 6060 with no TLS at all, so it cannot be reached over HTTPS.
+		     Scoped to that one domain; its banner images come from an HTTPS CDN. -->
+		<key>NSAppTransportSecurity</key>
+		<dict>
+			<key>NSExceptionDomains</key>
+			<dict>
+				<key>knightlauncher.com</key>
+				<dict>
+					<key>NSExceptionAllowsInsecureHTTPLoads</key>
+					<true/>
+					<key>NSIncludesSubdomains</key>
+					<true/>
+				</dict>
+			</dict>
+		</dict>
+		<!-- Game Mode. The OS decides whether to actually engage it, and per Apple's DTS
+		     it decides from LSApplicationCategoryType -- the boolean keys only opt in or
+		     out. LSSupportsGameMode is the current key (iOS 18.6+); GCSupportsGameMode is
+		     its deprecated predecessor, kept for 18.0-18.5. The app is already
+		     UIRequiresFullScreen, which is the other thing Game Mode wants. -->
+		<key>LSApplicationCategoryType</key>
+		<string>public.app-category.games</string>
+		<key>LSSupportsGameMode</key>
+		<true/>
+		<key>GCSupportsGameMode</key>
+		<true/>
+		<key>GCSupportsControllerUserInteraction</key>
+		<true/>
+		<key>GCSupportedGameControllers</key>
+		<array>
+			<dict>
+				<key>ProfileName</key>
+				<string>ExtendedGamepad</string>
+			</dict>
+			<dict>
+				<key>ProfileName</key>
+				<string>MicroGamepad</string>
+			</dict>
+		</array>
+		<key>UIRequiredDeviceCapabilities</key>
+		<array>
+			<string>arm64</string>
+		</array>
+		<key>UIRequiresFullScreen</key>
+		<true />
+		<key>UIStatusBarHidden</key>
+		<false />
+		<key>UISupportedInterfaceOrientations</key>
+		<array>
+			<string>UIInterfaceOrientationLandscapeLeft</string>
+			<string>UIInterfaceOrientationLandscapeRight</string>
+			<string>UIInterfaceOrientationPortrait</string>
+		</array>
+		<key>UISupportedInterfaceOrientations~ipad</key>
+		<array>
+			<string>UIInterfaceOrientationLandscapeLeft</string>
+			<string>UIInterfaceOrientationLandscapeRight</string>
+			<string>UIInterfaceOrientationPortrait</string>
+			<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		</array>
+		<key>UIFileSharingEnabled</key>
+		<true />
+		<key>LSSupportsOpeningDocumentsInPlace</key>
+		<true />
+	</dict>
+</plist>

@@ -1,0 +1,159 @@
+name: Build for iOS
+
+# Builds the IPAs. Called with a version by release-ios.yml, which makes it also publish a
+# GitHub Release: that is the only way a release happens, so the tag is created after a
+# successful build and a failed build leaves nothing behind to clean up.
+
+on:
+  push:
+    branches: ['main']
+  pull_request:
+    branches: ['main']
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      version:
+        description: Version to release, without the leading v. Empty builds only.
+        type: string
+        default: ''
+
+permissions:
+  contents: write # creates the release and its tag
+
+jobs:
+  build:
+    runs-on: macos-latest
+    env:
+      VERSION: ${{ inputs.version }}
+
+    steps:
+      # Everything a release needs is checked before the long build: a bad version, a missing
+      # changelog section or an already-used tag fail in seconds.
+      - name: Check release preconditions
+        if: env.VERSION != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          fail() { echo "::error::$1"; exit 1; }
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "Version must look like 1.2.3, without a leading v."
+          [ "$GITHUB_REF" = refs/heads/main ] || fail "Releases are made from main."
+          ! gh release view "v$VERSION" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || fail "Release v$VERSION already exists."
+          ! gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$VERSION" >/dev/null 2>&1 \
+            || fail "Tag v$VERSION already exists without a release. Delete it (git push origin :refs/tags/v$VERSION) or pick a new version."
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          lfs: true
+
+      # The Makefile versions the app from `git describe`, which needs the tags; the shallow
+      # checkout has none on branch builds, so they reported 1.0.0.
+      - name: Fetch tags for versioning
+        run: git fetch --force --tags --unshallow origin || git fetch --force --tags origin
+
+      # The release notes are this version's CHANGELOG.md section, followed by GitHub's
+      # generated notes.
+      - name: Extract changelog section
+        if: env.VERSION != ''
+        run: |
+          awk -v h="## $VERSION" '$0==h{f=1;next} /^## /{f=0} f' CHANGELOG.md > "$RUNNER_TEMP/release-notes.md"
+          grep -q '[^[:space:]]' "$RUNNER_TEMP/release-notes.md" || { echo "::error::CHANGELOG.md has no '## $VERSION' section"; exit 1; }
+
+      - name: Setup Java 8 (for LWJGL multi-release layer)
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '8'
+
+      - name: Setup Java 25 (for build tools)
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '25'
+
+      - name: Install build dependencies
+        run: brew install ant maven ninja wget ldid xcodegen
+
+      - name: Cache native build outputs
+        id: cache-out
+        uses: actions/cache@v4
+        with:
+          path: out
+          key: native-macos14-${{ hashFiles('external/**') }}-${{ hashFiles('scripts/build-*.sh') }}
+
+      - name: Build native submodules
+        if: steps.cache-out.outputs.cache-hit != 'true'
+        env:
+          JAVA8_HOME: ${{ env.JAVA_HOME_8_ARM64 }}
+          JAVA_HOME: ${{ env.JAVA_HOME_25_ARM64 }}
+        run: |
+          ./scripts/build-gl4es-ios.sh
+          ./scripts/build-openal-ios.sh
+          ./scripts/build-lwjgl3-ios.sh
+          ./scripts/build-cacio-ios.sh
+          ./scripts/build-frenchpress-ios.sh
+          ./scripts/build-bootstrap.sh
+
+      - name: Ensure JRE zip is present
+        run: |
+          mkdir -p assets
+          if [ ! -f "assets/jre25-ios-aarch64.zip" ] || [ $(wc -c < "assets/jre25-ios-aarch64.zip") -lt 1000 ]; then
+            echo "Downloading pre-built JRE 25..."
+            curl -L -o assets/jre25-ios-aarch64.zip https://github.com/SKonstruct/SKapsule-iOS/releases/download/v0.1.0/jre25-ios-aarch64.zip || true
+          fi
+
+      - name: Stage app assets
+        run: ./scripts/stage-app-assets.sh
+
+      - name: Build Standard IPA
+        run: |
+          make package RELEASE=1 SK_BUILD=${{ github.run_number }} ${VERSION:+SK_VERSION=$VERSION}
+          mv out/artifacts/com.skonstruct.skapsule-*.ipa out/artifacts/SKapsule.ipa
+
+      - name: Build TrollStore IPA (JIT Entitlements)
+        run: |
+          mv out/artifacts/SKapsule.ipa ./SKapsule.ipa
+          make clean
+          make package TROLLSTORE_JIT_ENT=1 RELEASE=1 SK_BUILD=${{ github.run_number }} ${VERSION:+SK_VERSION=$VERSION}
+          mv out/artifacts/com.skonstruct.skapsule-*-trollstore.tipa out/artifacts/SKapsule-TrollStore.tipa
+          mv ./SKapsule.ipa out/artifacts/SKapsule.ipa
+
+      - name: Verify the IPA carries the release version
+        if: env.VERSION != ''
+        run: |
+          got=$(unzip -p out/artifacts/SKapsule.ipa 'Payload/*.app/Info.plist' | plutil -extract CFBundleShortVersionString raw -)
+          [ "$got" = "$VERSION" ] || { echo "::error::IPA reports version '$got', expected '$VERSION'"; exit 1; }
+
+      # Creates the tag at the built commit together with the release, so a tag exists only
+      # for a release that was actually published.
+      - name: Publish GitHub Release
+        if: env.VERSION != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION }}
+          target_commitish: ${{ github.sha }}
+          files: |
+            out/artifacts/SKapsule.ipa
+            out/artifacts/SKapsule-TrollStore.tipa
+          body_path: ${{ runner.temp }}/release-notes.md
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+
+      - name: Upload Standard IPA
+        if: env.VERSION == ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: SKapsule-iOS
+          path: out/artifacts/SKapsule.ipa
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload TrollStore TIPA
+        if: env.VERSION == ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: SKapsule-iOS-TrollStore
+          path: out/artifacts/SKapsule-TrollStore.tipa
+          if-no-files-found: error
+          retention-days: 7

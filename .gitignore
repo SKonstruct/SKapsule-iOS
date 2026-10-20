@@ -1,0 +1,26 @@
+# Build outputs
+out/
+Natives/build/
+
+# Xcode
+xcuserdata/
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+timeline.xctimeline
+playground.xcworkspace
+.build/
+
+# Signing
+*.mobileprovision
+
+# macOS
+.DS_Store
+
+# Java build
+external/bootstrap/build/
+/.cache
+/build
+/Natives/build_xcode
+xcode-log.txt

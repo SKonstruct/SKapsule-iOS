@@ -1,0 +1,137 @@
+name: SKapsule
+options:
+  bundleIdPrefix: com.skonstruct.dev
+settings:
+  DEVELOPMENT_TEAM: 87DLA8MPF5
+schemes:
+  SKapsule:
+    shared: true
+    build:
+      targets:
+        SKapsule: all
+    run:
+      config: Debug
+  SKapsule Heap Diagnostics:
+    shared: true
+    build:
+      targets:
+        SKapsule: all
+    run:
+      config: Debug
+      environmentVariables:
+        MallocScribble: '1'
+        MallocGuardEdges: '1'
+  SKapsule VBO Diagnostics:
+    shared: true
+    build:
+      targets:
+        SKapsule: all
+    run:
+      config: Debug
+      environmentVariables:
+        MallocScribble: '1'
+        MallocGuardEdges: '1'
+        LIBGL_USEVBO: '0'
+        MTL_DEBUG_LAYER: '1'
+        MTL_SHADER_VALIDATION: '1'
+targets:
+  SKapsule:
+    type: application
+    platform: iOS
+    deploymentTarget: '17.4'
+    sources:
+      - path: Natives
+        excludes:
+          - 'build'
+          - 'build_xcode'
+          - 'CMakeLists.txt'
+          - 'awt_xawt'
+          - 'Info.plist'
+          - 'JITHelper'
+      - path: external/fishhook
+    settings:
+      CODE_SIGN_IDENTITY: 'Apple Development'
+      ENABLE_USER_SCRIPT_SANDBOXING: NO
+      INFOPLIST_FILE: 'Natives/Info.plist'
+      OTHER_CFLAGS: '-DGLES_SILENCE_DEPRECATION=1'
+      # To diagnose heap corruption again, uncomment this and rebuild gl4es with
+      # SK_ASAN=1 ./scripts/build-gl4es-ios.sh. It links the AddressSanitizer runtime into
+      # the app so it is loaded from process start -- without it ASan arrives when LWJGL
+      # dlopens the instrumented libgl4es and aborts with "Interceptors are not working".
+      # Linker only: the app's own code stays uninstrumented.
+      # OTHER_LDFLAGS: '$(inherited) -fsanitize=address'
+    postBuildScripts:
+      - name: Stage JRE and Assets
+        basedOnDependencyAnalysis: false
+        script: |
+          make xcode-payload WORKINGDIR="${BUILT_PRODUCTS_DIR}"
+    dependencies:
+      - framework: GameController.framework
+        embed: false
+      # Built-in JIT. The app embeds StikJIT but does not link it; only the helper does.
+      - target: SKJITHelper
+      - framework: out/stikjit/StikJIT.framework
+        link: false
+        embed: true
+      - target: awt_headless
+        link: false
+        embed: false
+      - target: awt_xawt
+        link: false
+        embed: false
+      - target: awt
+        link: false
+        embed: false
+
+  SKJITHelper:
+    # App extension that attaches StikJIT to the app (Natives/JITHelper). The Makefile builds
+    # the same thing for `make package`; this target is for Xcode builds.
+    type: app-extension
+    platform: iOS
+    deploymentTarget: '17.4'
+    sources:
+      - path: Natives/JITHelper
+        excludes:
+          - 'Info.plist'
+    settings:
+      INFOPLIST_FILE: 'Natives/JITHelper/Info.plist'
+      PRODUCT_BUNDLE_IDENTIFIER: com.skonstruct.dev.SKapsule.jithelper
+      CODE_SIGN_IDENTITY: 'Apple Development'
+      SWIFT_VERSION: '5.0'
+      FRAMEWORK_SEARCH_PATHS: '$(SRCROOT)/out/stikjit'
+      LD_RUNPATH_SEARCH_PATHS: '@executable_path/../../Frameworks'
+    preBuildScripts:
+      - name: Build StikJIT
+        basedOnDependencyAnalysis: false
+        script: |
+          [ -f "$SRCROOT/out/stikjit/StikJIT.framework/Info.plist" ] || "$SRCROOT/scripts/build-stikjit-ios.sh"
+    dependencies:
+      - framework: out/stikjit/StikJIT.framework
+        embed: false
+
+  awt_headless:
+    type: library.dynamic
+    platform: iOS
+    deploymentTarget: '17.4'
+    sources:
+      - path: Natives/awt_xawt/empty.m
+    settings:
+      CODE_SIGN_IDENTITY: 'Apple Development'
+
+  awt_xawt:
+    type: library.dynamic
+    platform: iOS
+    deploymentTarget: '17.4'
+    sources:
+      - path: Natives/awt_xawt/xawt_fake.m
+    settings:
+      CODE_SIGN_IDENTITY: 'Apple Development'
+
+  awt:
+    type: library.dynamic
+    platform: iOS
+    deploymentTarget: '17.4'
+    sources:
+      - path: Natives/awt_xawt/empty.m
+    settings:
+      CODE_SIGN_IDENTITY: 'Apple Development'

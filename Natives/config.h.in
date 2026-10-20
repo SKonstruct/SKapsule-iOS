@@ -1,0 +1,15 @@
+#ifndef CONFIG_H
+#define CONFIG_H
+
+#define CONFIG_VERSION "@CONFIG_VERSION@"
+#define CONFIG_BRANCH "@CONFIG_BRANCH@"
+#define CONFIG_COMMIT "@CONFIG_COMMIT@"
+
+#cmakedefine CONFIG_RELEASE 1
+#ifdef CONFIG_RELEASE
+#define CONFIG_TYPE "release"
+#else
+#define CONFIG_TYPE "debug"
+#endif
+
+#endif /* CONFIG_H */

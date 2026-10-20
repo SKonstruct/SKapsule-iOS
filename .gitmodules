@@ -1,0 +1,24 @@
+[submodule "gl4es"]
+	path = external/gl4es
+	url = https://github.com/SKonstruct/gl4es.git
+[submodule "openal-soft"]
+	path = external/openal-soft
+	url = https://github.com/SKonstruct/openal-soft.git
+[submodule "lwjgl3"]
+	path = external/lwjgl3
+	url = https://github.com/SKonstruct/lwjgl3.git
+[submodule "caciocavallo17"]
+	path = external/caciocavallo17
+	url = https://github.com/SKonstruct/caciocavallo17.git
+[submodule "frenchpress"]
+	path = external/frenchpress
+	url = https://github.com/SKonstruct/frenchpress.git
+[submodule "external/fishhook"]
+	path = external/fishhook
+	url = https://github.com/SKonstruct/fishhook.git
+[submodule "bootstrap"]
+	path = external/bootstrap
+	url = https://github.com/SKonstruct/bootstrap.git
+[submodule "external/StikJIT"]
+	path = external/StikJIT
+	url = https://github.com/StikDebug/StikJIT.git

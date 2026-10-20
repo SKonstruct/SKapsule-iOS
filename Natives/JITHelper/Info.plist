@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+	<dict>
+		<key>CFBundleDevelopmentRegion</key>
+		<string>en</string>
+		<key>CFBundleDisplayName</key>
+		<string>SKapsule JIT Helper</string>
+		<key>CFBundleExecutable</key>
+		<string>SKJITHelper</string>
+		<key>CFBundleIdentifier</key>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+		<key>CFBundleInfoDictionaryVersion</key>
+		<string>6.0</string>
+		<key>CFBundleName</key>
+		<string>SKJITHelper</string>
+		<key>CFBundlePackageType</key>
+		<string>XPC!</string>
+		<key>CFBundleShortVersionString</key>
+		<string>1.0.0</string>
+		<key>CFBundleVersion</key>
+		<string>1</string>
+		<!-- Not a real AR viewer: com.apple.ar.viewer is a generic extension point an app may
+		     start for itself through NSExtension, which is all SKBuiltinJIT.m needs. The
+		     activation rule keeps it from ever being offered to other apps. -->
+		<key>NSExtension</key>
+		<dict>
+			<key>NSExtensionAttributes</key>
+			<dict>
+				<key>NSExtensionActivationRule</key>
+				<string>FALSEPREDICATE</string>
+			</dict>
+			<key>NSExtensionContextClass</key>
+			<string>NSExtensionContext</string>
+			<key>NSExtensionContextHostClass</key>
+			<string>NSExtensionContext</string>
+			<key>NSExtensionPointIdentifier</key>
+			<string>com.apple.ar.viewer</string>
+			<key>NSExtensionPrincipalClass</key>
+			<string>SKJITHelperHandler</string>
+		</dict>
+		<key>XPCService</key>
+		<dict>
+			<key>ServiceType</key>
+			<string>Application</string>
+			<key>_MultipleInstances</key>
+			<true/>
+			<key>_ProcessType</key>
+			<string>App</string>
+		</dict>
+	</dict>
+</plist>

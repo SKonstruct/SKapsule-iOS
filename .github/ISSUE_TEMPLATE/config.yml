@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: JIT setup and troubleshooting
+    url: https://github.com/SKonstruct/SKapsule-iOS#troubleshooting
+    about: "Slow game, a JIT pill that never turns green, \"Couldn't enable JIT\" — start here. JIT is mandatory."
+  - name: Android port
+    url: https://github.com/SKonstruct/SKapsule/issues
+    about: Bugs in the Android build belong in the Android repository.
+  - name: StikDebug / StikJIT
+    url: https://github.com/StikDebug/StikDebug/issues
+    about: Pairing files, device mounting and StikDebug's own failures are handled upstream.
+  - name: Spiral Knights itself
+    url: https://forums.spiralknights.com/
+    about: SKapsule only packages the official client. Game bugs, account and billing issues are Grey Havens' to handle.
