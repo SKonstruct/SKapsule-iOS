@@ -4,7 +4,6 @@
 #include <UIKit/UIKit.h>
 
 extern BOOL isJailbroken;
-extern BOOL debugLogEnabled;
 
 /// Insets the game (and the control editor) uses when "avoid screen edges" is on.
 /// Hand-rolled rather than `safeAreaInsets`: UIKit mirrors the sensor-housing inset onto
@@ -12,8 +11,12 @@ extern BOOL debugLogEnabled;
 UIEdgeInsets SKGameSafeAreaInsets(UIView *view);
 
 BOOL isJITEnabled(BOOL checkCSFlags);
+/// Whether any debugger is attached to this process (CS_DEBUGGED).
+BOOL skDebuggerAttached(void);
 id getEntitlementValue(NSString *key);
-void init_bypassDyldLibValidation(void);
+
+/// Keeps a file or directory tree out of iCloud and iTunes backups. Safe if it does not exist yet.
+void skExcludeFromBackup(NSString *path);
 
 // Device JIT capability flags (ported from AngelAuraMC / Amethyst-iOS).
 typedef enum {
@@ -33,8 +36,6 @@ NSURL *skJITEnableURL(void);
 // Copies the bundled skapsule-jit.js into the app's Documents folder (visible
 // in Files) so it can be imported/assigned in StikJIT. Returns its path.
 NSString *skStageJITScriptToDocuments(void);
-
-NSString *getSelectedJavaHome(int minVersion);
 
 /// Java heap cap, shared by the launcher's RAM setting UI and the JVM launch.
 /// SK's live set peaks around 300MB, so the JVM's own ergonomics (a fraction of device

@@ -5,6 +5,7 @@
 #import "SKBuiltinJIT.h"
 #import "SKInstaller.h"
 #import "SKKeyboardBridge.h"
+#import "SKMouseButtons.h"
 #import "SKReporter.h"
 #import "SKTouchControlOverlay.h"
 #import "utils.h"
@@ -277,6 +278,9 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
 @property (nonatomic, strong) NSTimer *bootWatchdog;
 @property (nonatomic, strong) UIButton *buttonsToggle;
 @property (nonatomic, assign) int primaryTouchButton;
+/// Mouse buttons last reported down (bit 0 left, 1 right, 2 middle); a finger leaves this 0.
+@property (nonatomic, assign) unsigned pointerButtons;
+@property (nonatomic, assign) BOOL primaryTouchIsPointer;
 @end
 
 @implementation GameViewController
@@ -349,13 +353,11 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
 
     // Scroll wheel / two-finger trackpad scroll. A pan restricted to discrete scroll only
     // fires for real scroll input, so it cannot swallow touches meant for the game.
-    if (@available(iOS 13.4, *)) {
-        UIPanGestureRecognizer *scroll =
-          [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleScroll:)];
-        scroll.allowedScrollTypesMask = UIScrollTypeMaskDiscrete;
-        scroll.allowedTouchTypes = @[];  // scroll devices only, never fingers
-        [self.surfaceView addGestureRecognizer:scroll];
-    }
+    UIPanGestureRecognizer *scroll =
+      [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleScroll:)];
+    scroll.allowedScrollTypesMask = UIScrollTypeMaskDiscrete;
+    scroll.allowedTouchTypes = @[];  // scroll devices only, never fingers
+    [self.surfaceView addGestureRecognizer:scroll];
     [self setupGameControllers];
     [gEAGLContext renderbufferStorage:GL_RENDERBUFFER fromDrawable:gEAGLLayer];
 
@@ -603,25 +605,6 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
     [self pushCursorAtPoint:[touch locationInView:self.surfaceView]];
 }
 
-/**
- * Which mouse button a touch represents.
- *
- * A finger is always the left button. An indirect pointer (trackpad or mouse on iPadOS)
- * carries a buttonMask, and reporting its secondary click as a left click -- which is what
- * happened before -- makes context menus unreachable.
- */
-- (int)glfwButtonForTouch:(UITouch *)touch event:(UIEvent *)event {
-    if (@available(iOS 13.4, *)) {
-        if (touch.type == UITouchTypeIndirectPointer) {
-            UIEventButtonMask mask = event.buttonMask;
-            if (mask & UIEventButtonMaskSecondary) return 1;
-            // Bit 2 is the tertiary (middle) button; UIKit exposes no named constant.
-            if (mask & (1 << 2)) return 2;
-        }
-    }
-    return 0;
-}
-
 - (void)handleScroll:(UIPanGestureRecognizer *)recognizer API_AVAILABLE(ios(13.4)) {
     CGPoint delta = [recognizer translationInView:self.surfaceView];
     // ~16pt per notch, matching how far a discrete wheel step moves a scroll view. Only
@@ -637,18 +620,47 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
     sk_input_push_scroll(ticks);
 }
 
+/// Sends the press or release of every mouse button whose state differs from the last report.
+- (void)syncPointerButtons:(unsigned)mask {
+    unsigned pressed, released;
+    SKMouseButtonChanges(self.pointerButtons, mask, &pressed, &released);
+    self.pointerButtons = mask;
+    for (int button = 0; button < 3; button++) {
+        if (released & (1u << button)) sk_input_push_mouse_button(button, NO);
+        if (pressed & (1u << button)) sk_input_push_mouse_button(button, YES);
+    }
+}
+
 - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    if (self.primaryTouch)
+    UITouch *touch = touches.anyObject;
+    if (self.primaryTouch) {
+        // Another button of the pointer already held down, if UIKit reports it as a new touch.
+        if (self.primaryTouchIsPointer && touch.type == UITouchTypeIndirectPointer) {
+            [self sendCursorForTouch:touch];
+            [self syncPointerButtons:(unsigned)event.buttonMask];
+        }
         return;
-    self.primaryTouch = touches.anyObject;
-    self.primaryTouchButton = [self glfwButtonForTouch:self.primaryTouch event:event];
-    [self sendCursorForTouch:self.primaryTouch];
-    sk_input_push_mouse_button(self.primaryTouchButton, YES);
+    }
+    self.primaryTouch = touch;
+    self.primaryTouchIsPointer = touch.type == UITouchTypeIndirectPointer;
+    [self sendCursorForTouch:touch];
+    if (self.primaryTouchIsPointer) {
+        self.pointerButtons = 0;
+        // A press that reports no button is the primary one.
+        [self syncPointerButtons:(unsigned)event.buttonMask ?: 1u];
+    } else {
+        self.primaryTouchButton = 0;
+        sk_input_push_mouse_button(0, YES);
+    }
 }
 
 - (void)touchesMoved:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
     if (self.primaryTouch && [touches containsObject:self.primaryTouch]) {
         [self sendCursorForTouch:self.primaryTouch];
+        // A button pressed or released while another is held shows up here as a new mask.
+        if (self.primaryTouchIsPointer && event.buttonMask != 0) {
+            [self syncPointerButtons:(unsigned)event.buttonMask];
+        }
     }
 }
 
@@ -656,9 +668,15 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
     if (!self.primaryTouch || ![touches containsObject:self.primaryTouch])
         return;
     [self sendCursorForTouch:self.primaryTouch];
-    sk_input_push_mouse_button(self.primaryTouchButton, NO);
+    if (self.primaryTouchIsPointer) {
+        // The pointer lifting ends every button still held.
+        [self syncPointerButtons:0];
+    } else {
+        sk_input_push_mouse_button(self.primaryTouchButton, NO);
+    }
     self.primaryTouch = nil;
     self.primaryTouchButton = 0;
+    self.primaryTouchIsPointer = NO;
 }
 
 - (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
@@ -699,6 +717,24 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
 
 // Steam Guard prompt: alerts on main thread and submits asynchronously
 - (void)showSteamGuardPromptWithTitle:(NSString *)title message:(NSString *)message {
+    [self showSteamGuardPromptWithTitle:title message:message attempt:0];
+}
+
+/// UIKit silently drops a present while another alert is up or still animating away, which
+/// would leave the JVM thread waiting on a prompt nobody can see. Retry until it can be shown,
+/// and answer with an empty code (a cancel) if it never can.
+- (void)showSteamGuardPromptWithTitle:(NSString *)title message:(NSString *)message attempt:(int)attempt {
+    if (self.presentedViewController || !self.view.window) {
+        if (attempt >= 120) {
+            NSLog(@"[GameVC] Couldn't present the Steam Guard prompt; cancelling it");
+            [SKNativeBridge submitCode:@""];
+            return;
+        }
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+          [self showSteamGuardPromptWithTitle:title message:message attempt:attempt + 1];
+        });
+        return;
+    }
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:title
                                                                    message:message
                                                             preferredStyle:UIAlertControllerStyleAlert];
@@ -903,6 +939,11 @@ static BOOL skJITReady(void) {
 
     [self startHeapWatchdog];
 
+    // The block gets the only copy; the property must not keep the password for the session.
+    NSString *steamUser = self.steamUser ?: @"";
+    __block NSString *steamPass = self.steamPass ?: @"";
+    self.steamPass = nil;
+
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
       // Before the JVM: getdown runs inside SkBootstrap, so a jar dropped here is
       // refetched on this launch rather than the next one.
@@ -911,7 +952,8 @@ static BOOL skJITReady(void) {
       dispatch_async(dispatch_get_main_queue(), ^{
         [self startBootWatchdog];
       });
-      int ret = launchJVM(self.steamUser ?: @"", self.steamPass ?: @"", isSteam, w, h);
+      int ret = launchJVM(steamUser, steamPass, isSteam, w, h);
+      steamPass = nil;
       NSLog(@"[GameVC] JVM exited with code %d", ret);
       if (ret != 0) {
           SKReportFailure(@"jvm_exit",
@@ -961,9 +1003,7 @@ static const CGFloat kChromeButtonGap = 8.0f;
 }
 
 - (void)setChromeSymbol:(NSString *)symbolName onButton:(UIButton *)button {
-    if (@available(iOS 13.0, *)) {
-        [button setImage:[UIImage systemImageNamed:symbolName] forState:UIControlStateNormal];
-    }
+    [button setImage:[UIImage systemImageNamed:symbolName] forState:UIControlStateNormal];
 }
 
 - (void)chromePositionForKey:(NSString *)key defaultX:(CGFloat)dx defaultY:(CGFloat)dy into:(CGPoint *)out {

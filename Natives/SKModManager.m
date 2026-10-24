@@ -1,6 +1,7 @@
 #import "SKModManager.h"
 #import "SKZipUtils.h"
 #import <CommonCrypto/CommonDigest.h>
+#import <UIKit/UIKit.h>
 
 /**
  * Entries no mod may replace, lowercased; archive entries are compared lowercased too, as
@@ -193,6 +194,138 @@ static NSString *SKRestorePristineCodeJars(NSString *skPath) {
     return nil;
 }
 
+/// Keeps the app running for a few seconds after a backgrounding, so an apply or remove is not
+/// killed halfway through rewriting the game's files. The returned block ends the task; call it once.
+static dispatch_block_t SKBeginBackgroundWork(NSString *name) {
+    NSObject *lock = [NSObject new];
+    __block UIBackgroundTaskIdentifier task = UIBackgroundTaskInvalid;
+    dispatch_block_t end = ^{
+      @synchronized(lock) {
+          if (task == UIBackgroundTaskInvalid) return;
+          [UIApplication.sharedApplication endBackgroundTask:task];
+          task = UIBackgroundTaskInvalid;
+      }
+    };
+    task = [UIApplication.sharedApplication beginBackgroundTaskWithName:name expirationHandler:end];
+    return end;
+}
+
+/// mod.json is third-party input: each value is type-checked and anything off-type is ignored.
+/// Reads the top-level object, or its `mod` object when there is one.
+static void SKParseModMeta(NSDictionary *json, NSString *fallbackName, NSString **name, NSString **type,
+                           NSString **pxVersion, NSDictionary **locale) {
+    *name = fallbackName;
+    *type = nil;
+    *pxVersion = nil;
+    *locale = nil;
+    if (![json isKindOfClass:NSDictionary.class]) return;
+    id mod = json[@"mod"];
+    NSDictionary *obj = [mod isKindOfClass:NSDictionary.class] ? mod : json;
+    id v = obj[@"name"];
+    if ([v isKindOfClass:NSString.class] && [v length] > 0) *name = v;
+    v = obj[@"type"];
+    if ([v isKindOfClass:NSString.class]) *type = v;
+    v = obj[@"pxVersion"];
+    if ([v isKindOfClass:NSString.class]) *pxVersion = v;
+    v = obj[@"locale"];
+    if ([v isKindOfClass:NSDictionary.class]) *locale = v;
+}
+
+/// Folds a mod's `locale` ({bundle: {key: value}}) into the running total, dropping off-type entries.
+static void SKMergeLocale(NSMutableDictionary<NSString *, NSMutableDictionary *> *total, NSDictionary *locale) {
+    for (id bundle in locale) {
+        id changes = locale[bundle];
+        if (![bundle isKindOfClass:NSString.class] || ![changes isKindOfClass:NSDictionary.class]) continue;
+        NSMutableDictionary *merged = total[bundle];
+        if (!merged) {
+            merged = [NSMutableDictionary dictionary];
+            total[bundle] = merged;
+        }
+        for (id key in changes) {
+            id value = changes[key];
+            if ([key isKindOfClass:NSString.class] && [value isKindOfClass:NSString.class]) merged[key] = value;
+        }
+    }
+}
+
+/// Moves `replacement` over `path`, keeping `path` if anything fails.
+static BOOL SKReplaceFile(NSFileManager *fm, NSString *path, NSString *replacement, NSString *backup) {
+    [fm removeItemAtPath:backup error:nil];
+    if (![fm moveItemAtPath:path toPath:backup error:nil]) return NO;
+    if ([fm moveItemAtPath:replacement toPath:path error:nil]) {
+        [fm removeItemAtPath:backup error:nil];
+        return YES;
+    }
+    [fm moveItemAtPath:backup toPath:path error:nil];
+    return NO;
+}
+
+/// A name from the remote listing or the sync manifest: one visible path component.
+static BOOL SKValidModFileName(id name) {
+    return [name isKindOfClass:NSString.class] && [name length] > 0 && ![name hasPrefix:@"."] &&
+           [name rangeOfString:@"/"].location == NSNotFound && [name rangeOfString:@"\\"].location == NSNotFound;
+}
+
+/// The only place mod files come from; the listing's own sha, not the host, is what is trusted.
+static NSURL *SKModDownloadURL(id value) {
+    if (![value isKindOfClass:NSString.class]) return nil;
+    NSURL *url = [NSURL URLWithString:value];
+    if (![url.scheme.lowercaseString isEqualToString:@"https"] ||
+        ![url.host.lowercaseString isEqualToString:@"raw.githubusercontent.com"]) {
+        return nil;
+    }
+    return url;
+}
+
+/// Downloads to a temp file beside `destPath`, and only renames it into place once its git blob
+/// SHA matches `expectedSha`. Blocks. @return nil on success, otherwise why not.
+static NSString *SKDownloadVerified(NSURL *url, NSString *destPath, NSString *expectedSha) {
+    NSFileManager *fm = NSFileManager.defaultManager;
+    NSString *tmp = [destPath stringByAppendingString:@".download"];
+    [fm removeItemAtPath:tmp error:nil];
+
+    NSURLRequest *request = [NSURLRequest requestWithURL:url
+                                             cachePolicy:NSURLRequestReloadIgnoringLocalCacheData
+                                         timeoutInterval:60];
+    dispatch_semaphore_t done = dispatch_semaphore_create(0);
+    __block NSInteger status = 0;
+    __block NSError *error = nil;
+    __block BOOL stored = NO;
+    NSURLSessionDownloadTask *task = [NSURLSession.sharedSession
+        downloadTaskWithRequest:request
+              completionHandler:^(NSURL *location, NSURLResponse *response, NSError *err) {
+                error = err;
+                if ([response isKindOfClass:NSHTTPURLResponse.class]) status = ((NSHTTPURLResponse *)response).statusCode;
+                // The system deletes `location` when this returns.
+                if (!err && status == 200 && location) {
+                    stored = [fm moveItemAtURL:location toURL:[NSURL fileURLWithPath:tmp] error:nil];
+                }
+                dispatch_semaphore_signal(done);
+              }];
+    [task resume];
+    // The request's own timeout only covers idle time; bound the whole transfer too.
+    if (dispatch_semaphore_wait(done, dispatch_time(DISPATCH_TIME_NOW, 600 * NSEC_PER_SEC)) != 0) {
+        [task cancel];
+        dispatch_semaphore_wait(done, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC));
+        [fm removeItemAtPath:tmp error:nil];
+        return @"timed out";
+    }
+    if (error) return error.localizedDescription;
+    if (status != 200) return [NSString stringWithFormat:@"HTTP %ld", (long)status];
+    if (!stored) return @"couldn't store the download";
+
+    NSString *sha = [SKZipUtils calculateGitBlobShaOfFile:tmp];
+    if (![sha isEqualToString:expectedSha.lowercaseString]) {
+        [fm removeItemAtPath:tmp error:nil];
+        return @"failed verification";
+    }
+    if (rename(tmp.fileSystemRepresentation, destPath.fileSystemRepresentation) != 0) {
+        [fm removeItemAtPath:tmp error:nil];
+        return @"couldn't move into place";
+    }
+    return nil;
+}
+
 @implementation SKModManager
 
 + (instancetype)sharedManager {
@@ -280,31 +413,40 @@ static NSString *SKRestorePristineCodeJars(NSString *skPath) {
       NSMutableArray *modsToSync = [NSMutableArray array];
       NSMutableSet *remoteNames = [NSMutableSet set];
 
-      for (NSDictionary *file in remoteFiles) {
-          if ([file[@"type"] isEqualToString:@"file"]) {
-              [modsToSync addObject:file];
-              [remoteNames addObject:file[@"name"]];
+      for (id file in remoteFiles) {
+          if (![file isKindOfClass:NSDictionary.class] || ![file[@"type"] isEqual:@"file"] ||
+              !SKValidModFileName(file[@"name"])) {
+              continue;
           }
+          [modsToSync addObject:file];
+          [remoteNames addObject:file[@"name"]];
+      }
+
+      // Only files an earlier sync wrote are ever removed: the mods folder also holds the
+      // user's own mods, which are not in the remote listing.
+      NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
+      NSMutableSet *tracked = [NSMutableSet set];
+      for (id name in [defaults arrayForKey:@"mod_sync_files"]) {
+          if (SKValidModFileName(name)) [tracked addObject:name];
       }
 
       NSFileManager *fm = [NSFileManager defaultManager];
-      NSArray *localFiles = [fm contentsOfDirectoryAtPath:modsPath error:nil];
       NSInteger deleted = 0;
-      for (NSString *localFile in localFiles) {
-          if (![remoteNames containsObject:localFile]) {
-              [fm removeItemAtPath:[modsPath stringByAppendingPathComponent:localFile] error:nil];
-              deleted++;
-          }
+      for (NSString *name in tracked) {
+          if ([remoteNames containsObject:name]) continue;
+          if ([fm removeItemAtPath:[modsPath stringByAppendingPathComponent:name] error:nil]) deleted++;
       }
+      NSMutableSet *synced = [NSMutableSet set];
 
       NSInteger downloaded = 0;
       NSInteger skipped = 0;
+      NSInteger failed = 0;
 
       for (NSInteger i = 0; i < modsToSync.count; i++) {
           NSDictionary *mod = modsToSync[i];
           NSString *name = mod[@"name"];
-          NSString *downloadUrlString = mod[@"download_url"];
-          NSString *remoteSha = mod[@"sha"];
+          id shaValue = mod[@"sha"];
+          NSString *remoteSha = [shaValue isKindOfClass:NSString.class] && [shaValue length] == 40 ? shaValue : nil;
 
           NSString *destPath = [modsPath stringByAppendingPathComponent:name];
 
@@ -315,10 +457,19 @@ static NSString *SKRestorePristineCodeJars(NSString *skPath) {
             progressBlock(prog, msg);
           });
 
-          if ([fm fileExistsAtPath:destPath] && remoteSha.length > 0) {
+          // Without a sha there is nothing to verify the download against.
+          NSURL *downloadURL = SKModDownloadURL(mod[@"download_url"]);
+          if (!remoteSha || !downloadURL) {
+              NSLog(@"[SKModManager] Skipping %@: no usable sha or download URL", name);
+              failed++;
+              continue;
+          }
+
+          if ([fm fileExistsAtPath:destPath]) {
               NSString *localSha = [SKZipUtils calculateGitBlobShaOfFile:destPath];
-              if ([localSha isEqualToString:remoteSha]) {
+              if ([localSha isEqualToString:remoteSha.lowercaseString]) {
                   skipped++;
+                  [synced addObject:name];
                   continue;
               }
           }
@@ -329,32 +480,38 @@ static NSString *SKRestorePristineCodeJars(NSString *skPath) {
             progressBlock(prog, msg);
           });
 
-          NSData *modData = nil;
-          if (downloadUrlString.length > 0) {
-              NSURLRequest *dlReq = [NSURLRequest requestWithURL:[NSURL URLWithString:downloadUrlString]
-                                                    cachePolicy:NSURLRequestReloadIgnoringLocalCacheData
-                                                timeoutInterval:60];
-              dispatch_semaphore_t dlSem = dispatch_semaphore_create(0);
-              __block NSData *dlResult = nil;
-              NSURLSessionDataTask *dlTask =
-                  [NSURLSession.sharedSession dataTaskWithRequest:dlReq
-                                               completionHandler:^(NSData *d, NSURLResponse *r, NSError *e) {
-                                                 dlResult = d;
-                                                 dispatch_semaphore_signal(dlSem);
-                                               }];
-              [dlTask resume];
-              dispatch_semaphore_wait(dlSem, DISPATCH_TIME_FOREVER);
-              modData = dlResult;
-          }
-          if (modData) {
-              [modData writeToFile:destPath atomically:YES];
+          NSString *why = SKDownloadVerified(downloadURL, destPath, remoteSha);
+          if (why) {
+              NSLog(@"[SKModManager] Download of %@ failed: %@", name, why);
+              failed++;
+          } else {
               downloaded++;
+              [synced addObject:name];
           }
       }
 
+      // A file whose update failed stays tracked if it already was.
+      NSMutableArray *manifest = [NSMutableArray array];
+      for (NSString *name in remoteNames) {
+          if ([synced containsObject:name] || [tracked containsObject:name]) [manifest addObject:name];
+      }
+      [defaults setObject:manifest forKey:@"mod_sync_files"];
+
       dispatch_async(dispatch_get_main_queue(), ^{
-        NSString *stats = [NSString stringWithFormat:@"Sync complete!\nDownloaded: %ld\nSkipped: %ld\nDeleted: %ld",
-                                                     (long)downloaded, (long)skipped, (long)deleted];
+        if (failed > 0 && downloaded + skipped == 0) {
+            completionBlock(NO, nil,
+                            [NSError errorWithDomain:@"SKModManagerDomain"
+                                                code:8
+                                            userInfo:@{
+                                                NSLocalizedDescriptionKey:
+                                                    @"No mods could be downloaded. Check your connection and try again."
+                                            }]);
+            return;
+        }
+        NSMutableString *stats = [NSMutableString
+            stringWithFormat:@"Sync complete!\nDownloaded: %ld\nSkipped: %ld\nDeleted: %ld", (long)downloaded,
+                             (long)skipped, (long)deleted];
+        if (failed > 0) [stats appendFormat:@"\nFailed: %ld (try again)", (long)failed];
         completionBlock(YES, stats, nil);
       });
     });
@@ -363,7 +520,13 @@ static NSString *SKRestorePristineCodeJars(NSString *skPath) {
 - (void)applyModsWithProgress:(void (^)(float progress, NSString *status))progressBlock
                    completion:(void (^)(BOOL success, NSString *_Nullable summary,
                                         NSArray<NSString *> *_Nullable warnings,
-                                        NSError *_Nullable error))completionBlock {
+                                        NSError *_Nullable error))callerCompletion {
+    dispatch_block_t endBackground = SKBeginBackgroundWork(@"Apply mods");
+    void (^completionBlock)(BOOL, NSString *, NSArray<NSString *> *, NSError *) =
+        ^(BOOL success, NSString *summary, NSArray<NSString *> *warnings, NSError *error) {
+          endBackground();
+          callerCompletion(success, summary, warnings, error);
+        };
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
       const char *homeEnv = getenv("SKAPSULE_HOME");
       if (!homeEnv) {
@@ -418,6 +581,24 @@ static NSString *SKRestorePristineCodeJars(NSString *skPath) {
 
       NSSet<NSString *> *protectedFiles = SKModFilteredFiles();
 
+      NSString *codeDir = [skPath stringByAppendingPathComponent:@"code"];
+      NSString *classChangesDir = [codeDir stringByAppendingPathComponent:@"class-changes"];
+      NSString *localeChangesDir = [codeDir stringByAppendingPathComponent:@"locale-changes"];
+      NSString *tempPack = [modsPath stringByAppendingPathComponent:@".temp_pack"];
+
+      // Stops the apply, leaving the previous code jars as they are.
+      void (^fail)(NSString *) = ^(NSString *message) {
+        [fm removeItemAtPath:classChangesDir error:nil];
+        [fm removeItemAtPath:localeChangesDir error:nil];
+        [fm removeItemAtPath:tempPack error:nil];
+        dispatch_async(dispatch_get_main_queue(), ^{
+          completionBlock(NO, nil, nil,
+                          [NSError errorWithDomain:@"SKModManagerDomain"
+                                              code:8
+                                          userInfo:@{NSLocalizedDescriptionKey: message}]);
+        });
+      };
+
       dispatch_async(dispatch_get_main_queue(), ^{
         progressBlock(0.0f, @"Restoring original code jars…");
       });
@@ -431,10 +612,6 @@ static NSString *SKRestorePristineCodeJars(NSString *skPath) {
           });
           return;
       }
-
-      NSString *codeDir = [skPath stringByAppendingPathComponent:@"code"];
-      NSString *classChangesDir = [codeDir stringByAppendingPathComponent:@"class-changes"];
-      NSString *localeChangesDir = [codeDir stringByAppendingPathComponent:@"locale-changes"];
 
       // Purge everything in rsrcDir except jar, zip, jarv files
       NSArray *rsrcContents = [fm contentsOfDirectoryAtPath:rsrcDir error:nil];
@@ -468,7 +645,10 @@ static NSString *SKRestorePristineCodeJars(NSString *skPath) {
           });
 
           NSString *jarPath = [rsrcDir stringByAppendingPathComponent:file];
-          [SKZipUtils extractZipFile:jarPath toDirectory:rsrcDir checkProtected:NO protectedFiles:nil];
+          if (![SKZipUtils extractZipFile:jarPath toDirectory:rsrcDir checkProtected:NO protectedFiles:nil]) {
+              fail([NSString stringWithFormat:@"Couldn't unpack %@. Check free space, then try again.", file]);
+              return;
+          }
           jarsUnpacked++;
       }
 
@@ -496,7 +676,7 @@ static NSString *SKRestorePristineCodeJars(NSString *skPath) {
       NSMutableArray *warnings = [NSMutableArray array];
       BOOL hasClassMods = NO;
 
-      NSMutableDictionary *globalLocaleChanges = [NSMutableDictionary dictionary];
+      NSMutableDictionary<NSString *, NSMutableDictionary *> *globalLocaleChanges = [NSMutableDictionary dictionary];
 
       for (NSInteger i = 0; i < zipsOrModpacks.count; i++) {
           NSString *modFile = zipsOrModpacks[i];
@@ -511,28 +691,23 @@ static NSString *SKRestorePristineCodeJars(NSString *skPath) {
 
           BOOL isModpack = [modFile hasSuffix:@".modpack"];
 
-          NSDictionary *json = [SKZipUtils readModMetadataFromZip:modPath];
-          NSDictionary *modObj = json[@"mod"] ?: json;
-          NSString *modType = nil;
-          NSString *pxVersion = nil;
-          NSString *modName = modFile;
-          NSDictionary *localeChanges = nil;
-
-          if ([modObj isKindOfClass:[NSDictionary class]]) {
-              modName = modObj[@"name"] ?: modFile;
-              modType = modObj[@"type"];
-              pxVersion = modObj[@"pxVersion"];
-              localeChanges = modObj[@"locale"];
-          }
+          NSString *modName, *modType, *pxVersion;
+          NSDictionary *localeChanges;
+          SKParseModMeta([SKZipUtils readModMetadataFromZip:modPath], modFile, &modName, &modType, &pxVersion,
+                         &localeChanges);
 
           BOOL isClassMod = (modType && [modType caseInsensitiveCompare:@"class"] == NSOrderedSame);
 
           if (isModpack) {
-              NSString *tempPack = [modsPath stringByAppendingPathComponent:@".temp_pack"];
               [fm removeItemAtPath:tempPack error:nil];
               [fm createDirectoryAtPath:tempPack withIntermediateDirectories:YES attributes:nil error:nil];
 
-              [SKZipUtils extractZipFile:modPath toDirectory:tempPack checkProtected:NO protectedFiles:nil];
+              if (![SKZipUtils extractZipFile:modPath toDirectory:tempPack checkProtected:NO protectedFiles:nil]) {
+                  skipped++;
+                  [warnings addObject:[NSString stringWithFormat:@"Modpack '%@' could not be read - SKIPPED", modName]];
+                  [fm removeItemAtPath:tempPack error:nil];
+                  continue;
+              }
 
               NSArray *innerFiles = [fm contentsOfDirectoryAtPath:tempPack error:nil];
               NSInteger innerApplied = 0;
@@ -540,30 +715,25 @@ static NSString *SKRestorePristineCodeJars(NSString *skPath) {
                   if ([innerFile hasSuffix:@".zip"]) {
                       NSString *innerPath = [tempPack stringByAppendingPathComponent:innerFile];
 
-                      NSDictionary *innerJson = [SKZipUtils readModMetadataFromZip:innerPath];
-                      NSDictionary *innerModObj = innerJson[@"mod"] ?: innerJson;
-                      NSString *innerType = nil;
-                      NSString *innerPx = nil;
-                      NSString *innerName = innerFile;
-                      NSDictionary *innerLocale = nil;
-                      if ([innerModObj isKindOfClass:[NSDictionary class]]) {
-                          innerName = innerModObj[@"name"] ?: innerFile;
-                          innerType = innerModObj[@"type"];
-                          innerPx = innerModObj[@"pxVersion"];
-                          innerLocale = innerModObj[@"locale"];
-                      }
+                      NSString *innerName, *innerType, *innerPx;
+                      NSDictionary *innerLocale;
+                      SKParseModMeta([SKZipUtils readModMetadataFromZip:innerPath], innerFile, &innerName, &innerType,
+                                     &innerPx, &innerLocale);
 
                       BOOL innerIsClass = (innerType && [innerType caseInsensitiveCompare:@"class"] == NSOrderedSame);
+                      BOOL innerOK = YES;
                       if (innerIsClass) {
                           if (!innerPx || !gameVersion ||
                               [innerPx caseInsensitiveCompare:gameVersion] == NSOrderedSame) {
-                              [SKZipUtils extractZipFile:innerPath
-                                             toDirectory:classChangesDir
-                                          checkProtected:YES
-                                          protectedFiles:protectedFiles];
-                              classMods++;
-                              hasClassMods = YES;
-                              innerApplied++;
+                              innerOK = [SKZipUtils extractZipFile:innerPath
+                                                       toDirectory:classChangesDir
+                                                    checkProtected:YES
+                                                    protectedFiles:protectedFiles];
+                              if (innerOK) {
+                                  classMods++;
+                                  hasClassMods = YES;
+                                  innerApplied++;
+                              }
                           } else {
                               skipped++;
                               [warnings addObject:[NSString stringWithFormat:@"Class mod '%@' requires game version %@ "
@@ -571,24 +741,21 @@ static NSString *SKRestorePristineCodeJars(NSString *skPath) {
                                                                              innerName, innerPx, gameVersion]];
                           }
                       } else {
-                          [SKZipUtils extractZipFile:innerPath
-                                         toDirectory:rsrcDir
-                                      checkProtected:YES
-                                      protectedFiles:protectedFiles];
-                          resourceMods++;
-                          innerApplied++;
-                      }
-
-                      if (innerLocale) {
-                          for (NSString *bundle in innerLocale) {
-                              NSMutableDictionary *bundleChanges = globalLocaleChanges[bundle];
-                              if (!bundleChanges) {
-                                  bundleChanges = [NSMutableDictionary dictionary];
-                                  globalLocaleChanges[bundle] = bundleChanges;
-                              }
-                              [bundleChanges addEntriesFromDictionary:innerLocale[bundle]];
+                          innerOK = [SKZipUtils extractZipFile:innerPath
+                                                   toDirectory:rsrcDir
+                                                checkProtected:YES
+                                                protectedFiles:protectedFiles];
+                          if (innerOK) {
+                              resourceMods++;
+                              innerApplied++;
                           }
                       }
+                      if (!innerOK) {
+                          skipped++;
+                          [warnings addObject:[NSString stringWithFormat:@"'%@' could not be fully applied", innerName]];
+                      }
+
+                      SKMergeLocale(globalLocaleChanges, innerLocale);
                   }
               }
               if (innerApplied > 0)
@@ -596,12 +763,16 @@ static NSString *SKRestorePristineCodeJars(NSString *skPath) {
               [fm removeItemAtPath:tempPack error:nil];
           } else if (isClassMod) {
               if (!pxVersion || !gameVersion || [pxVersion caseInsensitiveCompare:gameVersion] == NSOrderedSame) {
-                  [SKZipUtils extractZipFile:modPath
-                                 toDirectory:classChangesDir
-                              checkProtected:YES
-                              protectedFiles:protectedFiles];
-                  classMods++;
-                  hasClassMods = YES;
+                  if ([SKZipUtils extractZipFile:modPath
+                                     toDirectory:classChangesDir
+                                  checkProtected:YES
+                                  protectedFiles:protectedFiles]) {
+                      classMods++;
+                      hasClassMods = YES;
+                  } else {
+                      skipped++;
+                      [warnings addObject:[NSString stringWithFormat:@"'%@' could not be fully applied", modName]];
+                  }
               } else {
                   skipped++;
                   [warnings
@@ -609,24 +780,17 @@ static NSString *SKRestorePristineCodeJars(NSString *skPath) {
                                               @"Class mod '%@' requires game version %@ but current is %@ - SKIPPED",
                                               modName, pxVersion, gameVersion]];
               }
-          } else {
-              [SKZipUtils extractZipFile:modPath
-                             toDirectory:rsrcDir
-                          checkProtected:YES
-                          protectedFiles:protectedFiles];
+          } else if ([SKZipUtils extractZipFile:modPath
+                                    toDirectory:rsrcDir
+                                 checkProtected:YES
+                                 protectedFiles:protectedFiles]) {
               resourceMods++;
+          } else {
+              skipped++;
+              [warnings addObject:[NSString stringWithFormat:@"'%@' could not be fully applied", modName]];
           }
 
-          if (localeChanges) {
-              for (NSString *bundle in localeChanges) {
-                  NSMutableDictionary *bundleChanges = globalLocaleChanges[bundle];
-                  if (!bundleChanges) {
-                      bundleChanges = [NSMutableDictionary dictionary];
-                      globalLocaleChanges[bundle] = bundleChanges;
-                  }
-                  [bundleChanges addEntriesFromDictionary:localeChanges[bundle]];
-              }
-          }
+          SKMergeLocale(globalLocaleChanges, localeChanges);
       }
 
       if (hasClassMods) {
@@ -635,20 +799,19 @@ static NSString *SKRestorePristineCodeJars(NSString *skPath) {
           });
           NSString *configJar = [codeDir stringByAppendingPathComponent:@"config.jar"];
           if ([fm fileExistsAtPath:configJar]) {
-              [SKZipUtils extractJarWithoutOverwrite:configJar toDirectory:classChangesDir];
-
               NSString *configNewJar = [codeDir stringByAppendingPathComponent:@"config-new.jar"];
               NSString *configOldJar = [codeDir stringByAppendingPathComponent:@"config-old.jar"];
 
-              [SKZipUtils createZipFileFromDirectory:classChangesDir toZipPath:configNewJar];
-
-              [fm removeItemAtPath:configOldJar error:nil];
-              if ([fm moveItemAtPath:configJar toPath:configOldJar error:nil]) {
-                  if ([fm moveItemAtPath:configNewJar toPath:configJar error:nil]) {
-                      [fm removeItemAtPath:configOldJar error:nil];
-                  } else {
-                      [fm moveItemAtPath:configOldJar toPath:configJar error:nil];
-                  }
+              if (![SKZipUtils extractJarWithoutOverwrite:configJar toDirectory:classChangesDir] ||
+                  ![SKZipUtils createZipFileFromDirectory:classChangesDir toZipPath:configNewJar]) {
+                  [fm removeItemAtPath:configNewJar error:nil];
+                  fail(@"Couldn't build the modded config.jar. Check free space, then try again.");
+                  return;
+              }
+              if (!SKReplaceFile(fm, configJar, configNewJar, configOldJar)) {
+                  [fm removeItemAtPath:configNewJar error:nil];
+                  fail(@"Couldn't replace config.jar.");
+                  return;
               }
           }
       }
@@ -663,14 +826,23 @@ static NSString *SKRestorePristineCodeJars(NSString *skPath) {
               [fm removeItemAtPath:localeChangesDir error:nil];
               [fm createDirectoryAtPath:localeChangesDir withIntermediateDirectories:YES attributes:nil error:nil];
 
-              [SKZipUtils extractZipFile:projectxConfig
-                             toDirectory:localeChangesDir
-                          checkProtected:NO
-                          protectedFiles:nil];
+              BOOL localeOK = [SKZipUtils extractZipFile:projectxConfig
+                                             toDirectory:localeChangesDir
+                                          checkProtected:NO
+                                          protectedFiles:nil];
 
               for (NSString *bundlePath in globalLocaleChanges) {
-                  NSString *propsPath = [localeChangesDir
-                      stringByAppendingPathComponent:[@"rsrc/i18n/" stringByAppendingString:bundlePath]];
+                  if (!localeOK) break;
+                  // Bundle names come from mod.json and must stay inside the extracted i18n folder.
+                  NSString *propsPath =
+                      [bundlePath hasPrefix:@"/"] || [bundlePath containsString:@"\\"]
+                          ? nil
+                          : [SKZipUtils safeDestinationForEntry:[@"rsrc/i18n/" stringByAppendingString:bundlePath]
+                                                    inDirectory:localeChangesDir];
+                  if (!propsPath) {
+                      NSLog(@"[SKModManager] Ignoring locale bundle with an unsafe path: %@", bundlePath);
+                      continue;
+                  }
                   if ([fm fileExistsAtPath:propsPath]) {
                       NSString *propsContent = [NSString stringWithContentsOfFile:propsPath
                                                                          encoding:NSUTF8StringEncoding
@@ -701,21 +873,23 @@ static NSString *SKRestorePristineCodeJars(NSString *skPath) {
                       for (NSString *key in properties) {
                           [newContent appendFormat:@"%@=%@\n", key, properties[key]];
                       }
-                      [newContent writeToFile:propsPath atomically:YES encoding:NSUTF8StringEncoding error:nil];
+                      if (![newContent writeToFile:propsPath atomically:YES encoding:NSUTF8StringEncoding error:nil]) {
+                          localeOK = NO;
+                      }
                   }
               }
 
               NSString *newJar = [codeDir stringByAppendingPathComponent:@"projectx-config-new.jar"];
               NSString *oldJar = [codeDir stringByAppendingPathComponent:@"projectx-config-old.jar"];
-              [SKZipUtils createZipFileFromDirectory:localeChangesDir toZipPath:newJar];
-
-              [fm removeItemAtPath:oldJar error:nil];
-              if ([fm moveItemAtPath:projectxConfig toPath:oldJar error:nil]) {
-                  if ([fm moveItemAtPath:newJar toPath:projectxConfig error:nil]) {
-                      [fm removeItemAtPath:oldJar error:nil];
-                  } else {
-                      [fm moveItemAtPath:oldJar toPath:projectxConfig error:nil];
-                  }
+              if (!localeOK || ![SKZipUtils createZipFileFromDirectory:localeChangesDir toZipPath:newJar]) {
+                  [fm removeItemAtPath:newJar error:nil];
+                  fail(@"Couldn't build the modded projectx-config.jar. Check free space, then try again.");
+                  return;
+              }
+              if (!SKReplaceFile(fm, projectxConfig, newJar, oldJar)) {
+                  [fm removeItemAtPath:newJar error:nil];
+                  fail(@"Couldn't replace projectx-config.jar.");
+                  return;
               }
           }
           [fm removeItemAtPath:localeChangesDir error:nil];
@@ -736,7 +910,12 @@ static NSString *SKRestorePristineCodeJars(NSString *skPath) {
 
 - (void)removeModsWithProgress:(void (^)(float progress, NSString *status))progressBlock
                     completion:
-                        (void (^)(BOOL success, NSString *_Nullable summary, NSError *_Nullable error))completionBlock {
+                        (void (^)(BOOL success, NSString *_Nullable summary, NSError *_Nullable error))callerCompletion {
+    dispatch_block_t endBackground = SKBeginBackgroundWork(@"Remove mods");
+    void (^completionBlock)(BOOL, NSString *, NSError *) = ^(BOOL success, NSString *summary, NSError *error) {
+      endBackground();
+      callerCompletion(success, summary, error);
+    };
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
       const char *homeEnv = getenv("SKAPSULE_HOME");
       if (!homeEnv) {
@@ -812,7 +991,20 @@ static NSString *SKRestorePristineCodeJars(NSString *skPath) {
           });
 
           NSString *jarPath = [rsrcDir stringByAppendingPathComponent:file];
-          [SKZipUtils extractZipFile:jarPath toDirectory:rsrcDir checkProtected:NO protectedFiles:nil];
+          if (![SKZipUtils extractZipFile:jarPath toDirectory:rsrcDir checkProtected:NO protectedFiles:nil]) {
+              dispatch_async(dispatch_get_main_queue(), ^{
+                completionBlock(NO, nil,
+                                [NSError errorWithDomain:@"SKModManagerDomain"
+                                                    code:8
+                                                userInfo:@{
+                                                    NSLocalizedDescriptionKey: [NSString
+                                                        stringWithFormat:@"Couldn't unpack %@. Check free space, "
+                                                                         @"then try again.",
+                                                                         file]
+                                                }]);
+              });
+              return;
+          }
           jarsUnpacked++;
       }
 

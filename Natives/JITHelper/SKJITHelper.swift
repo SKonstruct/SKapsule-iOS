@@ -34,6 +34,12 @@ final class SKJITHelperHandler: NSObject, NSExtensionRequestHandling {
         let paths = DDIPaths.default(in: root)
         do {
             try fm.createDirectory(at: root, withIntermediateDirectories: true)
+            // A request that was killed mid-flight never ran its `defer` below. Requests run one at
+            // a time on this queue, so nothing here can belong to a live one.
+            for name in (try? fm.contentsOfDirectory(atPath: root.path)) ?? []
+            where name.hasPrefix("pairing-") && name.hasSuffix(".plist") {
+                try? fm.removeItem(at: root.appendingPathComponent(name))
+            }
             let op = request["op"] as? String ?? ""
             if op == "reset" {
                 try StikJIT.resetCachedDDI(at: paths)

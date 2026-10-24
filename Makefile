@@ -56,7 +56,7 @@ METHOD_JAVA_UNPACK = \
 	cd $(SOURCEDIR)/out; \
 	if [ ! -f "jre$(1)/release" ]; then \
 		echo "Unpacking JRE $(1) from assets..."; \
-		unzip -q $(SOURCEDIR)/assets/jre$(1)-ios-aarch64.zip -d . || true; \
+		unzip -q $(SOURCEDIR)/assets/jre$(1)-ios-aarch64.zip -d .; \
 	fi
 
 # Unpack JRE, build stub dylibs, trim, copy into .app. Used by both 'jre' and
@@ -71,6 +71,7 @@ METHOD_JAVA_UNPACK = \
 # per-dylib links) were not needed for that, and signing services rewrite every symlink
 # in a bundle as a small text file holding the link target, which broke the JRE.
 METHOD_STAGE_JRE = \
+	set -e; \
 	mkdir -p $(SOURCEDIR)/out; \
 	cd $(SOURCEDIR)/out; \
 	$(call METHOD_JAVA_UNPACK,25); \
@@ -100,12 +101,12 @@ METHOD_STAGE_JRE = \
 		-miphoneos-version-min=17.4 \
 		-o $(WORKINGDIR)/libawt_xawt.dylib \
 		$(SOURCEDIR)/Natives/awt_xawt/xawt_fake.m; \
-	rm -rf $(SOURCEDIR)/out/jre25/{ASSEMBLY_EXCEPTION,bin,include,jre,legal,LICENSE,man,THIRD_PARTY_README,lib/{ct.sym,jspawnhelper,libjsig.dylib,src.zip,tools.jar}} 2>/dev/null || true; \
+	rm -rf $(SOURCEDIR)/out/jre25/{bin,include,jre,man,lib/{ct.sym,jspawnhelper,libjsig.dylib,src.zip,tools.jar}}; \
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/SKapsule.app/jre25); \
-	cp -R $(SOURCEDIR)/out/jre25/* $(WORKINGDIR)/SKapsule.app/jre25/ 2>/dev/null || true; \
-	cp $(WORKINGDIR)/libawt_headless.dylib $(WORKINGDIR)/SKapsule.app/jre25/lib/libawt_headless.dylib 2>/dev/null || true; \
-	cp $(WORKINGDIR)/libprefs.dylib $(WORKINGDIR)/SKapsule.app/jre25/lib/libprefs.dylib 2>/dev/null || true; \
-	cp $(WORKINGDIR)/libawt_xawt.dylib $(WORKINGDIR)/SKapsule.app/jre25/lib/libawt_xawt.dylib 2>/dev/null || true; \
+	cp -R $(SOURCEDIR)/out/jre25/* $(WORKINGDIR)/SKapsule.app/jre25/; \
+	cp $(WORKINGDIR)/libawt_headless.dylib $(WORKINGDIR)/SKapsule.app/jre25/lib/libawt_headless.dylib; \
+	cp $(WORKINGDIR)/libprefs.dylib $(WORKINGDIR)/SKapsule.app/jre25/lib/libprefs.dylib; \
+	cp $(WORKINGDIR)/libawt_xawt.dylib $(WORKINGDIR)/SKapsule.app/jre25/lib/libawt_xawt.dylib; \
 	find $(WORKINGDIR)/SKapsule.app -type l -delete
 
 
@@ -156,6 +157,7 @@ help:
 	echo 'Usage:'
 	echo '    make                  Build everything'
 	echo '    make native           Build the native app'
+	echo '    make test             Run the host-side unit tests'
 	echo '    make jre              Download and unpack JRE'
 	echo '    make payload          Assemble SKapsule.app'
 	echo '    make package          Create .ipa/.tipa'
@@ -315,4 +317,16 @@ clean:
 	rm -rf $(SOURCEDIR)/out/jre25
 	echo '[SKapsule v$(VERSION)] clean - end'
 
-.PHONY: all clean check native payload package deploy help format
+# Host-side tests of the logic that parses third-party input; they build for and run on the Mac.
+test:
+	echo '[SKapsule v$(VERSION)] test - start'
+	mkdir -p $(WORKINGDIR)
+	xcrun clang -fobjc-arc -Wall -framework Foundation -lz -I$(SOURCEDIR)/Natives \
+		$(SOURCEDIR)/Natives/Tests/SKZipUtilsTests.m $(SOURCEDIR)/Natives/SKZipUtils.m -o $(WORKINGDIR)/sk-tests
+	$(WORKINGDIR)/sk-tests
+	xcrun clang -fobjc-arc -Wall -framework Foundation -I$(SOURCEDIR)/Natives \
+		$(SOURCEDIR)/Natives/Tests/SKMouseButtonsTests.m -o $(WORKINGDIR)/sk-mouse-tests
+	$(WORKINGDIR)/sk-mouse-tests
+	echo '[SKapsule v$(VERSION)] test - end'
+
+.PHONY: all clean check native test payload package deploy help format

@@ -55,29 +55,54 @@ static BOOL sk_backedOff(void) {
 
 /**
  * Redacts what the JVM's output is known to carry: Steam/getdown credentials and
- * tokens, the player's account email, and the container path (which embeds the
- * device username on TrollStore installs).
+ * tokens (as key=value, JSON, or an Authorization header), SteamID64s, the player's
+ * account email, and the container path (which embeds the device username on
+ * TrollStore installs).
  */
 static NSString *sk_scrub(NSString *text) {
     if (text.length == 0) return text;
-    static NSRegularExpression *secrets, *emails;
+    static NSRegularExpression *lineSecrets, *bearer, *secrets, *steamIds, *emails;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-      secrets = [NSRegularExpression
-        regularExpressionWithPattern:@"(FRENCHPRESS_STEAM_USER|FRENCHPRESS_STEAM_PASS|pass(word|wd)?"
-                                     @"|token|session|auth|cookie|ticket|secret)\\s*[=:]\\s*\\S+"
+      // Passwords and Authorization headers can hold spaces ("Basic abc", a passphrase), so
+      // they take the rest of the line. A quoted value stops at its closing quote.
+      lineSecrets = [NSRegularExpression
+        regularExpressionWithPattern:@"(FRENCHPRESS_STEAM_PASS|authorization|(?<![a-z])pass(?:word|wd)?)[\"']?[ \\t]*[=:][ \\t]*"
+                                     @"(?:\"[^\"]*\"|'[^']*'|[^\\r\\n]*)"
                              options:NSRegularExpressionCaseInsensitive
                                error:nil];
+      bearer = [NSRegularExpression regularExpressionWithPattern:@"\\bBearer\\s+[\\w.~+/=-]+"
+                                                         options:NSRegularExpressionCaseInsensitive
+                                                           error:nil];
+      // The optional quote before the separator is what lets JSON ("token":"x") match.
+      secrets = [NSRegularExpression
+        regularExpressionWithPattern:@"(FRENCHPRESS_STEAM_USER|token|session[\\w-]*|auth|cookie|ticket|secret)"
+                                     @"[\"']?\\s*[=:]\\s*(?:\"[^\"]*\"|'[^']*'|\\S+)"
+                             options:NSRegularExpressionCaseInsensitive
+                               error:nil];
+      steamIds = [NSRegularExpression regularExpressionWithPattern:@"\\b7656119\\d{10}\\b" options:0 error:nil];
       emails = [NSRegularExpression regularExpressionWithPattern:@"[\\w.+-]+@[\\w-]+\\.[\\w.]{2,}"
                                                         options:0
                                                           error:nil];
     });
 
     NSMutableString *out = [text mutableCopy];
+    [lineSecrets replaceMatchesInString:out
+                                options:0
+                                  range:NSMakeRange(0, out.length)
+                           withTemplate:@"$1=[redacted]"];
+    [bearer replaceMatchesInString:out
+                           options:0
+                             range:NSMakeRange(0, out.length)
+                      withTemplate:@"Bearer [redacted]"];
     [secrets replaceMatchesInString:out
                             options:0
                               range:NSMakeRange(0, out.length)
                        withTemplate:@"$1=[redacted]"];
+    [steamIds replaceMatchesInString:out
+                             options:0
+                               range:NSMakeRange(0, out.length)
+                        withTemplate:@"[redacted-steamid]"];
     [emails replaceMatchesInString:out
                            options:0
                              range:NSMakeRange(0, out.length)
@@ -361,6 +386,24 @@ void SKReportFailure(NSString *type, NSString *message,
     sk_send(event, @[], nil);
 }
 
+/// Decodes bytes cut from the middle of a file, which can start or end inside a multibyte
+/// sequence; strict UTF-8 decoding would return nil for the whole chunk.
+static NSString *sk_utf8(NSData *raw) {
+    const uint8_t *bytes = raw.bytes;
+    NSUInteger start = 0, end = raw.length;
+    while (start < end && start < 3 && (bytes[start] & 0xC0) == 0x80) start++;
+    for (NSUInteger back = 1; back <= 3 && back <= end - start; back++) {
+        uint8_t c = bytes[end - back];
+        if ((c & 0xC0) == 0x80) continue;
+        NSUInteger need = c >= 0xF0 ? 4 : c >= 0xE0 ? 3 : c >= 0xC0 ? 2 : 1;
+        if (need > back) end -= back;
+        break;
+    }
+    NSString *text = [[NSString alloc] initWithBytes:bytes + start length:end - start encoding:NSUTF8StringEncoding];
+    // Bytes that are not UTF-8 anywhere else: a mangled report beats none.
+    return text ?: [[NSString alloc] initWithData:raw encoding:NSISOLatin1StringEncoding];
+}
+
 /// Reads at most `limit` bytes from the end of a file (the crash is at the end).
 static NSData *sk_tail(NSString *path, NSUInteger limit) {
     NSFileHandle *handle = [NSFileHandle fileHandleForReadingAtPath:path];
@@ -386,8 +429,7 @@ static NSDictionary *sk_attachment(NSString *path, NSUInteger limit, BOOL fromEn
         raw = whole.length > limit ? [whole subdataWithRange:NSMakeRange(0, limit)] : whole;
     }
     if (raw.length == 0) return nil;
-    NSString *text = [[NSString alloc] initWithData:raw encoding:NSUTF8StringEncoding];
-    if (!text) return nil;
+    NSString *text = sk_utf8(raw);
     return @{
         @"filename" : path.lastPathComponent,
         @"data" : [sk_scrub(text) dataUsingEncoding:NSUTF8StringEncoding],
@@ -401,7 +443,7 @@ BOOL SKPreviousRunDiedOnJITTrap(void) {
     NSString *path = [@(homeEnv) stringByAppendingPathComponent:@"latestlog.old.txt"];
     NSData *tail = sk_tail(path, kMaxLogTailBytes);
     if (tail.length == 0) return NO;
-    NSString *text = [[NSString alloc] initWithData:tail encoding:NSUTF8StringEncoding];
+    NSString *text = sk_utf8(tail);
     if (text.length == 0) return NO;
 
     // The JVM prints "Requesting N MB" and then executes brk #0x69, expecting the
@@ -453,9 +495,8 @@ void SKReportScanCrashArtifacts(void) {
         NSString *key = [NSString stringWithFormat:@"%@/%@", name, attrs[NSFileSize] ?: @0];
         if ([reported containsObject:key]) continue;
 
-        NSString *body = [NSString stringWithContentsOfFile:path
-                                                   encoding:NSUTF8StringEncoding
-                                                      error:nil];
+        NSData *raw = [NSData dataWithContentsOfFile:path options:NSDataReadingMappedIfSafe error:nil];
+        NSString *body = raw.length > 0 ? sk_utf8([raw subdataWithRange:NSMakeRange(0, MIN(raw.length, kMaxHsErrBytes))]) : nil;
         if (body.length == 0) continue;
 
         NSString *type, *value, *group;

@@ -34,7 +34,9 @@ LIBFFI_INC="$ROOT/external/lwjgl3/libffi/build_iphoneos-arm64/include"
 # We need CUPS headers for the build to succeed.
 if [ ! -d "cups-2.3.3" ]; then
     echo "Downloading CUPS headers..."
-    curl -sL "https://github.com/apple/cups/releases/download/v2.3.3/cups-2.3.3-source.tar.gz" | tar xz
+    curl -sfL -o cups.tar.gz "https://github.com/apple/cups/releases/download/v2.3.3/cups-2.3.3-source.tar.gz"
+    echo "261fd948bce8647b6d5cb2a1784f0c24cc52b5c4e827b71d726020bcc502f3ee  cups.tar.gz" | shasum -a 256 -c -
+    tar xzf cups.tar.gz && rm cups.tar.gz
 fi
 
 # Find boot JDK

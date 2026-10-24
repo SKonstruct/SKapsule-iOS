@@ -15,6 +15,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 + (BOOL)hasPairingFile;
 
+/// Where the imported pairing file lives (Library, not Documents).
++ (NSString *)pairingPath;
+
 /// Copies a user-picked pairing file into the app. Returns an error message, or nil.
 + (nullable NSString *)importPairingFileFromURL:(NSURL *)url;
 

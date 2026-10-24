@@ -87,17 +87,13 @@
     [super viewDidAppear:animated];
     // iOS does not re-evaluate supportedInterfaceOrientations just because a modal was
     // presented, so ask for landscape outright -- the launcher behind us is portrait-only.
-    if (@available(iOS 16.0, *)) {
-        [self setNeedsUpdateOfSupportedInterfaceOrientations];
-        UIWindowScene *scene = self.view.window.windowScene;
-        if (scene) {
-            UIWindowSceneGeometryPreferencesIOS *landscape =
-              [[UIWindowSceneGeometryPreferencesIOS alloc]
-                initWithInterfaceOrientations:UIInterfaceOrientationMaskLandscape];
-            [scene requestGeometryUpdateWithPreferences:landscape errorHandler:nil];
-        }
-    } else {
-        [UIViewController attemptRotationToDeviceOrientation];
+    [self setNeedsUpdateOfSupportedInterfaceOrientations];
+    UIWindowScene *scene = self.view.window.windowScene;
+    if (scene) {
+        UIWindowSceneGeometryPreferencesIOS *landscape =
+          [[UIWindowSceneGeometryPreferencesIOS alloc]
+            initWithInterfaceOrientations:UIInterfaceOrientationMaskLandscape];
+        [scene requestGeometryUpdateWithPreferences:landscape errorHandler:nil];
     }
 }
 

@@ -45,17 +45,17 @@
 		<string>LaunchScreen</string>
 		<!-- KnightLauncher's announcement service (the home-screen news card) listens
 		     on port 6060 with no TLS at all, so it cannot be reached over HTTPS.
-		     Scoped to that one domain; its banner images come from an HTTPS CDN. -->
+		     Scoped to that one host; banner images are only fetched over HTTPS. -->
 		<key>NSAppTransportSecurity</key>
 		<dict>
 			<key>NSExceptionDomains</key>
 			<dict>
-				<key>knightlauncher.com</key>
+				<key>flamingo.knightlauncher.com</key>
 				<dict>
 					<key>NSExceptionAllowsInsecureHTTPLoads</key>
 					<true/>
 					<key>NSIncludesSubdomains</key>
-					<true/>
+					<false/>
 				</dict>
 			</dict>
 		</dict>

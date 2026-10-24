@@ -27,7 +27,7 @@ body:
     attributes:
       label: SKapsule version and commit
       description: Shown in the log's `[Pre-Init]` lines, and in the launcher.
-      placeholder: "1.0.0 (4202ba1)"
+      placeholder: "X.Y.Z (abc1234)"
     validations:
       required: true
 

@@ -50,6 +50,11 @@ typedef struct {
 } iOSEOCD;
 #pragma pack(pop)
 
+/// Ceilings on declared uncompressed size, per entry and per archive: generous for mods and
+/// the base game jars, but finite, so a forged header cannot ask for gigabytes.
+static const size_t kSKZipMaxEntrySize = 512u << 20;
+static const size_t kSKZipMaxTotalSize = 2048u << 20;
+
 /// Resolves a zip entry against the extraction root, or nil if it escapes it.
 ///
 /// Zip entry names are attacker-controlled -- mod archives come from a third-party GitHub
@@ -85,21 +90,28 @@ static NSString *SKZipSafeDestination(NSString *targetDir, NSString *entryName) 
  * read, and why applied mods came back looking vanilla. The central directory always
  * carries the real sizes.
  *
+ * Mod archives are third-party input, so the declared sizes are capped before anything is
+ * allocated. The entry count is not capped below the format's own 16-bit field: the base
+ * game jars unpacked here can hold far more than a few thousand entries, and the loop is
+ * already bounded by the central directory's bytes.
+ *
+ * @param filter if given, entries it rejects are skipped without being inflated.
  * @param handler receives each entry name and its decompressed bytes; return NO to stop.
  */
 + (BOOL)enumerateZip:(NSString *)zipPath
-           usingBlock:(BOOL (^)(NSString *entryName, NSData *contents))handler {
+            matching:(nullable BOOL (^)(NSString *entryName))filter
+          usingBlock:(BOOL (^)(NSString *entryName, NSData *contents))handler {
     NSData *file = [NSData dataWithContentsOfFile:zipPath
                                           options:NSDataReadingMappedIfSafe
                                             error:nil];
     if (file.length < 22) return NO;
 
     const uint8_t *bytes = file.bytes;
-    NSUInteger length = file.length;
+    size_t length = file.length;
 
-    NSUInteger searchStart = length > 66000 ? length - 66000 : 0;
+    size_t searchStart = length > 66000 ? length - 66000 : 0;
     NSInteger eocd = -1;
-    for (NSInteger i = (NSInteger)(length - 4); i >= (NSInteger)searchStart; i--) {
+    for (NSInteger i = (NSInteger)length - 22; i >= (NSInteger)searchStart; i--) {
         if (OSReadLittleInt32(bytes, i) == 0x06054b50) {
             eocd = i;
             break;
@@ -108,10 +120,11 @@ static NSString *SKZipSafeDestination(NSString *targetDir, NSString *entryName) 
     if (eocd < 0) return NO;
 
     uint16_t entryCount = OSReadLittleInt16(bytes, eocd + 10);
-    NSUInteger cursor = OSReadLittleInt32(bytes, eocd + 16);
+    size_t cursor = OSReadLittleInt32(bytes, eocd + 16);
+    size_t totalSize = 0;
 
     for (uint16_t i = 0; i < entryCount; i++) {
-        if (cursor + 46 > length || OSReadLittleInt32(bytes, cursor) != 0x02014b50) return NO;
+        if (cursor > length || length - cursor < 46 || OSReadLittleInt32(bytes, cursor) != 0x02014b50) return NO;
 
         uint16_t method = OSReadLittleInt16(bytes, cursor + 10);
         uint32_t compressedSize = OSReadLittleInt32(bytes, cursor + 20);
@@ -119,23 +132,36 @@ static NSString *SKZipSafeDestination(NSString *targetDir, NSString *entryName) 
         uint16_t nameLength = OSReadLittleInt16(bytes, cursor + 28);
         uint16_t extraLength = OSReadLittleInt16(bytes, cursor + 30);
         uint16_t commentLength = OSReadLittleInt16(bytes, cursor + 32);
-        uint32_t localOffset = OSReadLittleInt32(bytes, cursor + 42);
-        if (cursor + 46 + nameLength > length) return NO;
+        size_t localOffset = OSReadLittleInt32(bytes, cursor + 42);
+        size_t nameStart = cursor + 46;
+        if (nameLength > length - nameStart) return NO;
 
-        NSString *entryName = [[NSString alloc] initWithBytes:bytes + cursor + 46
+        NSString *entryName = [[NSString alloc] initWithBytes:bytes + nameStart
                                                        length:nameLength
                                                      encoding:NSUTF8StringEncoding];
-        cursor += 46 + nameLength + extraLength + commentLength;
+        cursor = nameStart + nameLength + extraLength + commentLength;
         if (!entryName || [entryName hasSuffix:@"/"]) continue;
+        if (filter && !filter(entryName)) continue;
+
+        if (uncompressedSize > kSKZipMaxEntrySize || compressedSize > kSKZipMaxEntrySize) {
+            NSLog(@"[SKZipUtils] Rejected %@: entry %@ is too large", zipPath.lastPathComponent, entryName);
+            return NO;
+        }
+        totalSize += uncompressedSize;
+        if (totalSize > kSKZipMaxTotalSize) {
+            NSLog(@"[SKZipUtils] Rejected %@: contents are too large", zipPath.lastPathComponent);
+            return NO;
+        }
 
         // The local header repeats the name and extra fields, and its extra field can be a
         // different length from the central one, so the data offset has to be read here.
-        if (localOffset + 30 > length || OSReadLittleInt32(bytes, localOffset) != 0x04034b50) {
+        if (localOffset > length || length - localOffset < 30 ||
+            OSReadLittleInt32(bytes, localOffset) != 0x04034b50) {
             continue;
         }
-        NSUInteger dataStart = localOffset + 30 + OSReadLittleInt16(bytes, localOffset + 26) +
-                               OSReadLittleInt16(bytes, localOffset + 28);
-        if (dataStart + compressedSize > length) continue;
+        size_t dataStart = localOffset + 30 + OSReadLittleInt16(bytes, localOffset + 26) +
+                           OSReadLittleInt16(bytes, localOffset + 28);
+        if (dataStart > length || compressedSize > length - dataStart) continue;
 
         NSData *contents = nil;
         if (uncompressedSize == 0) {
@@ -152,8 +178,8 @@ static NSString *SKZipSafeDestination(NSString *targetDir, NSString *entryName) 
             strm.avail_in = compressedSize;
             strm.next_out = out.mutableBytes;
             strm.avail_out = uncompressedSize;
-            if (inflateInit2(&strm, -15) == Z_OK) {
-                if (inflate(&strm, Z_FINISH) == Z_STREAM_END) contents = out;
+            if (out && inflateInit2(&strm, -15) == Z_OK) {
+                if (inflate(&strm, Z_FINISH) == Z_STREAM_END && strm.total_out == uncompressedSize) contents = out;
                 inflateEnd(&strm);
             }
         }
@@ -161,6 +187,15 @@ static NSString *SKZipSafeDestination(NSString *targetDir, NSString *entryName) 
         if (!handler(entryName, contents)) return NO;
     }
     return YES;
+}
+
++ (BOOL)enumerateZip:(NSString *)zipPath
+           usingBlock:(BOOL (^)(NSString *entryName, NSData *contents))handler {
+    return [self enumerateZip:zipPath matching:nil usingBlock:handler];
+}
+
++ (nullable NSString *)safeDestinationForEntry:(NSString *)entryName inDirectory:(NSString *)directory {
+    return SKZipSafeDestination(directory, entryName);
 }
 
 + (BOOL)extractZipFile:(NSString *)zipPath
@@ -188,8 +223,7 @@ static NSString *SKZipSafeDestination(NSString *targetDir, NSString *entryName) 
                             withIntermediateDirectories:YES
                                              attributes:nil
                                                   error:nil];
-                     [contents writeToFile:destPath atomically:YES];
-                     return YES;
+                     return [contents writeToFile:destPath atomically:YES];
                    }];
 }
 
@@ -206,8 +240,7 @@ static NSString *SKZipSafeDestination(NSString *targetDir, NSString *entryName) 
                             withIntermediateDirectories:YES
                                              attributes:nil
                                                   error:nil];
-                     [contents writeToFile:destPath atomically:YES];
-                     return YES;
+                     return [contents writeToFile:destPath atomically:YES];
                    }];
 }
 
@@ -226,6 +259,10 @@ static void collectFiles(NSString *baseDir, NSString *currentDir, NSMutableArray
     }
 }
 
+static BOOL SKWriteAll(FILE *f, const void *bytes, size_t length) {
+    return length == 0 || fwrite(bytes, 1, length, f) == length;
+}
+
 + (BOOL)createZipFileFromDirectory:(NSString *)sourceDir toZipPath:(NSString *)zipPath {
     NSMutableArray *files = [NSMutableArray array];
     collectFiles(sourceDir, sourceDir, files);
@@ -235,7 +272,8 @@ static void collectFiles(NSString *baseDir, NSString *currentDir, NSMutableArray
         return NO;
 
     NSMutableArray *centralHeaders = [NSMutableArray array];
-    uint32_t currentOffset = 0;
+    uint64_t currentOffset = 0;
+    BOOL ok = YES;
 
     for (NSString *filePath in files) {
         NSString *relPath = [filePath substringFromIndex:sourceDir.length + 1];
@@ -243,9 +281,13 @@ static void collectFiles(NSString *baseDir, NSString *currentDir, NSMutableArray
             continue;
         }
 
+        // A file that cannot be read is an error, not something to leave out of the jar.
         NSData *data = [NSData dataWithContentsOfFile:filePath];
-        if (!data)
-            continue;
+        NSData *nameData = [relPath dataUsingEncoding:NSUTF8StringEncoding];
+        if (!data || data.length > kSKZipMaxEntrySize || !nameData || nameData.length > UINT16_MAX) {
+            ok = NO;
+            break;
+        }
 
         uLong crc = crc32(0L, Z_NULL, 0);
         crc = crc32(crc, [data bytes], (uInt)[data length]);
@@ -255,8 +297,8 @@ static void collectFiles(NSString *baseDir, NSString *currentDir, NSMutableArray
         memset(&strm, 0, sizeof(strm));
         int ret = deflateInit2(&strm, Z_DEFAULT_COMPRESSION, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY);
         if (ret != Z_OK) {
-            fclose(f);
-            return NO;
+            ok = NO;
+            break;
         }
 
         uint8_t outBuffer[8192];
@@ -267,13 +309,14 @@ static void collectFiles(NSString *baseDir, NSString *currentDir, NSMutableArray
             strm.next_out = outBuffer;
             strm.avail_out = sizeof(outBuffer);
             ret = deflate(&strm, Z_FINISH);
-            NSInteger compressedBytes = sizeof(outBuffer) - strm.avail_out;
-            [compressed appendBytes:outBuffer length:compressedBytes];
-        } while (strm.avail_out == 0);
+            [compressed appendBytes:outBuffer length:sizeof(outBuffer) - strm.avail_out];
+        } while (ret == Z_OK);
 
         deflateEnd(&strm);
-
-        NSData *nameData = [relPath dataUsingEncoding:NSUTF8StringEncoding];
+        if (ret != Z_STREAM_END) {
+            ok = NO;
+            break;
+        }
 
         iOSLocalFileHeader localHeader;
         localHeader.signature = 0x04034b50;
@@ -288,9 +331,12 @@ static void collectFiles(NSString *baseDir, NSString *currentDir, NSMutableArray
         localHeader.filename_length = (uint16_t)[nameData length];
         localHeader.extra_field_length = 0;
 
-        fwrite(&localHeader, 1, sizeof(iOSLocalFileHeader), f);
-        fwrite([nameData bytes], 1, [nameData length], f);
-        fwrite([compressed bytes], 1, [compressed length], f);
+        if (!SKWriteAll(f, &localHeader, sizeof(iOSLocalFileHeader)) ||
+            !SKWriteAll(f, [nameData bytes], [nameData length]) ||
+            !SKWriteAll(f, [compressed bytes], [compressed length])) {
+            ok = NO;
+            break;
+        }
 
         NSMutableData *cdRecord = [NSMutableData data];
         iOSCentralHeader cdHeader;
@@ -310,37 +356,48 @@ static void collectFiles(NSString *baseDir, NSString *currentDir, NSMutableArray
         cdHeader.disk_start = 0;
         cdHeader.internal_attrs = 0;
         cdHeader.external_attrs = 0;
-        cdHeader.local_header_offset = currentOffset;
+        cdHeader.local_header_offset = (uint32_t)currentOffset;
 
         [cdRecord appendBytes:&cdHeader length:sizeof(iOSCentralHeader)];
         [cdRecord appendData:nameData];
         [centralHeaders addObject:cdRecord];
 
         currentOffset += sizeof(iOSLocalFileHeader) + [nameData length] + [compressed length];
+        // 32-bit offsets and a 16-bit count: this writer has no ZIP64.
+        if (currentOffset > UINT32_MAX || centralHeaders.count >= UINT16_MAX) {
+            ok = NO;
+            break;
+        }
     }
 
-    uint32_t cdOffset = currentOffset;
-    uint32_t cdSize = 0;
-
-    for (NSData *cdRecord in centralHeaders) {
-        fwrite([cdRecord bytes], 1, [cdRecord length], f);
-        cdSize += [cdRecord length];
+    uint64_t cdSize = 0;
+    if (ok) {
+        for (NSData *cdRecord in centralHeaders) {
+            if (!SKWriteAll(f, [cdRecord bytes], [cdRecord length])) {
+                ok = NO;
+                break;
+            }
+            cdSize += [cdRecord length];
+        }
     }
 
-    iOSEOCD eocd;
-    eocd.signature = 0x06054b50;
-    eocd.disk_number = 0;
-    eocd.disk_with_cd = 0;
-    eocd.disk_entries = (uint16_t)[centralHeaders count];
-    eocd.total_entries = (uint16_t)[centralHeaders count];
-    eocd.cd_size = cdSize;
-    eocd.cd_offset = cdOffset;
-    eocd.comment_length = 0;
+    if (ok) {
+        iOSEOCD eocd;
+        eocd.signature = 0x06054b50;
+        eocd.disk_number = 0;
+        eocd.disk_with_cd = 0;
+        eocd.disk_entries = (uint16_t)[centralHeaders count];
+        eocd.total_entries = (uint16_t)[centralHeaders count];
+        eocd.cd_size = (uint32_t)cdSize;
+        eocd.cd_offset = (uint32_t)currentOffset;
+        eocd.comment_length = 0;
+        ok = SKWriteAll(f, &eocd, sizeof(iOSEOCD));
+    }
 
-    fwrite(&eocd, 1, sizeof(iOSEOCD), f);
-
-    fclose(f);
-    return YES;
+    // fclose flushes, so a full disk can surface only here.
+    if (fclose(f) != 0) ok = NO;
+    if (!ok) unlink([zipPath fileSystemRepresentation]);
+    return ok;
 }
 
 + (nullable NSString *)calculateGitBlobShaOfFile:(NSString *)filePath {
@@ -434,91 +491,48 @@ static void collectFiles(NSString *baseDir, NSString *currentDir, NSMutableArray
     return NO;
 }
 
-+ (nullable NSDictionary *)readModMetadataFromZip:(NSString *)zipPath {
-    FILE *f = fopen([zipPath UTF8String], "rb");
-    if (!f)
-        return nil;
-
-    iOSLocalFileHeader header;
-    while (fread(&header, 1, sizeof(iOSLocalFileHeader), f) == sizeof(iOSLocalFileHeader)) {
-        if (header.signature != 0x04034b50) {
-            break;
-        }
-
-        char *filename = malloc(header.filename_length + 1);
-        if (fread(filename, 1, header.filename_length, f) != header.filename_length) {
-            free(filename);
-            fclose(f);
-            return nil;
-        }
-        filename[header.filename_length] = '\0';
-
-        fseek(f, header.extra_field_length, SEEK_CUR);
-
-        NSString *entryName = [NSString stringWithUTF8String:filename];
-        free(filename);
-
-        if (!entryName) {
-            fseek(f, header.compressed_size, SEEK_CUR);
-            continue;
-        }
-
-        if ([entryName isEqualToString:@"mod.json"] || [entryName hasSuffix:@"/mod.json"]) {
-            uint8_t *compData = malloc(header.compressed_size);
-            if (fread(compData, 1, header.compressed_size, f) != header.compressed_size) {
-                free(compData);
-                fclose(f);
-                return nil;
-            }
-
-            NSData *uncompressedData = nil;
-            if (header.compression_method == 0) {
-                uncompressedData = [NSData dataWithBytesNoCopy:compData length:header.compressed_size freeWhenDone:YES];
-            } else if (header.compression_method == 8) {
-                uint8_t *uncompData = malloc(header.uncompressed_size);
-
-                z_stream strm;
-                memset(&strm, 0, sizeof(strm));
-                strm.next_in = (Bytef *)compData;
-                strm.avail_in = header.compressed_size;
-                strm.next_out = (Bytef *)uncompData;
-                strm.avail_out = header.uncompressed_size;
-
-                int ret = inflateInit2(&strm, -15);
-                if (ret == Z_OK) {
-                    ret = inflate(&strm, Z_FINISH);
-                    inflateEnd(&strm);
-                }
-
-                free(compData);
-
-                if (ret == Z_STREAM_END || ret == Z_OK) {
-                    uncompressedData = [NSData dataWithBytesNoCopy:uncompData
-                                                            length:header.uncompressed_size
-                                                      freeWhenDone:YES];
-                } else {
-                    free(uncompData);
-                    fclose(f);
-                    return nil;
-                }
-            } else {
-                free(compData);
-                fclose(f);
-                return nil;
-            }
-
-            if (uncompressedData) {
-                NSDictionary *json = [NSJSONSerialization JSONObjectWithData:uncompressedData options:0 error:nil];
-                fclose(f);
-                return json;
-            }
+/// Drops a comma that directly precedes a closing brace or bracket, outside strings. Mod authors
+/// write `"version": "1.0",` before the final `}`; the desktop launcher's JSON library accepts
+/// it and NSJSONSerialization does not.
++ (NSString *)stripTrailingCommas:(NSString *)json {
+    NSMutableString *out = [NSMutableString stringWithCapacity:json.length];
+    BOOL inString = NO, escaped = NO;
+    for (NSUInteger i = 0; i < json.length; i++) {
+        unichar c = [json characterAtIndex:i];
+        if (inString) {
+            [out appendFormat:@"%C", c];
+            if (escaped) escaped = NO;
+            else if (c == '\\') escaped = YES;
+            else if (c == '"') inString = NO;
+        } else if (c == '"') {
+            inString = YES;
+            [out appendFormat:@"%C", c];
+        } else if (c == ',') {
+            NSUInteger j = i + 1;
+            while (j < json.length && [NSCharacterSet.whitespaceAndNewlineCharacterSet characterIsMember:[json characterAtIndex:j]]) j++;
+            unichar next = j < json.length ? [json characterAtIndex:j] : 0;
+            if (next != '}' && next != ']' && next != 0) [out appendFormat:@"%C", c];
         } else {
-            fseek(f, header.compressed_size, SEEK_CUR);
+            [out appendFormat:@"%C", c];
         }
     }
+    return out;
+}
 
-    fclose(f);
-    return nil;
++ (nullable NSDictionary *)readModMetadataFromZip:(NSString *)zipPath {
+    __block NSDictionary *metadata = nil;
+    [self enumerateZip:zipPath
+              matching:^BOOL(NSString *name) {
+                return [name isEqualToString:@"mod.json"] || [name hasSuffix:@"/mod.json"];
+              }
+            usingBlock:^BOOL(NSString *name, NSData *contents) {
+              NSString *text = [[NSString alloc] initWithData:contents encoding:NSUTF8StringEncoding];
+              NSData *cleaned = text ? [[SKZipUtils stripTrailingCommas:text] dataUsingEncoding:NSUTF8StringEncoding] : contents;
+              id json = [NSJSONSerialization JSONObjectWithData:cleaned options:0 error:nil];
+              if ([json isKindOfClass:NSDictionary.class]) metadata = json;
+              return NO;
+            }];
+    return metadata;
 }
 
 @end

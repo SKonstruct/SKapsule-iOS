@@ -104,7 +104,8 @@ are supported, and so are mice and trackpads on iPad (less tested).
 **Mods.** **Download Modpack** in the sidebar fetches the [Spiral Knights Modpack](https://github.com/SirDank/Spiral-Knights-Modpack); you can also put
 your own mods in the `mods` folder (**Open Folder**). **Apply Mods** installs them and
 **Remove Mods** restores the game's original files. A few config files that often clash with
-game updates are never replaced, the same ones KnightLauncher skips.
+game updates are never replaced, the same ones KnightLauncher skips. Downloading the modpack
+never deletes mods you added yourself.
 
 **News.** The home screen shows current in-game events from the same feed as
 [KnightLauncher](https://github.com/lucasluqui/KnightLauncher). Tap a card to open the event
@@ -187,13 +188,12 @@ contains code adapted from Amethyst-iOS (GPL-3.0). It builds on:
 
 | Project | Used for | Licence |
 | --- | --- | --- |
-| [Amethyst-iOS](https://github.com/AngelAuraMC/Amethyst-iOS) | JIT script, dyld bypass, launch code and build layout | GPL-3.0 |
+| [Amethyst-iOS](https://github.com/AngelAuraMC/Amethyst-iOS) | JIT script, launch code and build layout | GPL-3.0 |
 | [AngelAuraMC OpenJDK build](https://github.com/AngelAuraMC/angelauramc-openjdk-build) | The bundled Java 25 runtime | GPLv2 with Classpath Exception |
 | [gl4es](https://github.com/SKonstruct/gl4es) ([upstream](https://github.com/ptitSeb/gl4es)) | OpenGL to OpenGL ES | MIT |
 | [OpenAL Soft](https://github.com/SKonstruct/openal-soft) ([upstream](https://github.com/kcat/openal-soft)) | Audio | LGPLv2 |
 | [LWJGL 3](https://github.com/SKonstruct/lwjgl3) ([upstream](https://github.com/LWJGL/lwjgl3)) | Java bindings | BSD-3-Clause |
 | [Caciocavallo](https://github.com/SKonstruct/caciocavallo17) | Headless AWT | GPLv2 with Classpath Exception |
-| [fishhook](https://github.com/SKonstruct/fishhook) ([upstream](https://github.com/facebook/fishhook)) | Runtime symbol rebinding | BSD-3-Clause |
 | [StikJIT](https://github.com/StikDebug/StikJIT) | Built-in JIT | MPL-2.0, bundled unmodified |
 | [bootstrap](https://github.com/SKonstruct/bootstrap) | Game bootstrap, shared with Android | MIT |
 | [frenchpress](https://github.com/SKonstruct/frenchpress) | Steam login | |

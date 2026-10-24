@@ -1,0 +1,28 @@
+name: Test
+
+# Host-side unit tests only, on every push and pull request, and on demand. The IPAs are built by
+# Build for iOS / Release iOS.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+# A pushed branch with an open pull request triggers both; only the newest run is kept.
+concurrency:
+  group: test-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Run unit tests
+        run: make test

@@ -280,7 +280,42 @@ static void apply_pending_resize(void) {
     }
 }
 
+// iOS kills an app that submits GL work once it is in the background, and the render thread
+// only ever reaches the GPU through nativeSwapBuffers' present. SceneDelegate raises this when
+// the scene stops being active and clears it when it is active again.
+static struct {
+    pthread_mutex_t lock;
+    pthread_cond_t resumed;
+    BOOL paused;
+} glPause = { .lock = PTHREAD_MUTEX_INITIALIZER, .resumed = PTHREAD_COND_INITIALIZER };
+
+void sk_gl_set_paused(BOOL paused) {
+    pthread_mutex_lock(&glPause.lock);
+    glPause.paused = paused;
+    if (!paused) pthread_cond_broadcast(&glPause.resumed);
+    pthread_mutex_unlock(&glPause.lock);
+}
+
+/// Called at the end of a frame, on the thread that owns the context. Parks it until the app
+/// is active again, so the game neither submits GL nor spins in the background.
+static void wait_until_active(void) {
+    pthread_mutex_lock(&glPause.lock);
+    BOOL paused = glPause.paused;
+    pthread_mutex_unlock(&glPause.lock);
+    if (!paused) return;
+
+    // Still allowed here (the scene is only resigning); finish what was queued so nothing
+    // is left in flight when the app is suspended.
+    [EAGLContext setCurrentContext:gEAGLContext];
+    glFinish();
+
+    pthread_mutex_lock(&glPause.lock);
+    while (glPause.paused) pthread_cond_wait(&glPause.resumed, &glPause.lock);
+    pthread_mutex_unlock(&glPause.lock);
+}
+
 static void nativeSwapBuffers(JNIEnv *env, jclass clazz, jlong window) {
+    wait_until_active();
     [EAGLContext setCurrentContext:gEAGLContext];
     glBindRenderbuffer(GL_RENDERBUFFER, gRenderbuffer);
     [gEAGLContext presentRenderbuffer:GL_RENDERBUFFER];

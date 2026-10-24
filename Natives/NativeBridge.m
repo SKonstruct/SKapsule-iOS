@@ -1,6 +1,9 @@
 #import "NativeBridge.h"
+#import <errno.h>
 #import <pthread.h>
+#import <time.h>
 
+// The handlers are set from the main thread and read from the JVM's threads.
 static SKBootStatusBlock _bootStatusHandler;
 static SKRenderReadyBlock _renderReadyHandler;
 static SKPromptDeviceCodeBlock _promptDeviceCodeHandler;
@@ -12,44 +15,68 @@ static pthread_mutex_t _codeMutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t _codeCond = PTHREAD_COND_INITIALIZER;
 static NSString *_submittedCode = nil;
 
+// Long enough for an authenticator app or an email round trip, short enough that an alert
+// that never appeared (or was lost) cannot park the JVM thread for good.
+static const int kCodeTimeoutSeconds = 5 * 60;
+
 @implementation SKNativeBridge
 
 + (void)setBootStatusHandler:(SKBootStatusBlock)handler {
-    _bootStatusHandler = [handler copy];
+    @synchronized(self) {
+        _bootStatusHandler = [handler copy];
+    }
 }
 
 + (void)setRenderReadyHandler:(SKRenderReadyBlock)handler {
-    _renderReadyHandler = [handler copy];
+    @synchronized(self) {
+        _renderReadyHandler = [handler copy];
+    }
 }
 
 + (void)setPromptDeviceCodeHandler:(SKPromptDeviceCodeBlock)handler {
-    _promptDeviceCodeHandler = [handler copy];
+    @synchronized(self) {
+        _promptDeviceCodeHandler = [handler copy];
+    }
 }
 
 + (void)setPromptEmailCodeHandler:(SKPromptEmailCodeBlock)handler {
-    _promptEmailCodeHandler = [handler copy];
+    @synchronized(self) {
+        _promptEmailCodeHandler = [handler copy];
+    }
 }
 
 + (void)onLaunchStatus:(NSString *)message {
     NSLog(@"[NativeBridge] launchStatus: %@", message);
-    if (_bootStatusHandler) {
+    SKBootStatusBlock handler;
+    @synchronized(self) {
+        handler = _bootStatusHandler;
+    }
+    if (handler) {
         dispatch_async(dispatch_get_main_queue(), ^{
-          _bootStatusHandler(message);
+          handler(message);
         });
     }
 }
 
 + (void)onRenderReady {
     NSLog(@"[NativeBridge] renderReady");
-    if (_renderReadyHandler) {
+    SKRenderReadyBlock handler;
+    @synchronized(self) {
+        handler = _renderReadyHandler;
+    }
+    if (handler) {
         dispatch_async(dispatch_get_main_queue(), ^{
-          _renderReadyHandler();
+          handler();
         });
     }
 }
 
 + (NSString *)promptForDeviceCode:(BOOL)prevWrong {
-    if (!_promptDeviceCodeHandler)
+    SKPromptDeviceCodeBlock handler;
+    @synchronized(self) {
+        handler = _promptDeviceCodeHandler;
+    }
+    if (!handler)
         return @"";
 
     // Clear before the prompt goes up: clearing inside awaitCode would discard a code
@@ -58,7 +85,7 @@ static NSString *_submittedCode = nil;
 
     // Dispatch the prompt to the UI thread
     dispatch_async(dispatch_get_main_queue(), ^{
-      _promptDeviceCodeHandler(prevWrong);
+      handler(prevWrong);
     });
 
     // Block the JVM thread until submitCode is called
@@ -66,13 +93,17 @@ static NSString *_submittedCode = nil;
 }
 
 + (NSString *)promptForEmailCode:(NSString *)email prevWrong:(BOOL)prevWrong {
-    if (!_promptEmailCodeHandler)
+    SKPromptEmailCodeBlock handler;
+    @synchronized(self) {
+        handler = _promptEmailCodeHandler;
+    }
+    if (!handler)
         return @"";
 
     [self resetCode];
 
     dispatch_async(dispatch_get_main_queue(), ^{
-      _promptEmailCodeHandler(email, prevWrong);
+      handler(email, prevWrong);
     });
 
     return [self awaitCode];
@@ -85,9 +116,17 @@ static NSString *_submittedCode = nil;
 }
 
 + (NSString *)awaitCode {
+    struct timespec deadline;
+    clock_gettime(CLOCK_REALTIME, &deadline);
+    deadline.tv_sec += kCodeTimeoutSeconds;
+
     pthread_mutex_lock(&_codeMutex);
     while (_submittedCode == nil) {
-        pthread_cond_wait(&_codeCond, &_codeMutex);
+        if (pthread_cond_timedwait(&_codeCond, &_codeMutex, &deadline) == ETIMEDOUT) {
+            NSLog(@"[NativeBridge] no code entered within %d s; giving up", kCodeTimeoutSeconds);
+            pthread_mutex_unlock(&_codeMutex);
+            return @"";
+        }
     }
     NSString *code = _submittedCode;
     _submittedCode = nil;

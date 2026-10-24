@@ -13,9 +13,6 @@
 [submodule "frenchpress"]
 	path = external/frenchpress
 	url = https://github.com/SKonstruct/frenchpress.git
-[submodule "external/fishhook"]
-	path = external/fishhook
-	url = https://github.com/SKonstruct/fishhook.git
 [submodule "bootstrap"]
 	path = external/bootstrap
 	url = https://github.com/SKonstruct/bootstrap.git

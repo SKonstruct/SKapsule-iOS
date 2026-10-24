@@ -5,10 +5,12 @@
 
 #import "AppDelegate.h"
 #import "JavaLauncher.h"
+#import "SKBuiltinJIT.h"
 #import "config.h"
 #import "utils.h"
 
 #include <dirent.h>
+#include <errno.h>
 #include <libgen.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -105,6 +107,23 @@ const char *__asan_default_options(void) {
            ":malloc_context_size=30";
 }
 
+/// Best effort: a full disk or a closed fd must not stop the reader below from draining the
+/// pipe, or the JVM would block on its next print. Unlike NSFileHandle's writeData:, which
+/// raises on ENOSPC, this just gives up on the chunk.
+static void write_all(int fd, const char *buf, size_t length) {
+    while (length > 0) {
+        ssize_t written = write(fd, buf, length);
+        if (written < 0 && errno == EINTR) {
+            continue;
+        }
+        if (written <= 0) {
+            return;
+        }
+        buf += written;
+        length -= (size_t)written;
+    }
+}
+
 static void __attribute__((unused)) init_redirectStdio(void) {
     NSString *home = @(getenv("SKAPSULE_HOME"));
     NSString *currName = [home stringByAppendingPathComponent:@"latestlog.txt"];
@@ -126,6 +145,14 @@ static void __attribute__((unused)) init_redirectStdio(void) {
         return;
     }
 
+    // Before touching stdout: if there is no pipe, console output must keep going where it was.
+    static int pfd[2];
+    if (pipe(pfd) != 0) {
+        NSLog(@"[Pre-init] pipe() failed (errno %d); not capturing the log", errno);
+        [file closeFile];
+        return;
+    }
+
     setvbuf(stdout, 0, _IOLBF, 0);
     setvbuf(stderr, 0, _IONBF, 0);
 
@@ -136,11 +163,10 @@ static void __attribute__((unused)) init_redirectStdio(void) {
     static int origOut;
     origOut = dup(fileno(stdout));
 
-    static int pfd[2];
-    pipe(pfd);
     dup2(pfd[1], fileno(stdout));
     dup2(pfd[1], fileno(stderr));
 
+    int logFd = file.fileDescriptor;  // `file` is captured below, so it outlives the reader
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
       ssize_t rsize;
       char buf[2048];
@@ -148,13 +174,13 @@ static void __attribute__((unused)) init_redirectStdio(void) {
           if (rsize < 2048)
               buf[rsize] = '\0';
           if (origOut >= 0) {
-              write(origOut, buf, rsize);
+              write_all(origOut, buf, (size_t)rsize);
           }
           // Deliberately no synchronizeFile: an fsync per <=2KB chunk turned a few MB of
           // log text into 1073 MB of actual disk writes in one 8-minute session, which
           // tripped iOS's daily disk-write limit. write(2) already hands the data to the
           // kernel, so it survives a process crash -- which is all "Share Logs" needs.
-          [file writeData:[NSData dataWithBytes:buf length:rsize]];
+          write_all(logFd, buf, (size_t)rsize);
       }
       [file closeFile];
     });
@@ -227,6 +253,11 @@ static void init_setupGameDirs(void) {
     for (NSString *dir in dirsToCreate) {
         [fm createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:nil];
     }
+    // The game tree is re-downloadable and home/ holds the Steam login token and prefs; neither
+    // belongs in a backup. Set on the directories, so it covers everything beneath them.
+    skExcludeFromBackup([NSString stringWithFormat:@"%s/sk", home]);
+    skExcludeFromBackup([NSString stringWithFormat:@"%s/home", home]);
+    skExcludeFromBackup(SKBuiltinJIT.pairingPath.stringByDeletingLastPathComponent);
     init_seedGamePrefs(home);
 }
 

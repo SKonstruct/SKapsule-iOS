@@ -11,15 +11,14 @@
 #include "utils.h"
 
 BOOL isJailbroken = NO;
-BOOL debugLogEnabled = NO;
 
 #define CS_OPS_STATUS 0
 #define CS_DEBUGGED 0x10000000
 int csops(pid_t pid, unsigned int ops, void *useraddr, size_t usersize);
 
 // SecTask lives in Security.framework on iOS but isn't in the public headers. This is the
-// same approach Amethyst-iOS uses; the project already relies on comparable API for the
-// dyld bypass and ptrace paths.
+// same approach Amethyst-iOS uses; the project already relies on comparable API for
+// the ptrace path.
 typedef struct __SecTask *SecTaskRef;
 extern SecTaskRef SecTaskCreateFromSelf(CFAllocatorRef allocator);
 extern CFTypeRef SecTaskCopyValueForEntitlement(SecTaskRef task, CFStringRef entitlement,
@@ -167,6 +166,12 @@ NSString *skStageJITScriptToDocuments(void) {
     return dst;
 }
 
+BOOL skDebuggerAttached(void) {
+    uint32_t flags = 0;
+    csops(getpid(), CS_OPS_STATUS, &flags, sizeof(flags));
+    return (flags & CS_DEBUGGED) != 0;
+}
+
 BOOL isJITEnabled(BOOL checkCSFlags) {
     (void)checkCSFlags;
     uint32_t flags = 0;
@@ -214,22 +219,8 @@ id getEntitlementValue(NSString *key) {
     }
 }
 
-NSString *getSelectedJavaHome(int minVersion) {
-    NSString *bundledJRE = [NSString stringWithFormat:@"%@/jre25", [[NSBundle mainBundle] bundlePath]];
-    if ([NSFileManager.defaultManager fileExistsAtPath:bundledJRE]) {
-        return bundledJRE;
-    }
-
-    const char *home = getenv("SKAPSULE_HOME");
-    if (home) {
-        NSString *extractedJRE = [NSString stringWithFormat:@"%s/jre25", home];
-        if ([NSFileManager.defaultManager fileExistsAtPath:extractedJRE]) {
-            return extractedJRE;
-        }
-    }
-
-    NSLog(@"[Utils] No JRE 25 found for iOS");
-    return nil;
+void skExcludeFromBackup(NSString *path) {
+    [[NSURL fileURLWithPath:path] setResourceValue:@YES forKey:NSURLIsExcludedFromBackupKey error:nil];
 }
 
 // --- Java heap cap ------------------------------------------------------------
@@ -287,12 +278,10 @@ UIEdgeInsets SKGameSafeAreaInsets(UIView *view) {
     static const CGFloat kHousingMargin = 11.0f;
 
     UIEdgeInsets insets = UIEdgeInsetsZero;
-    if (@available(iOS 11.0, *))
-        insets = view.safeAreaInsets;
+    insets = view.safeAreaInsets;
 
     UIInterfaceOrientation orientation = UIInterfaceOrientationUnknown;
-    if (@available(iOS 13.0, *))
-        orientation = view.window.windowScene.interfaceOrientation;
+    orientation = view.window.windowScene.interfaceOrientation;
 
     // UIInterfaceOrientation is defined against the *device* orientation it corresponds to,
     // which inverts the reading its name suggests: LandscapeRight == UIDeviceOrientation-

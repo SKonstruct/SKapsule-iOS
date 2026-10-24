@@ -18,7 +18,11 @@ static NSString *const kFeedURL =
 static NSString *const kCacheKey = @"news_cache_json";
 static NSString *const kCacheTimeKey = @"news_cache_time";
 static const NSTimeInterval kCacheTTL = 6 * 60 * 60;
+static const NSUInteger kMaxFeedBytes = 256 * 1024;
 static const NSUInteger kMaxImageBytes = 1024 * 1024;
+// A small file can declare a huge canvas; the pixel count is what decoding costs.
+static const CGFloat kMaxImageSide = 4096;
+static const CGFloat kMaxImagePixels = 8 * 1024 * 1024;
 
 @implementation SKNewsItem
 - (BOOL)isEndingSoon {
@@ -75,8 +79,7 @@ static SKNewsItem *sk_event(NSString *banner, NSString *content, NSString *link,
 static NSArray<SKNewsItem *> *sk_parse(NSData *data) {
     // Flamingo writes a trailing comma after the last field of every `events` entry.
     // JSON5 parsing accepts that by definition; plain parsing only happens to on newer OSes.
-    NSJSONReadingOptions options = 0;
-    if (@available(iOS 15.0, *)) options = NSJSONReadingJSON5Allowed;
+    NSJSONReadingOptions options = NSJSONReadingJSON5Allowed;
     NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:options error:nil];
     if (![json isKindOfClass:NSDictionary.class]) return @[];
     NSArray *servers = json[@"serverlist"];
@@ -110,6 +113,59 @@ static NSArray<SKNewsItem *> *sk_parse(NSData *data) {
     return fallback ? @[ fallback ] : @[];
 }
 
+#pragma mark - Capped download
+
+/// Collects a response body, cancelling the transfer as soon as it passes `limit`, rather than
+/// buffering whatever an unauthenticated host sends.
+@interface SKCappedFetch : NSObject <NSURLSessionDataDelegate>
+@property (nonatomic, assign) NSUInteger limit;
+@property (nonatomic, strong) NSMutableData *body;
+@property (nonatomic, assign) NSInteger status;
+@property (nonatomic, assign) BOOL overflow;
+@property (nonatomic, copy) void (^done)(NSData *data);
+@end
+
+@implementation SKCappedFetch
+- (void)URLSession:(NSURLSession *)session
+              dataTask:(NSURLSessionDataTask *)task
+    didReceiveResponse:(NSURLResponse *)response
+     completionHandler:(void (^)(NSURLSessionResponseDisposition))handler {
+    self.status = [response isKindOfClass:NSHTTPURLResponse.class] ? ((NSHTTPURLResponse *)response).statusCode : 0;
+    if (self.status != 200 || response.expectedContentLength > (long long)self.limit) {
+        self.overflow = self.status == 200;
+        handler(NSURLSessionResponseCancel);
+        return;
+    }
+    handler(NSURLSessionResponseAllow);
+}
+
+- (void)URLSession:(NSURLSession *)session dataTask:(NSURLSessionDataTask *)task didReceiveData:(NSData *)data {
+    [self.body appendData:data];
+    if (self.body.length > self.limit) {
+        self.overflow = YES;
+        [task cancel];
+    }
+}
+
+- (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task didCompleteWithError:(NSError *)error {
+    BOOL ok = !error && !self.overflow && self.status == 200 && self.body.length > 0;
+    self.done(ok ? self.body : nil);
+}
+@end
+
+/// Calls `done` off the main queue with the body, or nil on any error, non-200, or oversize.
+static void sk_fetch_capped(NSURLRequest *request, NSUInteger limit, void (^done)(NSData *data)) {
+    SKCappedFetch *fetch = [SKCappedFetch new];
+    fetch.limit = limit;
+    fetch.body = [NSMutableData data];
+    fetch.done = done;
+    NSURLSession *session = [NSURLSession sessionWithConfiguration:NSURLSessionConfiguration.ephemeralSessionConfiguration
+                                                          delegate:fetch
+                                                     delegateQueue:nil];
+    [[session dataTaskWithRequest:request] resume];
+    [session finishTasksAndInvalidate];  // releases the delegate once the task is done
+}
+
 #pragma mark - Public API
 
 void SKNewsFetch(void (^completion)(NSArray<SKNewsItem *> *)) {
@@ -130,22 +186,20 @@ void SKNewsFetch(void (^completion)(NSArray<SKNewsItem *> *)) {
     [request setValue:@"SKapsule-iOS" forHTTPHeaderField:@"User-Agent"];
     request.timeoutInterval = 10;
 
-    [[NSURLSession.sharedSession
-        dataTaskWithRequest:request
-          completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-            NSData *payload = data;
-            if (error || ((NSHTTPURLResponse *)response).statusCode != 200 || !data) {
-                // A stale cache still beats an empty home screen.
-                payload = cached;
-            } else {
-                [defaults setObject:data forKey:kCacheKey];
-                [defaults setObject:NSDate.date forKey:kCacheTimeKey];
-            }
-            NSArray<SKNewsItem *> *items = payload ? sk_parse(payload) : @[];
-            dispatch_async(dispatch_get_main_queue(), ^{
-              completion(items);
-            });
-          }] resume];
+    sk_fetch_capped(request, kMaxFeedBytes, ^(NSData *data) {
+      // Parse first: a captive portal's 200 must not replace a good cache.
+      NSArray<SKNewsItem *> *items = data ? sk_parse(data) : @[];
+      if (items.count > 0) {
+          [defaults setObject:data forKey:kCacheKey];
+          [defaults setObject:NSDate.date forKey:kCacheTimeKey];
+      } else if (cached) {
+          // A stale cache still beats an empty home screen.
+          items = sk_parse(cached);
+      }
+      dispatch_async(dispatch_get_main_queue(), ^{
+        completion(items);
+      });
+    });
 }
 
 void SKNewsFetchImage(NSString *urlString, void (^completion)(UIImage *)) {
@@ -177,21 +231,15 @@ void SKNewsFetchImage(NSString *urlString, void (^completion)(UIImage *)) {
     [request setValue:@"SKapsule-iOS" forHTTPHeaderField:@"User-Agent"];
     request.timeoutInterval = 15;
 
-    [[NSURLSession.sharedSession
-        dataTaskWithRequest:request
-          completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-            UIImage *image = nil;
-            // The feed is unauthenticated cleartext; do not let it decide how much
-            // of the cache directory to fill.
-            if (!error && ((NSHTTPURLResponse *)response).statusCode == 200 &&
-                data.length > 0 && data.length <= kMaxImageBytes) {
-                image = [UIImage imageWithData:data];
-                if (image) [data writeToFile:path atomically:YES];
-            }
-            dispatch_async(dispatch_get_main_queue(), ^{
-              completion(image);
-            });
-          }] resume];
+    sk_fetch_capped(request, kMaxImageBytes, ^(NSData *data) {
+      UIImage *image = data ? [UIImage imageWithData:data] : nil;
+      CGFloat w = image.size.width * image.scale, h = image.size.height * image.scale;
+      if (image && (w > kMaxImageSide || h > kMaxImageSide || w * h > kMaxImagePixels)) image = nil;
+      if (image) [data writeToFile:path atomically:YES];
+      dispatch_async(dispatch_get_main_queue(), ^{
+        completion(image);
+      });
+    });
 }
 
 /// "2d" / "5h" / "soon" for a span, for the chip to prefix.

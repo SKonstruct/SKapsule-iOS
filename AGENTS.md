@@ -29,7 +29,7 @@ live in `scripts/`.
   Steam login. Most Java code (external/bootstrap/) is shared.
 - **[Amethyst-iOS](https://github.com/AngelAuraMC/Amethyst-iOS)** — an iOS
   Minecraft launcher that informed the JVM-on-iOS approach (JIT enablement,
-  dyld bypass, fishhook, cacio bridge, Makefile+CMake build system).
+  cacio bridge, Makefile+CMake build system).
 
 ---
 
@@ -50,15 +50,18 @@ Natives/               iOS app (Objective-C) + CMake build
   SKTouchControlOverlay.*   touch-control overlay, edit mode, settings panel
   SKKeyboardBridge.*   offscreen UIKeyInput -> GLFW char/key events
   SKInstaller.*        runtime extraction + installation check
+  SKZipUtils.*         zip read/write (central directory), git blob SHA
+  SKModManager.*       modpack download, apply and remove
+  SKNewsFeed.*         home-screen news card feed (KnightLauncher's Flamingo service)
+  SKReporter.*         Sentry failure/crash reports, log scrubbing
+  glfw_ios.m           GLFW natives for the JVM: input queue, buffer swap, gamepad
   NativeBridge.*       JVM ↔ UI bridge (boot status, Steam Guard prompts)
   utils.*              JIT detection, entitlements, file helpers
   SKBuiltinJIT.*       JIT method choice, pairing file, starts the JIT helper extension
   JITHelper/           Swift app extension linking StikJIT (attaches the JIT debugger)
-  dyld_bypass_validation.m  library validation bypass for unsigned dylibs
   awt_xawt/            cacio AWT stubs
   Info.plist           iOS app metadata
-  Assets.xcassets/     app icon + launch screen
-  resources/           bundled frameworks, storyboards
+  Assets.xcassets/     app icon, Buy Me a Coffee image
 external/bootstrap/    Java bootstrap module (shared with Android)
   SkBootstrap.java     runs HeadlessGetdown → launches ProjectXApp
   HeadlessGetdown.java headless getdown driver
@@ -71,7 +74,6 @@ external/openal-soft/  submodule — audio
 external/lwjgl3/       submodule — LWJGL iOS build
 external/caciocavallo17/  submodule — headless AWT
 external/frenchpress/  submodule — Steam login
-external/fishhook/     submodule — runtime function hooking
 external/StikJIT/      submodule — built-in JIT framework (MPL-2.0), unmodified
 entitlements.*.xml     signing entitlements (sideload / TrollStore)
 out/                   native build outputs (generated, gitignored)
@@ -82,7 +84,9 @@ out/artifacts/         packaged IPA output (generated, gitignored)
 
 ## Build & verification
 
+- **Everything:** `./scripts/build.sh [debug|release|trollstore] [--natives] [--test] [--deploy]` builds missing natives and the jars, then the app (`--help`).
 - **Native app (CMake):** `make native` (requires Xcode CLI tools + iOS SDK)
+- **Host-side tests:** `make test` builds `Natives/Tests/` for the Mac and runs it (zip parsing, git blob SHA). Add a case there when touching `SKZipUtils`. The **Test** workflow runs it on every push and pull request.
 - **Full package:** `make package` (produces `.ipa` in `out/artifacts/`)
 - **TrollStore:** `make package TROLLSTORE_JIT_ENT=1` (produces `.tipa`)
 - **Release:** `make all RELEASE=1`

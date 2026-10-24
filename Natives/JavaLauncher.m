@@ -43,6 +43,11 @@ static void init_loadSKEnv(void) {
     }
 }
 
+static void skUnsetSteamEnv(void) {
+    unsetenv("FRENCHPRESS_STEAM_USER");
+    unsetenv("FRENCHPRESS_STEAM_PASS");
+}
+
 int launchJVM(NSString *steamUser, NSString *steamPass, BOOL isSteam, int width, int height) {
     NSLog(@"[JavaLauncher] Beginning JVM launch");
 
@@ -101,35 +106,37 @@ int launchJVM(NSString *steamUser, NSString *steamPass, BOOL isSteam, int width,
     // Build JVM args — translated from sklauncher.c
     int margc = -1;
     const char *margv[200];
+    // Every dynamic argument is strdup'd: UTF8String of an ARC temporary can dangle once the
+    // statement ends. They are never freed on purpose; the JVM keeps argv for the process lifetime.
 
-    margv[++margc] = [NSString stringWithFormat:@"%@/bin/java", javaHome].UTF8String;
+    margv[++margc] = strdup([NSString stringWithFormat:@"%@/bin/java", javaHome].UTF8String);
 
     int allocMB = sk_ram_get_mb();
     NSLog(@"[JavaLauncher] Max RAM: %d MB", allocMB);
     margv[++margc] = "-Xms128M";
-    margv[++margc] = [NSString stringWithFormat:@"-Xmx%dM", allocMB].UTF8String;
+    margv[++margc] = strdup([NSString stringWithFormat:@"-Xmx%dM", allocMB].UTF8String);
 
     // Paths — match sklauncher.c layout
-    margv[++margc] = [NSString stringWithFormat:@"-Djava.library.path=%@/Frameworks", bundlePath].UTF8String;
-    margv[++margc] = [NSString stringWithFormat:@"-Dappdir=%s/sk", home].UTF8String;
-    margv[++margc] = [NSString stringWithFormat:@"-Dresource_dir=%s/sk/rsrc", home].UTF8String;
-    margv[++margc] = [NSString stringWithFormat:@"-Dcrucible.dir=%s/sk/crucible", home].UTF8String;
-    margv[++margc] = [NSString stringWithFormat:@"-Djava.io.tmpdir=%s/sk/tmp", home].UTF8String;
-    margv[++margc] = [NSString stringWithFormat:@"-Duser.home=%s/home", home].UTF8String;
-    margv[++margc] = [NSString stringWithFormat:@"-Djava.util.prefs.userRoot=%s/home/.userPrefs", home].UTF8String;
-    margv[++margc] = [NSString stringWithFormat:@"-Djava.util.prefs.systemRoot=%s/home/.systemPrefs", home].UTF8String;
-    margv[++margc] = @"-Djava.util.prefs.PreferencesFactory=java.util.prefs.FileSystemPreferencesFactory".UTF8String;
-    margv[++margc] = [NSString stringWithFormat:@"-Duser.dir=%s/sk", home].UTF8String;
-    margv[++margc] = [NSString stringWithFormat:@"-Duser.timezone=%@", NSTimeZone.localTimeZone.name].UTF8String;
-    margv[++margc] = [NSString stringWithFormat:@"-DUIScreen.maximumFramesPerSecond=%d",
+    margv[++margc] = strdup([NSString stringWithFormat:@"-Djava.library.path=%@/Frameworks", bundlePath].UTF8String);
+    margv[++margc] = strdup([NSString stringWithFormat:@"-Dappdir=%s/sk", home].UTF8String);
+    margv[++margc] = strdup([NSString stringWithFormat:@"-Dresource_dir=%s/sk/rsrc", home].UTF8String);
+    margv[++margc] = strdup([NSString stringWithFormat:@"-Dcrucible.dir=%s/sk/crucible", home].UTF8String);
+    margv[++margc] = strdup([NSString stringWithFormat:@"-Djava.io.tmpdir=%s/sk/tmp", home].UTF8String);
+    margv[++margc] = strdup([NSString stringWithFormat:@"-Duser.home=%s/home", home].UTF8String);
+    margv[++margc] = strdup([NSString stringWithFormat:@"-Djava.util.prefs.userRoot=%s/home/.userPrefs", home].UTF8String);
+    margv[++margc] = strdup([NSString stringWithFormat:@"-Djava.util.prefs.systemRoot=%s/home/.systemPrefs", home].UTF8String);
+    margv[++margc] = strdup(@"-Djava.util.prefs.PreferencesFactory=java.util.prefs.FileSystemPreferencesFactory".UTF8String);
+    margv[++margc] = strdup([NSString stringWithFormat:@"-Duser.dir=%s/sk", home].UTF8String);
+    margv[++margc] = strdup([NSString stringWithFormat:@"-Duser.timezone=%@", NSTimeZone.localTimeZone.name].UTF8String);
+    margv[++margc] = strdup([NSString stringWithFormat:@"-DUIScreen.maximumFramesPerSecond=%d",
                                                 (int)UIScreen.mainScreen.maximumFramesPerSecond]
-                         .UTF8String;
+                         .UTF8String);
 
     // LWJGL / OpenGL
     margv[++margc] = "-Dorg.lwjgl.glfw.checkThread0=false";
     margv[++margc] = "-Dorg.lwjgl.system.allocator=system";
     margv[++margc] =
-        [NSString stringWithFormat:@"-Dorg.lwjgl.system.SharedLibraryExtractPath=%@/Frameworks", bundlePath].UTF8String;
+        strdup([NSString stringWithFormat:@"-Dorg.lwjgl.system.SharedLibraryExtractPath=%@/Frameworks", bundlePath].UTF8String);
     margv[++margc] = "-Dorg.lwjgl.util.NoChecks=true";
 
     // SK-specific
@@ -143,7 +150,7 @@ int launchJVM(NSString *steamUser, NSString *steamPass, BOOL isSteam, int width,
     // Frenchpress (Steam login)
     NSString *frenchpressJar = [NSString stringWithFormat:@"%s/frenchpress/frenchpress.jar", home];
     if (isSteam && [fm fileExistsAtPath:frenchpressJar]) {
-        margv[++margc] = [NSString stringWithFormat:@"-Dfrenchpress.jar=%@", frenchpressJar].UTF8String;
+        margv[++margc] = strdup([NSString stringWithFormat:@"-Dfrenchpress.jar=%@", frenchpressJar].UTF8String);
         margv[++margc] = "-Dfrenchpress.credentialPrompt=com.skarm.launcher.bootstrap.NativeBridgePrompt";
 
         if (steamUser.length > 0) {
@@ -176,13 +183,13 @@ int launchJVM(NSString *steamUser, NSString *steamPass, BOOL isSteam, int width,
     // Write the HotSpot crash report into SKAPSULE_HOME (Documents) so it can be
     // retrieved via Files / Share Logs — the default lands in the container tmp,
     // which isn't user-accessible.
-    margv[++margc] = [NSString stringWithFormat:@"-XX:ErrorFile=%s/hs_err_pid%%p.log", home].UTF8String;
+    margv[++margc] = strdup([NSString stringWithFormat:@"-XX:ErrorFile=%s/hs_err_pid%%p.log", home].UTF8String);
     // The VM's own output, written straight to a file. A failure during VM init prints its
     // reason and then _exit()s before main.m's pipe reader can copy it to latestlog.txt, so
     // that log only ever showed "Error occurred during initialization of VM".
     margv[++margc] = "-XX:+UnlockDiagnosticVMOptions";
     margv[++margc] = "-XX:+LogVMOutput";
-    margv[++margc] = [NSString stringWithFormat:@"-XX:LogFile=%s/vmout-%%p.log", home].UTF8String;
+    margv[++margc] = strdup([NSString stringWithFormat:@"-XX:LogFile=%s/vmout-%%p.log", home].UTF8String);
     // NMT brackets every os::malloc with canaries and validates them on free. The
     // 2026-08-19 12:14 crash tripped over a corrupted free block from inside a JVM
     // os::malloc, so a stray write into JVM C-heap gets caught here with the block's own
@@ -212,7 +219,7 @@ int launchJVM(NSString *steamUser, NSString *steamPass, BOOL isSteam, int width,
     margv[++margc] = "-XX:SoftRefLRUPolicyMSPerMB=10";
     // GC / class-unload / code-cache log next to the hs_err file, so Share Logs picks
     // it up. Cheap, and it is how we confirm the GC change above behaves on-device.
-    margv[++margc] = [NSString stringWithFormat:@"-Xlog:gc,class+unload=info,codecache=info:file=%s/vmlog-%%p.log:uptime,level,tags:filecount=3,filesize=4M", home].UTF8String;
+    margv[++margc] = strdup([NSString stringWithFormat:@"-Xlog:gc,class+unload=info,codecache=info:file=%s/vmlog-%%p.log:uptime,level,tags:filecount=3,filesize=4M", home].UTF8String);
     // iOS 26+ Trusted Execution Monitor forbids plain RWX JIT pages. This JRE
     // build's mirror-mapped CodeCache (separate RW-write / RX-execute views of the
     // same physical pages) is the W^X-compliant path it needs. Matches Amethyst-iOS.
@@ -235,19 +242,19 @@ int launchJVM(NSString *steamUser, NSString *steamPass, BOOL isSteam, int width,
     if ([fm fileExistsAtPath:cacioDir]) {
         NSString *cacioBootcp =
             [NSString stringWithFormat:@"-Xbootclasspath/a:%@/cacio-shared.jar:%@/cacio-tta.jar", cacioDir, cacioDir];
-        margv[++margc] = cacioBootcp.UTF8String;
-        margv[++margc] = [NSString stringWithFormat:@"-javaagent:%@/cacio-tta.jar", cacioDir].UTF8String;
+        margv[++margc] = strdup(cacioBootcp.UTF8String);
+        margv[++margc] = strdup([NSString stringWithFormat:@"-javaagent:%@/cacio-tta.jar", cacioDir].UTF8String);
         margv[++margc] = "-Djava.awt.headless=false";
         margv[++margc] = "-Dawt.toolkit=com.github.caciocavallosilano.cacio.ctc.CTCToolkit";
         margv[++margc] = "-Djava.awt.graphicsenv=com.github.caciocavallosilano.cacio.ctc.CTCGraphicsEnvironment";
         int sw = width > 0 ? width : 1280;
         int sh = height > 0 ? height : 720;
-        margv[++margc] = [NSString stringWithFormat:@"-Dcacio.managed.screensize=%dx%d", sw, sh].UTF8String;
+        margv[++margc] = strdup([NSString stringWithFormat:@"-Dcacio.managed.screensize=%dx%d", sw, sh].UTF8String);
         // Force the use of cacio's custom CTCFontManager instead of macOS default CFontManager
         margv[++margc] = "-Dsun.font.fontmanager=com.github.caciocavallosilano.cacio.ctc.CTCFontManager";
         margv[++margc] = "-Dcacio.font.fontmanager=com.github.caciocavallosilano.cacio.ctc.CTCFontManager";
         margv[++margc] = "-Dcacio.font.fontscaler=sun.font.FreetypeFontScaler";
-        margv[++margc] = [NSString stringWithFormat:@"-Dsun.java2d.fontpath=%@/jre25/lib/fonts", bundlePath].UTF8String;
+        margv[++margc] = strdup([NSString stringWithFormat:@"-Dsun.java2d.fontpath=%@/jre25/lib/fonts", bundlePath].UTF8String);
     // JDK 25's text shaping defaults to an FFM HarfBuzz binding (sun.font.HBShaper) whose static
     // initialiser builds upcall stubs, and those crash this mirror-mapped code cache (SIGBUS in
     // CodeBlob::CodeBlob from UpcallStub::create). false selects the older JNI path, which
@@ -275,22 +282,22 @@ int launchJVM(NSString *steamUser, NSString *steamPass, BOOL isSteam, int width,
 
     // Set LWJGL library paths for OpenGL (gl4es) and OpenAL
     margv[++margc] =
-        [NSString stringWithFormat:@"-Dorg.lwjgl.opengl.libname=%@/Frameworks/libgl4es.dylib", bundlePath].UTF8String;
+        strdup([NSString stringWithFormat:@"-Dorg.lwjgl.opengl.libname=%@/Frameworks/libgl4es.dylib", bundlePath].UTF8String);
     margv[++margc] =
-        [NSString stringWithFormat:@"-Dorg.lwjgl.openal.libname=%@/Frameworks/libopenal.dylib", bundlePath].UTF8String;
+        strdup([NSString stringWithFormat:@"-Dorg.lwjgl.openal.libname=%@/Frameworks/libopenal.dylib", bundlePath].UTF8String);
     setenv("BUNDLE_PATH", bundlePath.UTF8String, 1);
 
     // Classpath: bootstrap + getdown JARs
     NSString *libsPath = [NSString stringWithFormat:@"%@/libs", bundlePath];
     NSString *classpath = [NSString stringWithFormat:@"%@/*", libsPath];
     margv[++margc] = "-cp";
-    margv[++margc] = classpath.UTF8String;
+    margv[++margc] = strdup(classpath.UTF8String);
 
     // Main class: SkBootstrap
     margv[++margc] = "com.skarm.launcher.bootstrap.SkBootstrap";
 
     // SkBootstrap args: appdir
-    margv[++margc] = [NSString stringWithFormat:@"%s/sk", home].UTF8String;
+    margv[++margc] = strdup([NSString stringWithFormat:@"%s/sk", home].UTF8String);
 
     NSLog(@"[JavaLauncher] JLI_Launch with %d args", margc + 1);
     for (int i = 0; i <= margc; i++) {
@@ -306,11 +313,13 @@ int launchJVM(NSString *steamUser, NSString *steamPass, BOOL isSteam, int width,
 
     [SKNativeBridge onLaunchStatus:@"Launching Spiral Knights…"];
 
-    return pJLI_Launch(++margc, margv, 0, NULL, 0, NULL, "25-internal", "25", "java", "openjdk",
-                       0,   // javaargs
-                       1,   // cpwildcard
-                       0,   // javaw
-                       1);  // ergo
+    int ret = pJLI_Launch(++margc, margv, 0, NULL, 0, NULL, "25-internal", "25", "java", "openjdk",
+                          0,   // javaargs
+                          1,   // cpwildcard
+                          0,   // javaw
+                          1);  // ergo
+    skUnsetSteamEnv();
+    return ret;
 }
 
 
@@ -358,7 +367,7 @@ JNIEXPORT void JNICALL Java_com_skarm_launcher_bootstrap_SkBootstrap_registerGlf
     register_glfw_natives(env, glfwClass);
 }
 
-void register_sk_natives_if_needed(void) {
+static void register_sk_natives(void) {
     static BOOL registered = NO;
     if (registered)
         return;
@@ -477,8 +486,7 @@ void register_sk_natives_if_needed(void) {
                     (*env)->ExceptionClear(env);
                 } else if (envMap) {
                     (*env)->DeleteLocalRef(env, envMap);
-                    unsetenv("FRENCHPRESS_STEAM_USER");
-                    unsetenv("FRENCHPRESS_STEAM_PASS");
+                    skUnsetSteamEnv();
                 }
             }
             (*env)->DeleteLocalRef(env, sysCls);
@@ -486,4 +494,10 @@ void register_sk_natives_if_needed(void) {
 
         (*jvm)->DetachCurrentThread(jvm);
     }
+}
+
+void register_sk_natives_if_needed(void) {
+    register_sk_natives();
+    // Every exit above (timeouts, attach failure) must still clear the credentials.
+    skUnsetSteamEnv();
 }

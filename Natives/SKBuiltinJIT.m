@@ -2,12 +2,19 @@
 
 #import <UIKit/UIKit.h>
 #import <dlfcn.h>
+#import <stdatomic.h>
 #import <unistd.h>
 
 #import "utils.h"
 
 static NSString *const kSelectedKey = @"jit_builtin_selected";
 static NSString *const kHelperName = @"SKJITHelper.appex";
+// Preparing may download and mount the Developer Disk Image, so this only has to be longer than
+// a healthy run. It guards a helper that never answers, not one that is attached: an enable
+// request lasts as long as the debugger does.
+static const NSTimeInterval kHelperTimeout = 180;
+// A pairing file is a few KB of keys and certificates.
+static const NSUInteger kMaxPairingBytes = 1024 * 1024;
 
 // The private NSExtension API (ExtensionFoundation) that lets an app start one of its own
 // extensions and exchange items with it. There is no public way to launch the helper.
@@ -44,10 +51,6 @@ static NSString *const kHelperName = @"SKJITHelper.appex";
 }
 
 + (nullable NSString *)unavailableReason {
-    if (@available(iOS 17.4, *)) {
-    } else {
-        return @"Built-in JIT needs iOS 17.4 or later.";
-    }
     if (getenv("LC_HOME_PATH")) return @"Built-in JIT is unavailable inside LiveContainer.";
     if (!self.helperIdentifier) return @"This build does not include the JIT helper.";
     // The debugger attaches to this process, so this is the entitlement that matters; the
@@ -77,10 +80,14 @@ static NSString *const kHelperName = @"SKJITHelper.appex";
 
 + (nullable NSString *)importPairingFileFromURL:(NSURL *)url {
     BOOL scoped = [url startAccessingSecurityScopedResource];
-    NSData *data = [NSData dataWithContentsOfURL:url];
+    NSNumber *size = [url resourceValuesForKeys:@[NSURLFileSizeKey] error:nil][NSURLFileSizeKey];
+    NSData *data = size.unsignedIntegerValue <= kMaxPairingBytes ? [NSData dataWithContentsOfURL:url] : nil;
     if (scoped) [url stopAccessingSecurityScopedResource];
 
-    if (data.length == 0 || ![NSPropertyListSerialization propertyListWithData:data options:0 format:NULL error:nil]) {
+    // Only the shape is checked: its keys differ between pairing tools, and rejecting a valid
+    // file is worse than the helper failing on a bad one with its own message.
+    id plist = data.length == 0 ? nil : [NSPropertyListSerialization propertyListWithData:data options:0 format:NULL error:nil];
+    if (![plist isKindOfClass:NSDictionary.class]) {
         return @"That isn't a pairing file.";
     }
     NSString *path = self.pairingPath;
@@ -88,6 +95,7 @@ static NSString *const kHelperName = @"SKJITHelper.appex";
                             withIntermediateDirectories:YES
                                              attributes:nil
                                                   error:nil];
+    skExcludeFromBackup(path.stringByDeletingLastPathComponent);
     if (![data writeToFile:path
                    options:NSDataWritingAtomic | NSDataWritingFileProtectionCompleteUntilFirstUserAuthentication
                      error:nil]) {
@@ -131,8 +139,16 @@ static NSString *const kHelperName = @"SKJITHelper.appex";
         completion(NO, message);
       });
     };
+    // One request at a time: the helper serializes them anyway, and a second attach to the same
+    // process can only fail.
+    static atomic_bool busy;
+    if (atomic_exchange(&busy, true)) return fail(@"The JIT helper is still working. Try again in a moment.");
+    void (^failFree)(NSString *) = ^(NSString *message) {
+      atomic_store(&busy, false);
+      fail(message);
+    };
     NSString *identifier = self.helperIdentifier;
-    if (!identifier) return fail(@"This build does not include the JIT helper.");
+    if (!identifier) return failFree(@"This build does not include the JIT helper.");
 
     Class cls = NSClassFromString(@"NSExtension");
     if (!cls) {
@@ -140,13 +156,13 @@ static NSString *const kHelperName = @"SKJITHelper.appex";
         cls = NSClassFromString(@"NSExtension");
     }
     if (![cls respondsToSelector:@selector(extensionWithIdentifier:error:)]) {
-        return fail(@"iOS did not provide the extension API the JIT helper needs.");
+        return failFree(@"iOS did not provide the extension API the JIT helper needs.");
     }
     NSError *error = nil;
     id<SKExtension> extension = [(Class<SKExtensionClass>)cls extensionWithIdentifier:identifier error:&error];
     if (!extension) {
-        return fail([NSString stringWithFormat:@"The JIT helper could not be found: %@",
-                                               error.localizedDescription ?: @"unknown error"]);
+        return failFree([NSString stringWithFormat:@"The JIT helper could not be found: %@",
+                                                   error.localizedDescription ?: @"unknown error"]);
     }
 
     // The extension object has to outlive its request, and only the first outcome counts.
@@ -160,6 +176,7 @@ static NSString *const kHelperName = @"SKJITHelper.appex";
       dispatch_async(dispatch_get_main_queue(), ^{
         if (finished) return;
         finished = YES;
+        atomic_store(&busy, false);
         [running removeObject:extension];
         completion(ok, message);
       });
@@ -188,6 +205,12 @@ static NSString *const kHelperName = @"SKJITHelper.appex";
                                         completion:^(NSUUID *requestIdentifier) {
                                           if (!requestIdentifier) end(NO, @"The JIT helper did not start.");
                                         }];
+    BOOL isEnable = [request[@"op"] isEqual:@"enable"];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kHelperTimeout * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+      // Attached and waiting for the VM to map its code cache is the healthy long case.
+      if (isEnable && skDebuggerAttached()) return;
+      end(NO, @"The JIT helper did not answer in time. Check that LocalDevVPN is connected, then try again.");
+    });
 }
 
 + (void)requestJITWithFailure:(void (^)(NSString *message))failure {

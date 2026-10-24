@@ -107,6 +107,22 @@ Info.plist stamp, because `CONFIG_COMMIT` goes stale).
   the last getdown status ("Validating 75%") on screen.
 - **Render-scale floor is 0.6.** At 0.5 a 1080p-tall device gives SK a 540 px surface and
   its UI stops laying out (578 px worked, measured on Android).
+- **No GL while the scene is inactive.** iOS terminates an app that submits GL in the
+  background. `SceneDelegate` raises `sk_gl_set_paused`; `nativeSwapBuffers` runs `glFinish`
+  and parks the render thread on a condition variable until the scene is active again.
+
+### Mods — `Natives/SKModManager.m`, `Natives/SKZipUtils.m`
+
+- **Mod archives and `mod.json` are third-party input.** Zip offsets are bounds-checked,
+  declared sizes capped (512 MB per entry, 2 GB per archive), entry names and locale bundle
+  keys confined to their extraction root, and every `mod.json` value type-checked.
+- **Downloads are verified against the listing's git blob SHA** (and only taken from
+  `raw.githubusercontent.com` over HTTPS) before being moved into place. The listing's
+  `main` branch is trusted, not pinned. A sync only deletes files an earlier sync wrote
+  (`mod_sync_files`); the user's own mods in the folder are never removed.
+- **Apply fails closed:** if a jar cannot be rebuilt or swapped, the code jars stay as the
+  restored originals and the user gets the error. Apply and remove run under a background
+  task (about 30 s of grace if the app is backgrounded).
 
 ### Crash reporting and news — `Natives/SKReporter.m`, `Natives/SKNewsFeed.m`
 
@@ -115,8 +131,10 @@ Info.plist stamp, because `CONFIG_COMMIT` goes stale).
   every JIT run has. `SKReporter` POSTs an envelope itself; the real signal is the JVM's
   `hs_err`, sent on the next launch with a scrubbed log tail.
 - **The news service is plain HTTP**, so its payload is untrusted: image and link URLs are
-  dropped unless HTTPS, the download is size-capped, and `machineId` is a constant, not a
-  device identifier.
+  dropped unless HTTPS, the body and the decoded image are size-capped, a response is cached
+  only if it parses (a captive portal must not evict a good cache), and `machineId` is a
+  constant, not a device identifier. ATS allows cleartext for `flamingo.knightlauncher.com`
+  only.
 
 ### Built-in JIT — `Natives/SKBuiltinJIT.m`, `Natives/JITHelper/`
 
@@ -324,8 +342,8 @@ usually belongs in the other.
 ## History (condensed)
 
 - **JVM boot & staging.** `JavaLauncher.m` boots JRE 25 via `JLI_Launch`;
-  `dyld_bypass_validation.m` allows the unsigned dylibs; `SKInstaller.m` stages
-  JARs/assets version-aware so a rebuilt JAR is never served from stale cache.
+  `SKInstaller.m` stages JARs/assets version-aware so a rebuilt JAR is never served from
+  stale cache. The JRE and natives are codesigned at build time, so no dyld validation bypass.
 - **iOS 26 JIT bring-up.** Boot chain fixed: compressed-class-pointer abort → missing
   `libawt_xawt.dylib` → `java.awt.Font.initIDs` → `GLFWNativeCocoa` → FFM upcall stubs.
   The last one matters: LWJGL's `GLFW*Callback` classes build a Panama upcall stub in

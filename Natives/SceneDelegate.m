@@ -1,6 +1,8 @@
 #import "SceneDelegate.h"
 #import "LauncherViewController.h"
 
+extern void sk_gl_set_paused(BOOL paused);
+
 @implementation SceneDelegate
 
 - (void)scene:(UIScene *)scene
@@ -21,15 +23,18 @@
 }
 
 - (void)sceneDidBecomeActive:(UIScene *)scene {
+    sk_gl_set_paused(NO);
 }
 
 - (void)sceneWillResignActive:(UIScene *)scene {
+    sk_gl_set_paused(YES);
 }
 
 - (void)sceneWillEnterForeground:(UIScene *)scene {
 }
 
 - (void)sceneDidEnterBackground:(UIScene *)scene {
+    sk_gl_set_paused(YES);
 }
 
 @end

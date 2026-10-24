@@ -1,14 +1,11 @@
 name: Build for iOS
 
-# Builds the IPAs. Called with a version by release-ios.yml, which makes it also publish a
+# Builds the IPAs. Manual only (Actions -> Build for iOS -> Run workflow): nothing builds on a
+# push or a pull request. Called with a version by release-ios.yml, which makes it also publish a
 # GitHub Release: that is the only way a release happens, so the tag is created after a
 # successful build and a failed build leaves nothing behind to clean up.
 
 on:
-  push:
-    branches: ['main']
-  pull_request:
-    branches: ['main']
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -37,12 +34,15 @@ jobs:
           fail() { echo "::error::$1"; exit 1; }
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "Version must look like 1.2.3, without a leading v."
           [ "$GITHUB_REF" = refs/heads/main ] || fail "Releases are made from main."
+          latest=$(gh release list -R "$GITHUB_REPOSITORY" --limit 1 --json tagName --jq '.[0].tagName // ""')
+          [ -z "$latest" ] || [ "$(printf '%s\n%s\n' "${latest#v}" "$VERSION" | sort -V | tail -1)" = "$VERSION" ] \
+            || fail "Version $VERSION must be newer than the latest release ($latest)."
           ! gh release view "v$VERSION" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || fail "Release v$VERSION already exists."
           ! gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$VERSION" >/dev/null 2>&1 \
             || fail "Tag v$VERSION already exists without a release. Delete it (git push origin :refs/tags/v$VERSION) or pick a new version."
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           submodules: recursive
           lfs: true
@@ -61,13 +61,13 @@ jobs:
           grep -q '[^[:space:]]' "$RUNNER_TEMP/release-notes.md" || { echo "::error::CHANGELOG.md has no '## $VERSION' section"; exit 1; }
 
       - name: Setup Java 8 (for LWJGL multi-release layer)
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: zulu
           java-version: '8'
 
       - name: Setup Java 25 (for build tools)
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: zulu
           java-version: '25'
@@ -75,12 +75,15 @@ jobs:
       - name: Install build dependencies
         run: brew install ant maven ninja wget ldid xcodegen
 
+      - name: Run unit tests
+        run: make test
+
       - name: Cache native build outputs
         id: cache-out
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: out
-          key: native-macos14-${{ hashFiles('external/**') }}-${{ hashFiles('scripts/build-*.sh') }}
+          key: native-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('external/**') }}-${{ hashFiles('scripts/build-*.sh') }}
 
       - name: Build native submodules
         if: steps.cache-out.outputs.cache-hit != 'true'
@@ -95,13 +98,16 @@ jobs:
           ./scripts/build-frenchpress-ios.sh
           ./scripts/build-bootstrap.sh
 
+      # The JRE zip is an LFS object, which the checkout fetches. If it came back as a pointer
+      # file, pull it again rather than download an unchecked copy from somewhere else.
       - name: Ensure JRE zip is present
         run: |
-          mkdir -p assets
-          if [ ! -f "assets/jre25-ios-aarch64.zip" ] || [ $(wc -c < "assets/jre25-ios-aarch64.zip") -lt 1000 ]; then
-            echo "Downloading pre-built JRE 25..."
-            curl -L -o assets/jre25-ios-aarch64.zip https://github.com/SKonstruct/SKapsule-iOS/releases/download/v0.1.0/jre25-ios-aarch64.zip || true
+          zip=assets/jre25-ios-aarch64.zip
+          if [ ! -f "$zip" ] || [ "$(wc -c < "$zip")" -lt 1000 ]; then
+            git lfs pull --include="$zip"
           fi
+          [ "$(wc -c < "$zip")" -ge 1000 ] || { echo "::error::$zip is missing or still an LFS pointer"; exit 1; }
+          unzip -tq "$zip"
 
       - name: Stage app assets
         run: ./scripts/stage-app-assets.sh
@@ -119,6 +125,24 @@ jobs:
           mv out/artifacts/com.skonstruct.skapsule-*-trollstore.tipa out/artifacts/SKapsule-TrollStore.tipa
           mv ./SKapsule.ipa out/artifacts/SKapsule.ipa
 
+      # A staging step that silently skipped something would otherwise ship an app that cannot
+      # launch; fail the build instead.
+      - name: Verify the IPAs carry the runtime and natives
+        run: |
+          for ipa in out/artifacts/SKapsule.ipa out/artifacts/SKapsule-TrollStore.tipa; do
+            listing=$(unzip -Z1 "$ipa")
+            for need in \
+              'Payload/SKapsule.app/jre25/lib/libjli.dylib' \
+              'Payload/SKapsule.app/jre25/lib/modules' \
+              'Payload/SKapsule.app/Frameworks/libgl4es.dylib' \
+              'Payload/SKapsule.app/Frameworks/libopenal.dylib' \
+              'Payload/SKapsule.app/libs/' \
+              'Payload/SKapsule.app/libs_lwjgl/lwjgl.jar' \
+              'Payload/SKapsule.app/Frameworks/liblwjgl.dylib'; do
+              grep -qF "$need" <<<"$listing" || { echo "::error::$ipa is missing $need"; exit 1; }
+            done
+          done
+
       - name: Verify the IPA carries the release version
         if: env.VERSION != ''
         run: |
@@ -129,7 +153,7 @@ jobs:
       # for a release that was actually published.
       - name: Publish GitHub Release
         if: env.VERSION != ''
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: v${{ env.VERSION }}
           target_commitish: ${{ github.sha }}
@@ -142,7 +166,7 @@ jobs:
 
       - name: Upload Standard IPA
         if: env.VERSION == ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: SKapsule-iOS
           path: out/artifacts/SKapsule.ipa
@@ -151,7 +175,7 @@ jobs:
 
       - name: Upload TrollStore TIPA
         if: env.VERSION == ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: SKapsule-iOS-TrollStore
           path: out/artifacts/SKapsule-TrollStore.tipa

@@ -34,9 +34,11 @@
 @property (nonatomic, assign) NSInteger previewSteamPlayers;
 @property (nonatomic, strong) UILabel *titleLabel;
 @property (nonatomic, copy) NSString *updateURL;
+@property (nonatomic, strong) UIButton *updateButton;
+@property (nonatomic, strong) UIButton *checkUpdatesButton;
+@property (nonatomic, assign) BOOL checkingForUpdates;
 @property (nonatomic, strong) UILabel *setupStatus;
 @property (nonatomic, strong) UIActivityIndicatorView *spinner;
-@property (nonatomic, assign) BOOL runtimeReady;
 
 // JIT status pill (tap to enable via StikJIT)
 @property (nonatomic, strong) UIButton *jitStatusButton;
@@ -70,12 +72,7 @@
 
     // 1. Top Options/Gear Button
     UIButton *btnOptions = [UIButton buttonWithType:UIButtonTypeSystem];
-    if (@available(iOS 13.0, *)) {
-        [btnOptions setImage:[UIImage systemImageNamed:@"gearshape"] forState:UIControlStateNormal];
-    } else {
-        [btnOptions setTitle:@"⚙" forState:UIControlStateNormal];
-        btnOptions.titleLabel.font = [UIFont systemFontOfSize:24];
-    }
+    [btnOptions setImage:[UIImage systemImageNamed:@"gearshape"] forState:UIControlStateNormal];
     btnOptions.tintColor = UIColor.whiteColor;
     btnOptions.translatesAutoresizingMaskIntoConstraints = NO;
     [btnOptions addTarget:self action:@selector(toggleSidebar) forControlEvents:UIControlEventTouchUpInside];
@@ -116,16 +113,22 @@
     self.subtitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:self.subtitleLabel];
 
+    // Its own control: the subtitle is rewritten by the player count and has its own tap.
+    self.updateButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [self.updateButton setTitleColor:[UIColor colorWithRed:0.95 green:0.75 blue:0.23 alpha:1.0]
+                            forState:UIControlStateNormal];
+    self.updateButton.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
+    self.updateButton.hidden = YES;
+    self.updateButton.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.updateButton addTarget:self action:@selector(onUpdateTapped) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:self.updateButton];
+
     // 3. Segmented Control
     self.modeSegmentedControl = [[UISegmentedControl alloc] initWithItems:@[@"Web", @"Steam"]];
     self.modeSegmentedControl.selectedSegmentIndex = 0;
     self.modeSegmentedControl.translatesAutoresizingMaskIntoConstraints = NO;
 
-    if (@available(iOS 13.0, *)) {
-        self.modeSegmentedControl.selectedSegmentTintColor = themeColor;
-    } else {
-        self.modeSegmentedControl.tintColor = themeColor;
-    }
+    self.modeSegmentedControl.selectedSegmentTintColor = themeColor;
 
     // Style text of segmented control
     [self.modeSegmentedControl setTitleTextAttributes:@{
@@ -164,10 +167,8 @@
     self.btnLaunch.translatesAutoresizingMaskIntoConstraints = NO;
     [self.btnLaunch addTarget:self action:@selector(onLaunchPressed) forControlEvents:UIControlEventTouchUpInside];
 
-    if (@available(iOS 13.0, *)) {
-        [self.btnLaunch setImage:[UIImage systemImageNamed:@"play.fill"] forState:UIControlStateNormal];
-        self.btnLaunch.tintColor = UIColor.whiteColor;
-    }
+    [self.btnLaunch setImage:[UIImage systemImageNamed:@"play.fill"] forState:UIControlStateNormal];
+    self.btnLaunch.tintColor = UIColor.whiteColor;
     [self.view addSubview:self.btnLaunch];
 
     // 4b. JIT status pill (tap to enable JIT via StikJIT before playing)
@@ -202,9 +203,7 @@
     [self.view addSubview:self.setupStatus];
 
     self.spinner = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
-    if (@available(iOS 13.0, *)) {
-        self.spinner.activityIndicatorViewStyle = UIActivityIndicatorViewStyleMedium;
-    }
+    self.spinner.activityIndicatorViewStyle = UIActivityIndicatorViewStyleMedium;
     self.spinner.color = UIColor.whiteColor;
     self.spinner.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:self.spinner];
@@ -342,6 +341,12 @@
                                                         action:@selector(onJITSetup:)];
     [stackView addArrangedSubview:btnJITSetup];
 
+    UIButton *btnCheckUpdates = [self createSidebarButtonWithTitle:@"Check for Updates"
+                                                          iconName:@"arrow.triangle.2.circlepath"
+                                                            action:@selector(onCheckForUpdates)];
+    [stackView addArrangedSubview:btnCheckUpdates];
+    self.checkUpdatesButton = btnCheckUpdates;
+
     UIButton *btnGitHub = [self createSidebarButtonWithTitle:@"GitHub" iconName:@"link" action:@selector(onGitHub)];
     [stackView addArrangedSubview:btnGitHub];
 
@@ -365,13 +370,11 @@
     self.btnLogout.titleLabel.font = [UIFont systemFontOfSize:16];
     self.btnLogout.contentEdgeInsets = UIEdgeInsetsMake(12, 8, 12, 8);
     [self.btnLogout addTarget:self action:@selector(onLogout) forControlEvents:UIControlEventTouchUpInside];
-    if (@available(iOS 13.0, *)) {
-        [self.btnLogout setImage:[UIImage systemImageNamed:@"rectangle.portrait.and.arrow.right"]
-                        forState:UIControlStateNormal];
-        self.btnLogout.tintColor = [UIColor colorWithRed:1.0 green:0.3 blue:0.3 alpha:1.0];
-        self.btnLogout.imageEdgeInsets = UIEdgeInsetsMake(0, 0, 0, 8);
-        self.btnLogout.titleEdgeInsets = UIEdgeInsetsMake(0, 8, 0, 0);
-    }
+    [self.btnLogout setImage:[UIImage systemImageNamed:@"rectangle.portrait.and.arrow.right"]
+                    forState:UIControlStateNormal];
+    self.btnLogout.tintColor = [UIColor colorWithRed:1.0 green:0.3 blue:0.3 alpha:1.0];
+    self.btnLogout.imageEdgeInsets = UIEdgeInsetsMake(0, 0, 0, 8);
+    self.btnLogout.titleEdgeInsets = UIEdgeInsetsMake(0, 8, 0, 0);
     [stackView addArrangedSubview:self.btnLogout];
 
     // General divider
@@ -504,6 +507,9 @@
 
         [self.subtitleLabel.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
         [self.subtitleLabel.bottomAnchor constraintEqualToAnchor:self.modeSegmentedControl.topAnchor constant:-30],
+        [self.updateButton.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+        [self.updateButton.topAnchor constraintEqualToAnchor:self.subtitleLabel.bottomAnchor constant:2],
+        [self.updateButton.heightAnchor constraintEqualToConstant:26],
 
         // Segmented Control Layout
         [self.modeSegmentedControl.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
@@ -626,8 +632,12 @@
     // tail we attach belongs to the run that crashed.
     // Order matters: the scan closes the previous session as "crashed" if it finds an
     // hs_err, so it has to run before the new one opens.
-    SKReportScanCrashArtifacts();
-    SKReportSessionStart();
+    // Off the main thread: it reads and scrubs files of up to half a megabyte each. Both calls
+    // stay in one block so the order above holds.
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+      SKReportScanCrashArtifacts();
+      SKReportSessionStart();
+    });
     [NSNotificationCenter.defaultCenter
         addObserverForName:UIApplicationDidEnterBackgroundNotification
                     object:nil
@@ -662,17 +672,13 @@
  * the launcher would stay sideways until the device was physically rotated.
  */
 - (void)enforcePortraitOrientation {
-    if (@available(iOS 16.0, *)) {
-        [self setNeedsUpdateOfSupportedInterfaceOrientations];
-        UIWindowScene *scene = self.view.window.windowScene;
-        if (scene) {
-            UIWindowSceneGeometryPreferencesIOS *portrait =
-              [[UIWindowSceneGeometryPreferencesIOS alloc]
-                initWithInterfaceOrientations:UIInterfaceOrientationMaskPortrait];
-            [scene requestGeometryUpdateWithPreferences:portrait errorHandler:nil];
-        }
-    } else {
-        [UIViewController attemptRotationToDeviceOrientation];
+    [self setNeedsUpdateOfSupportedInterfaceOrientations];
+    UIWindowScene *scene = self.view.window.windowScene;
+    if (scene) {
+        UIWindowSceneGeometryPreferencesIOS *portrait =
+          [[UIWindowSceneGeometryPreferencesIOS alloc]
+            initWithInterfaceOrientations:UIInterfaceOrientationMaskPortrait];
+        [scene requestGeometryUpdateWithPreferences:portrait errorHandler:nil];
     }
 }
 
@@ -727,10 +733,8 @@
     self.jitStatusButton.tintColor = color;
     self.jitStatusButton.layer.borderColor = [color colorWithAlphaComponent:0.6].CGColor;
     self.jitStatusButton.backgroundColor = [color colorWithAlphaComponent:0.12];
-    if (@available(iOS 13.0, *)) {
-        NSString *icon = enabled ? @"checkmark.seal.fill" : @"bolt.slash.fill";
-        [self.jitStatusButton setImage:[UIImage systemImageNamed:icon] forState:UIControlStateNormal];
-    }
+    NSString *icon = enabled ? @"checkmark.seal.fill" : @"bolt.slash.fill";
+    [self.jitStatusButton setImage:[UIImage systemImageNamed:icon] forState:UIControlStateNormal];
     // Not `enabled`: a disabled UIButton draws in UIControlStateDisabled, which ignores the
     // colours set above for UIControlStateNormal and greys the badge out exactly when it
     // should be green. This keeps the normal appearance and just stops taps.
@@ -754,12 +758,10 @@
     btn.titleLabel.font = [UIFont systemFontOfSize:16];
     btn.contentEdgeInsets = UIEdgeInsetsMake(12, 8, 12, 8);
     [btn addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];
-    if (@available(iOS 13.0, *)) {
-        [btn setImage:[UIImage systemImageNamed:iconName] forState:UIControlStateNormal];
-        btn.tintColor = UIColor.whiteColor;
-        btn.imageEdgeInsets = UIEdgeInsetsMake(0, 0, 0, 8);
-        btn.titleEdgeInsets = UIEdgeInsetsMake(0, 8, 0, 0);
-    }
+    [btn setImage:[UIImage systemImageNamed:iconName] forState:UIControlStateNormal];
+    btn.tintColor = UIColor.whiteColor;
+    btn.imageEdgeInsets = UIEdgeInsetsMake(0, 0, 0, 8);
+    btn.titleEdgeInsets = UIEdgeInsetsMake(0, 8, 0, 0);
     return btn;
 }
 
@@ -984,10 +986,20 @@
 
 #pragma mark - Update check
 
-/// Compares dotted numeric versions. Returns -1 if a < b, 1 if a > b, 0 if equal.
+/// The dotted numeric part of a version: a leading "v" and any "-dev" / "-rc.1" / "+build" suffix
+/// are dropped, so a suffix cannot add components or throw off the comparison.
+static NSArray<NSString *> *SKVersionParts(NSString *version) {
+    NSRange suffix = [version rangeOfCharacterFromSet:[NSCharacterSet characterSetWithCharactersInString:@"-+"]];
+    if (suffix.location != NSNotFound) version = [version substringToIndex:suffix.location];
+    if ([version hasPrefix:@"v"]) version = [version substringFromIndex:1];
+    return [version componentsSeparatedByString:@"."];
+}
+
+/// Compares dotted numeric versions; a component that is not a number counts as 0.
+/// Returns -1 if a < b, 1 if a > b, 0 if equal.
 static int SKCompareVersions(NSString *a, NSString *b) {
-    NSArray<NSString *> *ap = [a componentsSeparatedByString:@"."];
-    NSArray<NSString *> *bp = [b componentsSeparatedByString:@"."];
+    NSArray<NSString *> *ap = SKVersionParts(a);
+    NSArray<NSString *> *bp = SKVersionParts(b);
     NSUInteger n = MAX(ap.count, bp.count);
     for (NSUInteger i = 0; i < n; i++) {
         int av = i < ap.count ? ap[i].intValue : 0;
@@ -1001,11 +1013,21 @@ static int SKCompareVersions(NSString *a, NSString *b) {
 /// The API allows 60 unauthenticated requests an hour per IP, so a good response is
 /// cached for six hours rather than re-fetched on every launch.
 - (void)checkForUpdate {
+    [self checkForUpdateForced:NO completion:nil];
+}
+
+/// `force` skips the six-hour cache, for when the user asks to check. `completion`, if given,
+/// runs on the main queue with the latest release ({version, url}), or nil if it could not be read.
+- (void)checkForUpdateForced:(BOOL)force completion:(void (^)(NSDictionary *result))completion {
     NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
     NSDate *lastCheck = [defaults objectForKey:@"update_check_time"];
     NSDictionary *cached = [defaults dictionaryForKey:@"update_check_result"];
-    if (cached && lastCheck && -lastCheck.timeIntervalSinceNow < 6 * 60 * 60) {
+    // A cached answer belongs to the version that fetched it: after an update it was written when
+    // "latest" was something else, and would call a fresh install a development build.
+    BOOL cacheIsCurrent = [[defaults stringForKey:@"update_check_app_version"] isEqualToString:@CONFIG_VERSION];
+    if (!force && cacheIsCurrent && cached && lastCheck && -lastCheck.timeIntervalSinceNow < 6 * 60 * 60) {
         [self applyUpdateResult:cached];
+        if (completion) completion(cached);
         return;
     }
 
@@ -1017,17 +1039,23 @@ static int SKCompareVersions(NSString *a, NSString *b) {
     request.timeoutInterval = 10;
 
     __weak typeof(self) weakSelf = self;
+    void (^fail)(void) = ^{
+      if (!completion) return;
+      dispatch_async(dispatch_get_main_queue(), ^{
+        completion(nil);
+      });
+    };
     [[NSURLSession.sharedSession
         dataTaskWithRequest:request
           completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-            if (error || ((NSHTTPURLResponse *)response).statusCode != 200 || !data) return;
+            if (error || ((NSHTTPURLResponse *)response).statusCode != 200 || !data) { fail(); return; }
             NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-            if (![json isKindOfClass:NSDictionary.class]) return;
+            if (![json isKindOfClass:NSDictionary.class]) { fail(); return; }
             NSString *tag = json[@"tag_name"];
             NSString *htmlURL = json[@"html_url"];
             if (![tag isKindOfClass:NSString.class] || ![htmlURL isKindOfClass:NSString.class] ||
                 tag.length == 0 || htmlURL.length == 0) {
-                return;
+                { fail(); return; }
             }
             NSDictionary *result = @{
                 @"version" : [tag hasPrefix:@"v"] ? [tag substringFromIndex:1] : tag,
@@ -1035,10 +1063,72 @@ static int SKCompareVersions(NSString *a, NSString *b) {
             };
             [defaults setObject:result forKey:@"update_check_result"];
             [defaults setObject:NSDate.date forKey:@"update_check_time"];
+            [defaults setObject:@CONFIG_VERSION forKey:@"update_check_app_version"];
             dispatch_async(dispatch_get_main_queue(), ^{
               [weakSelf applyUpdateResult:result];
+              if (completion) completion(result);
             });
           }] resume];
+}
+
+/// The sidebar's Check for Updates. Unlike the quiet check at launch it always answers.
+- (void)onCheckForUpdates {
+    // A second tap while the first request is out would only stack another request.
+    if (self.checkingForUpdates) return;
+    self.checkingForUpdates = YES;
+    UIButton *button = self.checkUpdatesButton;
+    NSString *idleTitle = [button titleForState:UIControlStateNormal];
+    [button setTitle:@"  Checking…" forState:UIControlStateNormal];
+    button.enabled = NO;
+    [self checkForUpdateForced:YES
+                    completion:^(NSDictionary *result) {
+                      self.checkingForUpdates = NO;
+                      [button setTitle:idleTitle forState:UIControlStateNormal];
+                      button.enabled = YES;
+                      NSString *remote = result[@"version"];
+                      NSString *url = result[@"url"];
+                      if (![remote isKindOfClass:NSString.class] || ![url isKindOfClass:NSString.class]) {
+                          [self showAlertWithTitle:@"Couldn't Check for Updates"
+                                           message:@"Check your connection and try again. GitHub also limits "
+                                                   @"how often a network can ask, so a busy network may need "
+                                                   @"to wait a while."];
+                          return;
+                      }
+                      int cmp = SKCompareVersions(@CONFIG_VERSION, remote);
+                      if (cmp > 0) {
+                          [self showAlertWithTitle:@"Development Build"
+                                           message:[NSString stringWithFormat:@"You're on v%s, which is newer than "
+                                                                              @"the latest release (v%@).",
+                                                                              CONFIG_VERSION, remote]];
+                          return;
+                      }
+                      if (cmp == 0) {
+                          // A stale answer may have painted the title as a development build.
+                          self.titleLabel.text = [NSString stringWithFormat:@"SKapsule v%s", CONFIG_VERSION];
+                          self.titleLabel.textColor = UIColor.whiteColor;
+                          [self showAlertWithTitle:@"Up to Date"
+                                           message:[NSString stringWithFormat:@"You're on the latest version (v%s).",
+                                                                              CONFIG_VERSION]];
+                          return;
+                      }
+                      UIAlertController *alert = [UIAlertController
+                          alertControllerWithTitle:@"Update Available"
+                                           message:[NSString stringWithFormat:@"v%@ is out; you have v%s. Download "
+                                                                              @"the new IPA from the release page "
+                                                                              @"and install it the same way you "
+                                                                              @"installed this one.",
+                                                                              remote, CONFIG_VERSION]
+                                    preferredStyle:UIAlertControllerStyleAlert];
+                      [alert addAction:[UIAlertAction actionWithTitle:@"View Release"
+                                                                style:UIAlertActionStyleDefault
+                                                              handler:^(UIAlertAction *action) {
+                                                                [self openURLWithSafariFallback:url];
+                                                              }]];
+                      [alert addAction:[UIAlertAction actionWithTitle:@"Not Now"
+                                                                style:UIAlertActionStyleCancel
+                                                              handler:nil]];
+                      [self presentViewController:alert animated:YES completion:nil];
+                    }];
 }
 
 - (void)applyUpdateResult:(NSDictionary *)result {
@@ -1051,17 +1141,18 @@ static int SKCompareVersions(NSString *a, NSString *b) {
         // Ahead of the newest release: a local build between tags.
         self.titleLabel.text = [NSString stringWithFormat:@"SKapsule v%s-dev", CONFIG_VERSION];
         self.titleLabel.textColor = [UIColor colorWithRed:0.95 green:0.75 blue:0.23 alpha:1.0];
+        self.updateButton.hidden = YES;
         return;
     }
-    if (cmp == 0) return;
+    if (cmp == 0) {
+        self.updateButton.hidden = YES;
+        return;
+    }
 
     self.updateURL = url;
-    self.subtitleLabel.text = [NSString stringWithFormat:@"Update available - v%@", remote];
-    self.subtitleLabel.textColor = [UIColor colorWithRed:0.95 green:0.75 blue:0.23 alpha:1.0];
-    self.subtitleLabel.userInteractionEnabled = YES;
-    [self.subtitleLabel addGestureRecognizer:[[UITapGestureRecognizer alloc]
-                                                 initWithTarget:self
-                                                         action:@selector(onUpdateTapped)]];
+    [self.updateButton setTitle:[NSString stringWithFormat:@"Update available - v%@", remote]
+                       forState:UIControlStateNormal];
+    self.updateButton.hidden = NO;
 }
 
 - (void)onUpdateTapped {
@@ -1069,7 +1160,10 @@ static int SKCompareVersions(NSString *a, NSString *b) {
 }
 
 - (void)openURLWithSafariFallback:(NSString *)urlString {
+    // SFSafariViewController raises for anything but http(s), and the string can come from the network.
     NSURL *url = [NSURL URLWithString:urlString];
+    NSString *scheme = url.scheme.lowercaseString;
+    if (!url.host.length || !([scheme isEqualToString:@"https"] || [scheme isEqualToString:@"http"])) return;
     [[UIApplication sharedApplication] openURL:url
                                        options:@{}
                              completionHandler:^(BOOL success) {
@@ -1101,18 +1195,11 @@ static int SKCompareVersions(NSString *a, NSString *b) {
         return;
     }
     NSURL *docsURL = [NSURL fileURLWithPath:docsDir];
-    if (@available(iOS 14.0, *)) {
-        UIDocumentPickerViewController *picker = [[UIDocumentPickerViewController alloc]
-            initForOpeningContentTypes:@[[UTType typeWithIdentifier:@"public.folder"]]];
-        picker.directoryURL = docsURL;
-        picker.delegate = (id)self;
-        [self presentViewController:picker animated:YES completion:nil];
-    } else {
-        UIDocumentPickerViewController *picker =
-            [[UIDocumentPickerViewController alloc] initWithURL:docsURL inMode:UIDocumentPickerModeOpen];
-        picker.delegate = (id)self;
-        [self presentViewController:picker animated:YES completion:nil];
-    }
+    UIDocumentPickerViewController *picker = [[UIDocumentPickerViewController alloc]
+        initForOpeningContentTypes:@[[UTType typeWithIdentifier:@"public.folder"]]];
+    picker.directoryURL = docsURL;
+    picker.delegate = (id)self;
+    [self presentViewController:picker animated:YES completion:nil];
 }
 
 - (void)onGitHub {
@@ -1209,14 +1296,9 @@ static int SKCompareVersions(NSString *a, NSString *b) {
 
 - (void)presentPairingPicker {
     UIDocumentPickerViewController *picker;
-    if (@available(iOS 14.0, *)) {
-        picker = [[UIDocumentPickerViewController alloc]
-            initForOpeningContentTypes:@[UTTypePropertyList, UTTypeData]
-                                asCopy:YES];
-    } else {
-        picker = [[UIDocumentPickerViewController alloc] initWithDocumentTypes:@[@"public.data"]
-                                                                        inMode:UIDocumentPickerModeImport];
-    }
+    picker = [[UIDocumentPickerViewController alloc]
+        initForOpeningContentTypes:@[UTTypePropertyList, UTTypeData]
+                            asCopy:YES];
     picker.delegate = (id)self;
     self.pairingPicker = picker;
     [self presentViewController:picker animated:YES completion:nil];
@@ -1226,6 +1308,8 @@ static int SKCompareVersions(NSString *a, NSString *b) {
     if (controller != self.pairingPicker || !urls.firstObject) return;
     self.pairingPicker = nil;
     NSString *error = [SKBuiltinJIT importPairingFileFromURL:urls.firstObject];
+    // The picker handed us a private copy of a device credential; nothing else needs it.
+    [NSFileManager.defaultManager removeItemAtURL:urls.firstObject error:nil];
     [self showAlertWithTitle:error ? @"Pairing file not imported" : @"Pairing file imported"
                      message:error ?: @"Built-in JIT is now selected. Connect LocalDevVPN, then tap Enable JIT."];
 }
@@ -1280,7 +1364,6 @@ static int SKCompareVersions(NSString *a, NSString *b) {
         [self.spinner stopAnimating];
         if (ok) {
             self.setupStatus.text = @"";
-            self.runtimeReady = YES;
             [self setButtonsEnabled:YES];
         } else {
             self.setupStatus.text = @"Setup failed. Check your internet connection and relaunch.";
@@ -1307,8 +1390,9 @@ static int SKCompareVersions(NSString *a, NSString *b) {
 - (void)promptSteamLogin {
     UIAlertController *alert =
         [UIAlertController alertControllerWithTitle:@"Steam Login"
-                                            message:@"Enter your Steam credentials. They are passed "
-                                                    @"directly to the game and never stored by SKapsule."
+                                            message:@"Enter your Steam credentials. Your password goes straight to "
+                                                    @"the game's Steam login and is not saved. A login token is "
+                                                    @"stored encrypted on this device so you stay signed in."
                                      preferredStyle:UIAlertControllerStyleAlert];
 
     // textContentType is what puts a password manager in the QuickType bar. The pair has to
@@ -1338,6 +1422,7 @@ static int SKCompareVersions(NSString *a, NSString *b) {
                               handler:^(UIAlertAction *action) {
                                 NSString *user = alert.textFields[0].text ?: @"";
                                 NSString *pass = alert.textFields[1].text ?: @"";
+                                alert.textFields[1].text = @"";
                                 [self
                                     launchGameWithMode:SKLoginModeSteam
                                              steamUser:[user
@@ -1420,11 +1505,14 @@ static int SKCompareVersions(NSString *a, NSString *b) {
           self.subtitleLabel.text =
             [NSString stringWithFormat:@"Fight alongside ~%ld other Spiral Knights!",
                                        (long)total];
-          self.subtitleLabel.userInteractionEnabled = YES;
-          [self.subtitleLabel addGestureRecognizer:
-                                [[UITapGestureRecognizer alloc]
-                                    initWithTarget:self
-                                            action:@selector(onPlayerCountTapped)]];
+          // Once: this runs on every refresh, and stacked recognizers would fire together.
+          if (!self.subtitleLabel.userInteractionEnabled) {
+              self.subtitleLabel.userInteractionEnabled = YES;
+              [self.subtitleLabel addGestureRecognizer:
+                                    [[UITapGestureRecognizer alloc]
+                                        initWithTarget:self
+                                                action:@selector(onPlayerCountTapped)]];
+          }
       }
     });
 }

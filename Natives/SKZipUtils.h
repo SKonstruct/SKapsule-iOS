@@ -10,6 +10,14 @@ NS_ASSUME_NONNULL_BEGIN
 /// decompressed bytes to handler; return NO from it to stop. NO if the archive is unreadable.
 + (BOOL)enumerateZip:(NSString *)zipPath usingBlock:(BOOL (^)(NSString *entryName, NSData *contents))handler;
 
+/// As above, but entries @c filter rejects are skipped without being inflated.
++ (BOOL)enumerateZip:(NSString *)zipPath
+            matching:(nullable BOOL (^)(NSString *entryName))filter
+          usingBlock:(BOOL (^)(NSString *entryName, NSData *contents))handler;
+
+/// @c entryName resolved inside @c directory, or nil if it is empty, absolute or climbs out with "..".
++ (nullable NSString *)safeDestinationForEntry:(NSString *)entryName inDirectory:(NSString *)directory;
+
 /**
  Extracts a ZIP/JAR file to a target directory.
  Optional file filter supports preventing overwrites of protected game files.
@@ -35,8 +43,9 @@ NS_ASSUME_NONNULL_BEGIN
 + (nullable NSString *)calculateGitBlobShaOfFile:(NSString *)filePath;
 
 /**
- Reads the mod.json metadata dictionary directly from a ZIP file without extracting other contents.
+ Reads the first mod.json in a ZIP (nil if absent or not a JSON object) without inflating other entries.
  */
++ (NSString *)stripTrailingCommas:(NSString *)json;
 + (nullable NSDictionary *)readModMetadataFromZip:(NSString *)zipPath;
 
 /// @return YES if the zip's central directory is readable and contains @c entryName.
