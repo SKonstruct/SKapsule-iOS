@@ -112,6 +112,9 @@ If you cannot run the build, say so. Do not claim a change is verified when it i
    commit `apps.json` by hand. Use the released file, not a local build: the source records its
    size and sha256, and a mismatch makes stores refuse the install.
 
+Dependabot ([.github/dependabot.yml](.github/dependabot.yml)) bumps the pinned workflow actions
+weekly; nothing else here has a manifest it reads.
+
 Nothing commits automatically. `apps.json`'s `appPermissions.entitlements` must list every
 entitlement in the IPA's signature (stores check it), so update it when entitlements change.
 
