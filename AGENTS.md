@@ -48,7 +48,10 @@ Natives/               iOS app (Objective-C) + CMake build
   JavaLauncher.*       JVM bootstrap (dlopen libjli, JLI_Launch)
   SKTouchControls.*    touch-control node model + persisted layout
   SKTouchControlOverlay.*   touch-control overlay, edit mode, settings panel
+  SKControlsEditorViewController.*  controls editor opened from the launcher sidebar
+  SKMouseButtons.h     per-button mouse/trackpad press tracking (header-only)
   SKKeyboardBridge.*   offscreen UIKeyInput -> GLFW char/key events
+  Tests/               host-side tests (`make test`)
   SKInstaller.*        runtime extraction + installation check
   SKZipUtils.*         zip read/write (central directory), git blob SHA
   SKModManager.*       modpack download, apply and remove
@@ -86,7 +89,7 @@ out/artifacts/         packaged IPA output (generated, gitignored)
 
 - **Everything:** `./scripts/build.sh [debug|release|trollstore] [--natives] [--test] [--deploy]` builds missing natives and the jars, then the app (`--help`).
 - **Native app (CMake):** `make native` (requires Xcode CLI tools + iOS SDK)
-- **Host-side tests:** `make test` builds `Natives/Tests/` for the Mac and runs it (zip parsing, git blob SHA). Add a case there when touching `SKZipUtils`. The **Test** workflow runs it on every push and pull request.
+- **Host-side tests:** `make test` builds `Natives/Tests/` for the Mac and runs it (zip parsing, git blob SHA, mouse buttons). Add a case there when touching `SKZipUtils` or `SKMouseButtons`. The **Test** workflow runs it on every push and pull request.
 - **Full package:** `make package` (produces `.ipa` in `out/artifacts/`)
 - **TrollStore:** `make package TROLLSTORE_JIT_ENT=1` (produces `.tipa`)
 - **Release:** `make all RELEASE=1`

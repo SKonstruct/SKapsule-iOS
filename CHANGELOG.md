@@ -4,6 +4,19 @@ Notable changes per release. Versions are the git tags the IPAs are built from
 (`vX.Y.Z` → `SKapsule.ipa` on that release). Before releasing, rename **Unreleased** to the new
 version: the Release workflow publishes that section as the release notes.
 
+## 1.0.2
+
+### Fixed
+
+- **Mods can no longer replace the behavior, spawn table and variant table configs** (`config/behavior`,
+  `spawn_table`, `variant_table`, `.dat` and `.xml`). The protected list was still six entries short of
+  KnightLauncher's.
+- **A first launch that downloads the game could be called a failed start.** The 90-second start
+  timer ran from the moment the game launched, even while the download was reporting progress. It now
+  restarts with every status message, so only 90 seconds of silence counts.
+- **Apply Mods before the game has been launched once** asks for a launch first and no longer sends an
+  error report, and cancelling the JIT wait is no longer reported as a failure.
+
 ## 1.0.1
 
 ### Added

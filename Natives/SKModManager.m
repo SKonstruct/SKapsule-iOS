@@ -20,6 +20,7 @@ static NSSet<NSString *> *SKModFilteredFiles(void) {
           @"config/area.dat", @"config/area.xml",
           @"config/attack.dat", @"config/attack.xml",
           @"config/battle_sprite.dat", @"config/battle_sprite.xml",
+          @"config/behavior.dat", @"config/behavior.xml",
           @"config/catalog.dat", @"config/catalog.xml",
           @"config/conversation.dat", @"config/conversation.xml",
           @"config/cursor.dat", @"config/cursor.xml",
@@ -56,6 +57,7 @@ static NSSet<NSString *> *SKModFilteredFiles(void) {
           @"config/scene_global.dat", @"config/scene_global.xml",
           @"config/shader.dat", @"config/shader.xml",
           @"config/sounder.dat", @"config/sounder.xml",
+          @"config/spawn_table.dat", @"config/spawn_table.xml",
           @"config/status_condition.dat", @"config/status_condition.xml",
           @"config/style.dat", @"config/style.xml",
           @"config/texture.dat", @"config/texture.xml",
@@ -114,6 +116,15 @@ static NSString *SKGetdownDigest(NSString *jarPath) {
     NSMutableString *hex = [NSMutableString stringWithCapacity:CC_SHA256_DIGEST_LENGTH * 2];
     for (int i = 0; i < CC_SHA256_DIGEST_LENGTH; i++) [hex appendFormat:@"%02x", digest[i]];
     return hex;
+}
+
+/// Code 8: the game has not been launched yet, so there is nothing to restore. The user needs to
+/// launch once; it is not a failure to report.
+static NSError *SKRestoreFailure(NSString *message) {
+    BOOL notInstalled = [message hasPrefix:@"No digest for"];
+    return [NSError errorWithDomain:@"SKModManagerDomain"
+                               code:notInstalled ? 8 : 7
+                           userInfo:@{NSLocalizedDescriptionKey: message}];
 }
 
 /**
@@ -606,9 +617,7 @@ static NSString *SKDownloadVerified(NSURL *url, NSString *destPath, NSString *ex
       if (restoreError) {
           dispatch_async(dispatch_get_main_queue(), ^{
             completionBlock(NO, nil, nil,
-                            [NSError errorWithDomain:@"SKModManagerDomain"
-                                                code:7
-                                            userInfo:@{NSLocalizedDescriptionKey: restoreError}]);
+                            SKRestoreFailure(restoreError));
           });
           return;
       }
@@ -952,9 +961,7 @@ static NSString *SKDownloadVerified(NSURL *url, NSString *destPath, NSString *ex
       if (restoreError) {
           dispatch_async(dispatch_get_main_queue(), ^{
             completionBlock(NO, nil,
-                            [NSError errorWithDomain:@"SKModManagerDomain"
-                                                code:7
-                                            userInfo:@{NSLocalizedDescriptionKey: restoreError}]);
+                            SKRestoreFailure(restoreError));
           });
           return;
       }

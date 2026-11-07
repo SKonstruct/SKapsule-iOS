@@ -1617,8 +1617,9 @@ static int SKCompareVersions(NSString *a, NSString *b) {
                                                                               [NSCharacterSet
                                                                                   whitespaceAndNewlineCharacterSet]]];
                                         } else {
-                                            SKReportFailure(@"mods_apply_failed",
-                                                            error.localizedDescription, nil);
+                                            if (!(error.code == 8 && [error.domain isEqualToString:@"SKModManagerDomain"]))
+                                                SKReportFailure(@"mods_apply_failed",
+                                                                error.localizedDescription, nil);
                                             [self showAlertWithTitle:@"Apply Failed"
                                                              message:error.localizedDescription];
                                         }

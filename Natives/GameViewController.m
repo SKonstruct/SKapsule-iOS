@@ -416,6 +416,9 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
 
     [SKNativeBridge setBootStatusHandler:^(NSString *message) {
       weakSelf.bootStatus.text = message;
+      // A first launch downloads the game, which takes minutes while status keeps arriving:
+      // only a silence of kBootTimeout is a stall.
+      if (weakSelf.bootWatchdog.valid) [weakSelf startBootWatchdog];
     }];
 
     [SKNativeBridge setRenderReadyHandler:^{
@@ -892,8 +895,6 @@ static BOOL skJITReady(void) {
                                               if (!self)
                                                   return;
                                               self.jitWaitCancelled = YES;
-                                              SKReportFailure(@"jit_unavailable",
-                                                              @"user cancelled the JIT wait", nil);
                                               self.jitWaitAlert = nil;
                                               [self dismissViewControllerAnimated:YES completion:nil];
                                             }]];
@@ -1177,7 +1178,7 @@ static const CGFloat kChromeButtonGap = 8.0f;
     self.bootStatus.text = @"Spiral Knights did not finish starting.\n"
                            @"Share Logs from the launcher sidebar to report it.";
     [self.spinner stopAnimating];
-    SKReportFailure(@"boot_timeout", @"no first frame within 90s of JVM launch", nil);
+    SKReportFailure(@"boot_timeout", @"no first frame or progress within 90s of JVM launch", nil);
 }
 
 - (void)startHeapWatchdog {
