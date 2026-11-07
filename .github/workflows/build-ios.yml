@@ -88,8 +88,8 @@ jobs:
       - name: Build native submodules
         if: steps.cache-out.outputs.cache-hit != 'true'
         env:
-          JAVA8_HOME: ${{ env.JAVA_HOME_8_ARM64 }}
-          JAVA_HOME: ${{ env.JAVA_HOME_25_ARM64 }}
+          JAVA8_HOME: ${{ env.JAVA_HOME_8_AARCH64 }}
+          JAVA_HOME: ${{ env.JAVA_HOME_25_AARCH64 }}
         run: |
           ./scripts/build-gl4es-ios.sh
           ./scripts/build-openal-ios.sh

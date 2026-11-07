@@ -65,6 +65,7 @@ static NSSet<NSString *> *SKModFilteredFiles(void) {
           @"config/tile_replacement.dat", @"config/tile_replacement.xml",
           @"config/uplink.dat", @"config/uplink.xml",
           @"config/variant.dat", @"config/variant.xml",
+          @"config/variant_table.dat", @"config/variant_table.xml",
           @"config/wall.dat", @"config/wall.xml",
       ];
       files = [NSSet setWithArray:protectedFiles];
