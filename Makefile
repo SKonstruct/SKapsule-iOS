@@ -121,7 +121,7 @@ METHOD_STAGE_JITHELPER = \
 	xcrun -sdk iphoneos swiftc -target arm64-apple-ios17.4 -O -module-name SKJITHelper -application-extension \
 		-F $(SOURCEDIR)/out/stikjit -framework StikJIT \
 		-Xlinker -e -Xlinker _NSExtensionMain -Xlinker -rpath -Xlinker @executable_path/../../Frameworks \
-		$(SOURCEDIR)/Natives/JITHelper/SKJITHelper.swift -o $$X/SKJITHelper; \
+		$(SOURCEDIR)/Natives/JITHelper/SKJITHelper.swift $(SOURCEDIR)/Natives/JITHelper/RSDPortResolver.swift -o $$X/SKJITHelper; \
 	cp -R $(SOURCEDIR)/out/stikjit/StikJIT.framework $(1)/Frameworks/; \
 	rm -rf $(1)/Frameworks/StikJIT.framework/Headers $(1)/Frameworks/StikJIT.framework/Modules; \
 	cp $(SOURCEDIR)/Natives/JITHelper/Info.plist $$X/Info.plist; \
@@ -184,6 +184,7 @@ SK_ASAN ?= OFF
 
 native:
 	echo '[SKapsule v$(VERSION)] native - start'
+	[ -f $(SOURCEDIR)/out/rppairing/libskrppairing.a ] || $(SOURCEDIR)/scripts/build-rppairing-ios.sh
 	mkdir -p $(WORKINGDIR)
 	cd $(WORKINGDIR) && cmake \
 		-DCMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE) \
@@ -242,6 +243,7 @@ payload: jre
 	plutil -replace CFBundleIdentifier -string '$(BUNDLE_ID)' $(WORKINGDIR)/SKapsule.app/Info.plist
 	plutil -replace CFBundleShortVersionString -string '$(VERSION)' $(WORKINGDIR)/SKapsule.app/Info.plist
 	plutil -replace CFBundleVersion -string '$(SK_BUILD)' $(WORKINGDIR)/SKapsule.app/Info.plist
+	plutil -replace BGTaskSchedulerPermittedIdentifiers -json '["$(BUNDLE_ID).pairing.*"]' $(WORKINGDIR)/SKapsule.app/Info.plist
 	plutil -replace SKBuildStamp -string "$$(date '+%Y-%m-%d %H:%M:%S')" $(WORKINGDIR)/SKapsule.app/Info.plist
 	plutil -replace MinimumOSVersion -string '$(DEPLOYMENT_TARGET)' $(WORKINGDIR)/SKapsule.app/Info.plist
 	plutil -replace CFBundleSupportedPlatforms -json '["iPhoneOS"]' $(WORKINGDIR)/SKapsule.app/Info.plist
@@ -327,6 +329,12 @@ test:
 	xcrun clang -fobjc-arc -Wall -framework Foundation -I$(SOURCEDIR)/Natives \
 		$(SOURCEDIR)/Natives/Tests/SKMouseButtonsTests.m -o $(WORKINGDIR)/sk-mouse-tests
 	$(WORKINGDIR)/sk-mouse-tests
+	xcrun clang -fobjc-arc -Wall -framework Foundation -I$(SOURCEDIR)/Natives \
+		$(SOURCEDIR)/Natives/Tests/SKJITAdviceTests.m -o $(WORKINGDIR)/sk-jit-advice-tests
+	$(WORKINGDIR)/sk-jit-advice-tests
+	xcrun clang -fobjc-arc -Wall -framework Foundation -lz -I$(SOURCEDIR)/Natives \
+		$(SOURCEDIR)/Natives/Tests/SKServersTests.m $(SOURCEDIR)/Natives/SKServers.m $(SOURCEDIR)/Natives/SKZipUtils.m -o $(WORKINGDIR)/sk-server-tests
+	$(WORKINGDIR)/sk-server-tests
 	echo '[SKapsule v$(VERSION)] test - end'
 
 .PHONY: all clean check native test payload package deploy help format

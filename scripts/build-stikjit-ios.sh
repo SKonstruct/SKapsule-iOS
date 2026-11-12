@@ -6,17 +6,22 @@
 # debugger to SKapsule over the device's own debug tunnel, so StikDebug is not needed.
 # Its idevice FFI ships prebuilt inside the submodule, so this needs only Xcode and
 # xcodegen.
+#
+# Built from a copy of the submodule with scripts/patches/*.patch applied, so the checkout
+# stays at the upstream commit. The patch makes the debugserver page
+# commands carry full 64-bit addresses: upstream's nine hex digits truncate any JIT mapping
+# above 0xfffffffff. StikJIT is MPL-2.0: the patch is the source of that modification.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-STIKJIT_SRC="${STIKJIT_SRC:-$REPO_ROOT/external/StikJIT}"
+STIKJIT_UPSTREAM="${STIKJIT_SRC:-$REPO_ROOT/external/StikJIT}"
 OUT_DIR="${OUT_DIR:-$REPO_ROOT/out/stikjit}"
 BUILD_DIR="${BUILD_DIR:-$OUT_DIR/build}"
 
-[[ -f "$STIKJIT_SRC/project.yml" ]] || {
-    echo "ERROR: StikJIT source not found at $STIKJIT_SRC (git submodule update --init)" >&2
+[[ -f "$STIKJIT_UPSTREAM/project.yml" ]] || {
+    echo "ERROR: StikJIT source not found at $STIKJIT_UPSTREAM (git submodule update --init)" >&2
     exit 1
 }
 command -v xcodegen > /dev/null || {
@@ -24,11 +29,23 @@ command -v xcodegen > /dev/null || {
     exit 1
 }
 
-echo "StikJIT source: $STIKJIT_SRC"
-echo
-
 rm -rf "$BUILD_DIR" "$OUT_DIR/StikJIT.framework"
 mkdir -p "$OUT_DIR"
+
+STIKJIT_SRC="$OUT_DIR/src"
+rm -rf "$STIKJIT_SRC"
+mkdir -p "$STIKJIT_SRC"
+(cd "$STIKJIT_UPSTREAM" && tar --exclude=.git -cf - .) | (cd "$STIKJIT_SRC" && tar -xf -)
+for patch in "$SCRIPT_DIR"/patches/stikjit-*.patch; do
+    patch -d "$STIKJIT_SRC" -p1 -s < "$patch" || {
+        echo "ERROR: $(basename "$patch") no longer applies to StikJIT; refresh it" >&2
+        exit 1
+    }
+done
+
+echo "StikJIT source: $STIKJIT_UPSTREAM (+ patches)"
+echo
+
 (cd "$STIKJIT_SRC" && xcodegen generate --quiet)
 xcodebuild archive \
     -project "$STIKJIT_SRC/StikJIT.xcodeproj" \

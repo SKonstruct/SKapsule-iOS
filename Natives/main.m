@@ -281,11 +281,13 @@ int main(int argc, char *argv[]) {
     }
 
     isJailbroken = init_checkForJailbreak();
+    [SKBuiltinJIT noteLaunchState];  // before anything attaches: a jailbreak marks apps as debugged at launch
     init_setupHomeDirectory();
     init_redirectStdio();  // tees console output to latestlog.txt for Share Logs
     init_logDeviceAndVer();
     init_setupGameDirs();
     skStageJITScriptToDocuments();  // make the JIT script importable in StikJIT
+    skInstallJITTrapGuard();
 
     // If sandbox is disabled (TrollStore), enable JIT via PT_TRACE_ME
     if (!isJITEnabled(YES) && getEntitlementValue(@"com.apple.private.security.no-sandbox")) {

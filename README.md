@@ -4,11 +4,7 @@ Play **Spiral Knights** on iPhone and iPad. SKapsule runs the real desktop game 
 your device: a bundled Java 25 runtime, the game's OpenGL renderer translated to OpenGL ES,
 OpenAL audio, touch and controller support, and Web or Steam login (including Steam Guard).
 
-> [!WARNING]
-> **Experimental.** Gameplay has been reached on device, but recent builds are still being
-> stabilised and crashes are expected. Bug reports with logs are very welcome.
-
-SKapsule is an unofficial fan project, not affiliated with or endorsed by SEGA or
+SKapsule is an unofficial fan project, not affiliated with or endorsed by
 Grey Havens. It doesn't include the game: the client is downloaded from the official servers
 on first launch, exactly like on desktop, and you play on your own account.
 
@@ -54,26 +50,36 @@ with a method that keeps it.
 On a free Apple ID, SKapsule uses two of your three app IDs: one for the app and one for
 its built-in JIT helper.
 
-A `SKapsule-TrollStore.tipa` is also built, which enables JIT through TrollStore instead.
-It has not been tested.
+A `SKapsule-TrollStore.tipa` is also built, which keeps the entitlements TrollStore preserves so
+it can enable JIT without a debugger app (see [Enabling JIT](#enabling-jit)). It has not been tested.
 
 ## Enabling JIT
 
-Open **JIT Setup** in the sidebar and pick one of the two methods below. You only need one.
+Open **JIT Setup** in the sidebar (or tap the **Enable JIT** pill when nothing is set up yet).
+It opens a sheet with the ways to get JIT; tap one for its steps. You only need one.
+**Automatic** (the default) uses the StikDebug app when it is installed and the built-in method
+otherwise; picking a way pins it, and **Choose automatically** undoes that.
 
 ### Built-in (no other app needed)
 
-1. Turn on **Developer Mode**: Settings → Privacy & Security → Developer Mode.
-2. Install **LocalDevVPN** and connect it.
-3. Get your device's **pairing file**: the one StikDebug uses, or one made with
-   `idevice_pair` on a computer. In SKapsule, open **JIT Setup → Import Pairing File** and
-   pick it.
-4. Tap **Enable JIT**. The first time, SKapsule downloads and mounts the Developer Disk
-   Image, which takes a while. It then stays mounted until the device restarts.
+Pick **Pair on this iPhone** (iOS 27 or later) or **Use a pairing file**, then:
 
-**Check Setup** tests the connection without launching the game. If you have no Wi-Fi, turn
-on cellular data, connect LocalDevVPN, then turn on Airplane Mode before returning to the
-app. If preparing keeps failing, restart the device or use **Reset Developer Disk Image**.
+1. Turn on **Developer Mode**: Settings → Privacy & Security → Developer Mode.
+2. **Pair.** On iOS 27 tap **Start pairing**, then in Settings → Privacy & Security → Developer
+   Mode tap **Pair with SKapsule** and enter the code the sheet shows (also sent as a
+   notification). Otherwise import a pairing file: the one StikDebug uses, or one made with
+   `idevice_pair` on a computer. A file left at `Documents/pairingFile.plist` is picked up too.
+3. Install **LocalDevVPN**. SKapsule opens it to connect when it isn't, and carries on when you
+   come back; you can also connect it yourself first.
+4. Tap **Check setup**, then **Enable JIT**. The first time, SKapsule downloads and mounts the
+   Developer Disk Image, which takes a while. It then stays mounted until the device restarts.
+
+iOS asks for **Local Network** access the first time: SKapsule uses it to find your device's
+debug service on iOS 26 and later, and to pair with itself on iOS 27.
+
+If you have no Wi-Fi, turn on cellular data, connect LocalDevVPN, then turn on Airplane Mode
+before returning to the app. If preparing keeps failing, restart the device or use **Reset
+Developer Disk Image** on the Enable page.
 
 The pairing file is a credential for your whole device, so SKapsule keeps it where the Files
 app can't reach it. Built-in JIT is unavailable inside LiveContainer.
@@ -87,6 +93,15 @@ nothing to import.
 Older StikDebug versions ignore that script. If the JIT pill never turns green, update
 StikDebug, or import `skapsule-jit.js` from SKapsule's folder (**Open Folder** in the
 sidebar) in StikDebug's Tools and assign it to SKapsule.
+
+### TrollStore and jailbreaks (before iOS 26)
+
+Before iOS 26 a process a debugger touched may make executable memory itself, so these two work
+without a pairing file. **Use TrollStore** asks TrollStore to enable JIT whenever the game starts
+(install SKapsule through TrollStore and turn on its URL Scheme setting). **Use a jailbreak** needs
+a jailbreak that marks apps as debugged, such as Dopamine's **Allow JIT in Apps**; close SKapsule
+completely and open it again after turning that on. From iOS 26 JIT also needs a debugger that
+stays attached, so neither is offered there.
 
 ## Playing
 
@@ -104,8 +119,17 @@ are supported, and so are mice and trackpads on iPad (less tested).
 **Mods.** **Download Modpack** in the sidebar fetches the [Spiral Knights Modpack](https://github.com/SirDank/Spiral-Knights-Modpack); you can also put
 your own mods in the `mods` folder (**Open Folder**). **Apply Mods** installs them and
 **Remove Mods** restores the game's original files. A few config files that often clash with
-game updates are never replaced, the same ones KnightLauncher skips. Downloading the modpack
+game updates are never replaced, the same ones [KnightLauncher](https://github.com/lucasluqui/KnightLauncher) skips. Downloading the modpack
 never deletes mods you added yourself.
+
+**Custom servers.** The **Server** picker above Web / Steam chooses Official or a saved server; the **+**
+beside it adds one (address, port, and optionally its public key and client/content URLs) and the pencil
+edits the selected one. The Web / Steam switch is Official's, so it is hidden for a private server. At launch the connection settings
+are written into the game's `code/config.jar` (`deployment.properties`), as KnightLauncher does, and
+Official's values are written back when you switch. A private server gets the game's own logon window, or your
+saved login for it if you gave one (kept in the Keychain; the game's bootstrap drops it unless the game's
+`server_host` is that server). Steam sign-in is unavailable while a private server is selected. With a game update pending the launch is refused until
+you update on Official, since the updater would replace the edit.
 
 **News.** The home screen shows current in-game events from the same feed as
 [KnightLauncher](https://github.com/lucasluqui/KnightLauncher). Tap a card to open the event
@@ -156,7 +180,8 @@ are the steps [CI](.github/workflows/build-ios.yml) runs:
 ```sh
 git clone --recursive https://github.com/SKonstruct/SKapsule-iOS.git
 cd SKapsule-iOS
-brew install ant maven ninja wget ldid xcodegen
+brew install ant maven ninja wget ldid xcodegen rustup
+rustup-init -y && rustup target add aarch64-apple-ios   # on-device pairing library
 
 # JAVA_HOME must point at JDK 25 and JAVA8_HOME at JDK 8
 ./scripts/build-gl4es-ios.sh
@@ -164,6 +189,7 @@ brew install ant maven ninja wget ldid xcodegen
 ./scripts/build-lwjgl3-ios.sh
 ./scripts/build-cacio-ios.sh
 ./scripts/build-frenchpress-ios.sh
+./scripts/build-rppairing-ios.sh
 ./scripts/build-bootstrap.sh
 
 ./scripts/stage-app-assets.sh
@@ -178,7 +204,7 @@ rebuilt components. An app started from Xcode can't get JIT, though, so launch i
 home screen to play. After adding a source file under `Natives/`, run `xcodegen generate`.
 
 Contributors: [AGENTS.md](AGENTS.md) has the project conventions and
-[ROADMAP.md](ROADMAP.md) the engineering notes and invariants.
+[ENGINEERING.md](ENGINEERING.md) the engineering notes and invariants.
 
 ## Credits and licences
 
@@ -194,13 +220,14 @@ contains code adapted from Amethyst-iOS (GPL-3.0). It builds on:
 | [OpenAL Soft](https://github.com/SKonstruct/openal-soft) ([upstream](https://github.com/kcat/openal-soft)) | Audio | LGPLv2 |
 | [LWJGL 3](https://github.com/SKonstruct/lwjgl3) ([upstream](https://github.com/LWJGL/lwjgl3)) | Java bindings | BSD-3-Clause |
 | [Caciocavallo](https://github.com/SKonstruct/caciocavallo17) | Headless AWT | GPLv2 with Classpath Exception |
-| [StikJIT](https://github.com/StikDebug/StikJIT) | Built-in JIT | MPL-2.0, bundled unmodified |
+| [idevice](https://github.com/jkcoxson/idevice) | On-device pairing (Rust crates, notices in the app's `legal` folder) | MIT |
+| [StikJIT](https://github.com/StikDebug/StikJIT) | Built-in JIT | MPL-2.0, with one patch ([scripts/patches](scripts/patches)) |
 | [bootstrap](https://github.com/SKonstruct/bootstrap) | Game bootstrap, shared with Android | MIT |
 | [frenchpress](https://github.com/SKonstruct/frenchpress) | Steam login | |
 | [Getdown](https://github.com/threerings/getdown) (the official client's build) | Game downloads and updates | |
 | [DejaVu fonts](https://github.com/dejavu-fonts/dejavu-fonts) | Bundled fonts | [Bitstream Vera licence](assets/fonts/LICENSE) |
 | [Simple Icons](https://simpleicons.org) | Buy Me a Coffee glyph | CC0 |
 
-Spiral Knights is © SEGA / Grey Havens, LLC.
+Spiral Knights is © Grey Havens, LLC.
 
 If you enjoy SKapsule, you can [buy me a coffee](https://buymeacoffee.com/sirdankk).

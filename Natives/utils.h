@@ -30,6 +30,13 @@ BOOL DeviceHasJITFlags(JITFlags flags);
 BOOL DeviceHasTXM(void);
 // Heuristic: is a debugger (StikDebug) still attached to service JIT syscalls?
 BOOL JIT26IsLikelyDebuggerKeepAttached(void);
+/// Installs a SIGTRAP handler for the JVM's `brk #0x69` JIT request. With a debugger servicing
+/// it the Mach exception port takes the trap first and this never runs; without one the kernel
+/// would kill the process silently, so the handler skips the instruction with x0 = 0 (the JVM
+/// then fails its own mapping, loudly) and records that it did. Any other trap keeps its default.
+void skInstallJITTrapGuard(void);
+/// Whether the guard has skipped an unserviced JIT request in this run.
+BOOL skJITTrapWasSkipped(void);
 // Builds the stikjit:// URL that asks StikDebug to enable JIT for this process, with the
 // JIT script inline on TXM devices.
 NSURL *skJITEnableURL(void);

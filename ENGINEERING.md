@@ -144,6 +144,45 @@ path passes the script inline too (`script-data`, base64url).
 - `codesign --verify` cannot check this bundle (macOS reports `ldid`'s iOS signatures as
   "not signed at all"); re-signing with zsign is the check that means something.
 - CI needs `xcodegen` to build StikJIT.
+- **StikJIT is built from a patched copy** (`scripts/patches/stikjit-high-address.patch`, from
+  a community fix; the submodule stays at the upstream commit). Upstream writes page addresses
+  as nine hex digits, which truncates any JIT mapping above 0xfffffffff (reported on iPads).
+- **On iOS 26+ the helper reads the device's RemotePairing port** from its `_remotepairing._tcp`
+  Bonjour service (`RSDPortResolver.swift`): the device picks the port at boot, so StikJIT's
+  fixed 49152 can be closed. Needs `NSBonjourServices` in the helper and the app's Info.plist
+  plus the Local Network permission.
+- **Before a request, the route to 10.7.0.1 must leave by a VPN interface** (an unsent UDP
+  connect, `SKBuiltinJIT.m`); otherwise the helper can only time out. When it does not, the app
+  opens LocalDevVPN (`localdevvpn://enable?scheme=skapsule`; the `skapsule` URL scheme and the
+  `localdevvpn` query scheme are in Info.plist), waits for the app to leave and return, polls up to
+  10 s for the tunnel to route, then continues; 2 minutes without a return gives up. Failures get advice from
+  `SKJITAdvice.h` (pairing replaced, another VPN, LocalDevVPN off, cellular-only), covered by
+  `make test`. Cellular data alone breaks LocalDevVPN's loopback.
+- **On-device pairing (iOS 27+)** (`SKJITPairing.m`, `Natives/RPPairing`, C interface
+  `SKRPPairing.h`): iOS 27 lists `_remotepairing-pairable-host._tcp` services under Developer Mode
+  and asks for a PIN the "computer" shows. The Rust library (idevice's `PairableHost`) listens
+  and runs the pairing; the app publishes the Bonjour service through `dns_sd` (Local Network
+  permission only), shows the PIN (alert, notification, continued-task subtitle) and saves the
+  pairing file through `SKBuiltinJIT savePairingData:`. The user is in Settings meanwhile, so a
+  `BGContinuedProcessingTask` (`<bundle id>.pairing.*` in `BGTaskSchedulerPermittedIdentifiers`;
+  the Makefile rewrites the prefix) keeps the app alive; a sideloader that renames the bundle
+  leaves the plist stale and iOS refuses it, leaving the ~30 s grace period. Every pairing makes a
+  new key under the same identifier, so only the newest pairing file works. A pairing stops after
+  5 minutes. Notices of the Rust crates ship as `legal/LICENSES-rppairing-crates.txt`.
+- **JIT Setup is a bottom sheet** (`SKJITSetupViewController`): a navigation controller in a
+  medium/large sheet. The root lists the ways; each pushes a page (pair, import, LocalDevVPN, enable,
+  StikDebug, TrollStore, jailbreak). Pages rebuild from state on every change (pairing notifications,
+  a 1 s `isJITEnabled` poll), so there is no per-view bookkeeping. TrollStore and jailbreak exist only
+  where `canGrantOwnJIT` (before iOS 26): from the TXM on, a debugger must stay and answer the VM.
+  TrollStore asks `apple-magnifier://enable-jit`; a jailbreak is detected by `/var/jb` and by the
+  process already being debugged at launch (`noteLaunchState`, read in `main` before anything attaches).
+- **The pairing continued task must be registered for the concrete identifier it submits**
+  (`<bundle id>.pairing.session`; `.pairing.*` is only what Info.plist permits): submitting an
+  identifier nothing registered raises, which crashed the first on-device pairing. The task also has
+  to report progress or iOS ends it.
+- **Method is Automatic by default** (StikDebug app if installed, else built-in), never switched
+  after a failure.
+- None of the patch, port lookup, advice or on-device pairing has run on a device yet.
 
 **The JIT badge has one blind spot.** `isJITEnabled` on a TXM device checks `CS_DEBUGGED`
 plus `getppid() != 1` (`utils.m`): it sees that *a* debugger is attached, not that it runs
@@ -151,7 +190,10 @@ plus `getppid() != 1` (`utils.m`): it sees that *a* debugger is attached, not th
 script) turns the pill green and the launch proceeds into `brk #0x69` with nobody to service
 it: the process dies instantly, with no `hs_err`, a 0-byte vmlog, and a log that stops after
 `[JIT26] Requesting N MB for JIT mapping`. There is no reliable in-process check, so the gate
-is unchanged; the next launch detects it (`SKPreviousRunDiedOnJITTrap`: that request line
+is unchanged. `skInstallJITTrapGuard` (a SIGTRAP handler for the exact `brk #0x69` word, which a
+servicing debugger never lets reach it) skips the instruction with x0 = 0, logs it and lets the
+game screen say why; HotSpot then falls back to a plain `mmap`, which TXM refuses (how the VM fails
+after that is unverified on a device). The next launch also detects it (`SKPreviousRunDiedOnJITTrap`: that request line
 without the following `[JIT26] mapping at RW=…, RX=…`) and says so in an alert.
 
 `assets/skapsule-jit.js` sets `detachAfterFirstBr = true`, so the script services exactly one
@@ -312,7 +354,7 @@ usually belongs in the other.
 ## Build & verification
 
 ```sh
-make native                      # CMake build of the native app
+make native                      # CMake build of the native app (builds the Rust pairing lib if missing)
 make test                        # host-side tests (zip parsing, mouse buttons)
 ./scripts/build-gl4es-ios.sh     # -> out/gl4es/libgl4es.dylib
 make package                     # -> .ipa in out/artifacts/

@@ -944,6 +944,10 @@ static BOOL skJITReady(void) {
     NSString *steamUser = self.steamUser ?: @"";
     __block NSString *steamPass = self.steamPass ?: @"";
     self.steamPass = nil;
+    NSString *webUser = self.webUser ?: @"";
+    __block NSString *webPass = self.webPass ?: @"";
+    NSString *loginHost = self.loginHost ?: @"";
+    self.webPass = nil;
 
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
       // Before the JVM: getdown runs inside SkBootstrap, so a jar dropped here is
@@ -952,9 +956,11 @@ static BOOL skJITReady(void) {
       [SKInstaller repairUnpackedResources];
       dispatch_async(dispatch_get_main_queue(), ^{
         [self startBootWatchdog];
+        [self watchForUnservicedJITTrap];
       });
-      int ret = launchJVM(steamUser, steamPass, isSteam, w, h);
+      int ret = launchJVM(steamUser, steamPass, webUser, webPass, loginHost, isSteam, w, h);
       steamPass = nil;
+      webPass = nil;
       NSLog(@"[GameVC] JVM exited with code %d", ret);
       if (ret != 0) {
           SKReportFailure(@"jvm_exit",
@@ -962,7 +968,8 @@ static BOOL skJITReady(void) {
                           @{@"exit_code" : @(ret).stringValue});
       }
       dispatch_async(dispatch_get_main_queue(), ^{
-        self.bootStatus.text = [NSString stringWithFormat:@"JVM exited (code %d)", ret];
+        // The JIT message is the cause; the exit code is only its aftermath.
+        if (!skJITTrapWasSkipped()) self.bootStatus.text = [NSString stringWithFormat:@"JVM exited (code %d)", ret];
         [self.spinner stopAnimating];
       });
     });
@@ -1171,6 +1178,29 @@ static const CGFloat kChromeButtonGap = 8.0f;
                                                           block:^(NSTimer *timer) {
                                                             [weakSelf onBootTimedOut];
                                                           }];
+}
+
+/// The JVM's JIT request went unanswered (see skInstallJITTrapGuard): the JVM cannot map its
+/// code cache and will fail, so say why now rather than leave the last status on screen.
+- (void)watchForUnservicedJITTrap {
+    __weak typeof(self) weakSelf = self;
+    [NSTimer scheduledTimerWithTimeInterval:0.5
+                                    repeats:YES
+                                      block:^(NSTimer *timer) {
+                                        typeof(self) self = weakSelf;
+                                        if (!self || !self.bootOverlay.superview) {
+                                            [timer invalidate];
+                                            return;
+                                        }
+                                        if (!skJITTrapWasSkipped()) return;
+                                        [timer invalidate];
+                                        [self.bootWatchdog invalidate];
+                                        self.bootStatus.text =
+                                            @"JIT was not enabled: the game asked for its JIT memory and "
+                                            @"nothing answered.\nIn StikDebug, import skapsule-jit.js and "
+                                            @"assign it to SKapsule, then enable JIT again.";
+                                        [self.spinner stopAnimating];
+                                      }];
 }
 
 - (void)onBootTimedOut {

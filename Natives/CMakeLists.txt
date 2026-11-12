@@ -37,6 +37,8 @@ add_executable(SKapsule
   LauncherViewController.m
   SKZipUtils.m
   SKModManager.m
+  SKServers.m
+  SKCredentials.m
   GameViewController.m
   SKTouchControls.m
   SKTouchControlOverlay.m
@@ -48,6 +50,8 @@ add_executable(SKapsule
   SKInstaller.m
   SKNewsFeed.m
   SKBuiltinJIT.m
+  SKJITPairing.m
+  SKJITSetupViewController.m
   SKReporter.m
   utils.m
   Assets.xcassets
@@ -91,6 +95,10 @@ target_link_libraries(SKapsule
   "-framework Security"
   "-framework SafariServices"
   "-framework UniformTypeIdentifiers"
+  "-framework BackgroundTasks"
+  "-framework UserNotifications"
+  # On-device pairing (Natives/RPPairing), built by scripts/build-rppairing-ios.sh.
+  "${CMAKE_CURRENT_LIST_DIR}/../out/rppairing/libskrppairing.a"
   "-ldl"
   "-lz"
 )

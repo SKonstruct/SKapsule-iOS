@@ -43,6 +43,39 @@
 		</dict>
 		<key>UILaunchStoryboardName</key>
 		<string>LaunchScreen</string>
+		<!-- Lets the Automatic JIT method see whether the StikDebug app is installed, and JIT setup whether LocalDevVPN is. -->
+		<key>LSApplicationQueriesSchemes</key>
+		<array>
+			<string>stikdebug</string>
+			<string>stikjit</string>
+			<string>localdevvpn</string>
+		</array>
+		<!-- LocalDevVPN returns here after it connects (localdevvpn://enable?scheme=skapsule). -->
+		<key>CFBundleURLTypes</key>
+		<array>
+			<dict>
+				<key>CFBundleURLName</key>
+				<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<string>skapsule</string>
+				</array>
+			</dict>
+		</array>
+		<!-- Built-in JIT looks up the device's RemotePairing service on the local network. -->
+		<key>NSLocalNetworkUsageDescription</key>
+		<string>SKapsule finds this device's debug service and pairs with itself to enable JIT, and connects to private game servers on your network.</string>
+		<key>NSBonjourServices</key>
+		<array>
+			<string>_remotepairing._tcp</string>
+			<string>_remotepairing-pairable-host._tcp</string>
+		</array>
+		<!-- Task identifiers for the continued-processing task that keeps on-device pairing alive
+		     while the user is in Settings (SKJITPairing.m). The Makefile rewrites the prefix. -->
+		<key>BGTaskSchedulerPermittedIdentifiers</key>
+		<array>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER).pairing.*</string>
+		</array>
 		<!-- KnightLauncher's announcement service (the home-screen news card) listens
 		     on port 6060 with no TLS at all, so it cannot be reached over HTTPS.
 		     Scoped to that one host; banner images are only fetched over HTTPS. -->

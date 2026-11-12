@@ -46,9 +46,13 @@ static void init_loadSKEnv(void) {
 static void skUnsetSteamEnv(void) {
     unsetenv("FRENCHPRESS_STEAM_USER");
     unsetenv("FRENCHPRESS_STEAM_PASS");
+    unsetenv("SK_WEB_USER");
+    unsetenv("SK_WEB_PASS");
+    unsetenv("SK_LOGIN_HOST");
 }
 
-int launchJVM(NSString *steamUser, NSString *steamPass, BOOL isSteam, int width, int height) {
+int launchJVM(NSString *steamUser, NSString *steamPass, NSString *webUser, NSString *webPass, NSString *loginHost,
+              BOOL isSteam, int width, int height) {
     NSLog(@"[JavaLauncher] Beginning JVM launch");
 
     init_loadSKEnv();
@@ -167,6 +171,13 @@ int launchJVM(NSString *steamUser, NSString *steamPass, BOOL isSteam, int width,
             withIntermediateDirectories:YES
                              attributes:nil
                                   error:nil];
+    }
+
+    // Quick login for Web mode: SkBootstrap hands it to the game as username then password.
+    if (!isSteam && webUser.length > 0 && webPass.length > 0) {
+        setenv("SK_WEB_USER", webUser.UTF8String, 1);
+        setenv("SK_WEB_PASS", webPass.UTF8String, 1);
+        if (loginHost.length > 0) setenv("SK_LOGIN_HOST", loginHost.UTF8String, 1);
     }
 
     // Module opens/exports for LWJGL + cacio

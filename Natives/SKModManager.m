@@ -340,6 +340,20 @@ static NSString *SKDownloadVerified(NSURL *url, NSString *destPath, NSString *ex
 
 @implementation SKModManager
 
++ (void)preservePristineCodeJarNamed:(NSString *)name {
+    const char *homeEnv = getenv("SKAPSULE_HOME");
+    if (!homeEnv) return;
+    NSString *skPath = [[NSString stringWithUTF8String:homeEnv] stringByAppendingPathComponent:@"sk"];
+    NSString *expected = SKReadGetdown([skPath stringByAppendingPathComponent:@"digest2.txt"])[[@"code/" stringByAppendingString:name]];
+    if (!expected) return;
+    NSString *jar = [skPath stringByAppendingPathComponent:[@"code/" stringByAppendingString:name]];
+    NSString *pristine = [jar stringByAppendingString:@".pristine"];
+    if ([SKGetdownDigest(jar) isEqualToString:expected] && ![SKGetdownDigest(pristine) isEqualToString:expected]) {
+        [NSFileManager.defaultManager removeItemAtPath:pristine error:nil];
+        [NSFileManager.defaultManager copyItemAtPath:jar toPath:pristine error:nil];
+    }
+}
+
 + (instancetype)sharedManager {
     static SKModManager *sharedInstance = nil;
     static dispatch_once_t onceToken;

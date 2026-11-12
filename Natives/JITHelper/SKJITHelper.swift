@@ -22,8 +22,10 @@ final class SKJITHelperHandler: NSObject, NSExtensionRequestHandling {
     }
 
     private static func handle(_ request: [String: Any]) -> [String: Any] {
+        // Said on a failure, so a log shows which port the attempt used.
+        var portNote = ""
         func reply(_ ok: Bool, _ message: String) -> [String: Any] {
-            var out: [String: Any] = ["ok": ok, "message": message]
+            var out: [String: Any] = ["ok": ok, "message": ok ? message : message + portNote]
             if let txm = StikJIT.isTXMPresent { out["txm"] = txm }
             return out
         }
@@ -41,6 +43,15 @@ final class SKJITHelperHandler: NSObject, NSExtensionRequestHandling {
                 try? fm.removeItem(at: root.appendingPathComponent(name))
             }
             let op = request["op"] as? String ?? ""
+            var configuration = StikJIT.Configuration.default
+            // Since iOS 26 the device's RemotePairing port is picked at boot, so StikJIT's fixed
+            // one is closed; read the advertised one. Earlier iOS keeps the default.
+            if op != "reset", ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26 {
+                let lookup = RSDPortResolver.resolve()
+                NSLog("[SKJITHelper] RemotePairing port: %@", lookup.detail)
+                if let port = lookup.port { configuration.rsdPort = port }
+                portNote = " [port lookup: \(lookup.detail); using \(configuration.rsdPort)]"
+            }
             if op == "reset" {
                 try StikJIT.resetCachedDDI(at: paths)
                 return reply(true, "The Developer Disk Image cache was cleared.")
@@ -57,7 +68,7 @@ final class SKJITHelperHandler: NSObject, NSExtensionRequestHandling {
 
             switch op {
             case "prepare":
-                switch StikJIT.prepareDevice(pairingFile: pairingURL, paths: paths) {
+                switch StikJIT.prepareDevice(pairingFile: pairingURL, paths: paths, configuration: configuration) {
                 case .ready:
                     return reply(true, "LocalDevVPN is reachable and the Developer Disk Image is mounted.")
                 case .unreachable(let reason):
@@ -76,6 +87,7 @@ final class SKJITHelperHandler: NSObject, NSExtensionRequestHandling {
                 try StikJIT.enableJIT(targetPID: pid,
                                       pairingFile: pairingURL,
                                       ddiPaths: paths,
+                                      configuration: configuration,
                                       script: .customBase64(script),
                                       progress: { NSLog("[SKJITHelper] %@", $0) })
                 return reply(true, "JIT enabled.")

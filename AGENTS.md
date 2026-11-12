@@ -29,7 +29,8 @@ live in `scripts/`.
   Steam login. Most Java code (external/bootstrap/) is shared.
 - **[Amethyst-iOS](https://github.com/AngelAuraMC/Amethyst-iOS)** — an iOS
   Minecraft launcher that informed the JVM-on-iOS approach (JIT enablement,
-  cacio bridge, Makefile+CMake build system).
+  cacio bridge, Makefile+CMake build system). Upstream credit only: no local
+  checkout is kept, and the GPL-3.0 code adapted from it stays attributed in the README.
 
 ---
 
@@ -55,12 +56,17 @@ Natives/               iOS app (Objective-C) + CMake build
   SKInstaller.*        runtime extraction + installation check
   SKZipUtils.*         zip read/write (central directory), git blob SHA
   SKModManager.*       modpack download, apply and remove
+  SKServers.*          custom servers: saved list, validation, config.jar connection edit (Foundation only, host-tested)
   SKNewsFeed.*         home-screen news card feed (KnightLauncher's Flamingo service)
   SKReporter.*         Sentry failure/crash reports, log scrubbing
   glfw_ios.m           GLFW natives for the JVM: input queue, buffer swap, gamepad
   NativeBridge.*       JVM ↔ UI bridge (boot status, Steam Guard prompts)
   utils.*              JIT detection, entitlements, file helpers
   SKBuiltinJIT.*       JIT method choice, pairing file, starts the JIT helper extension
+  SKJITAdvice.h        built-in JIT failure advice (header-only, tested by `make test`)
+  SKJITPairing.*       on-device pairing (iOS 27+): Bonjour advert, background task, PIN
+  SKJITSetupViewController.*  the JIT Setup bottom sheet (ways in, steps, pairing, LocalDevVPN, enable)
+  SKRPPairing.h        C interface of Natives/RPPairing/ (Rust, libskrppairing.a)
   JITHelper/           Swift app extension linking StikJIT (attaches the JIT debugger)
   awt_xawt/            cacio AWT stubs
   Info.plist           iOS app metadata
@@ -70,14 +76,14 @@ external/bootstrap/    Java bootstrap module (shared with Android)
   HeadlessGetdown.java headless getdown driver
   NativeBridgePrompt.java   frenchpress credential prompt
   GLFW.java            GLFW shim routing to native implementations
-scripts/               build-*-ios.sh per native component + stage-app-assets.sh
+scripts/               build-*-ios.sh per native component + stage-app-assets.sh; patches/ for StikJIT
 assets/                bundled JRE zip, fonts, JIT script, iOS-only shadow classes
 external/gl4es/        submodule — GL → GLES translation
 external/openal-soft/  submodule — audio
 external/lwjgl3/       submodule — LWJGL iOS build
 external/caciocavallo17/  submodule — headless AWT
 external/frenchpress/  submodule — Steam login
-external/StikJIT/      submodule — built-in JIT framework (MPL-2.0), unmodified
+external/StikJIT/      submodule — built-in JIT framework (MPL-2.0); built from a patched copy (scripts/patches)
 entitlements.*.xml     signing entitlements (sideload / TrollStore)
 out/                   native build outputs (generated, gitignored)
 out/artifacts/         packaged IPA output (generated, gitignored)
@@ -89,7 +95,7 @@ out/artifacts/         packaged IPA output (generated, gitignored)
 
 - **Everything:** `./scripts/build.sh [debug|release|trollstore] [--natives] [--test] [--deploy]` builds missing natives and the jars, then the app (`--help`).
 - **Native app (CMake):** `make native` (requires Xcode CLI tools + iOS SDK)
-- **Host-side tests:** `make test` builds `Natives/Tests/` for the Mac and runs it (zip parsing, git blob SHA, mouse buttons). Add a case there when touching `SKZipUtils` or `SKMouseButtons`. The **Test** workflow runs it on every push and pull request.
+- **Host-side tests:** `make test` builds `Natives/Tests/` for the Mac and runs it (zip parsing, git blob SHA, mouse buttons, JIT advice, custom servers). Add a case there when touching `SKZipUtils`, `SKMouseButtons` or `SKServers`. The **Test** workflow runs it on every push and pull request.
 - **Full package:** `make package` (produces `.ipa` in `out/artifacts/`)
 - **TrollStore:** `make package TROLLSTORE_JIT_ENT=1` (produces `.tipa`)
 - **Release:** `make all RELEASE=1`
@@ -100,6 +106,7 @@ out/artifacts/         packaged IPA output (generated, gitignored)
     - `build-lwjgl3-ios.sh` — needs JDK 25 + iOS SDK + ant
     - `build-cacio-ios.sh` — needs JDK 25 + Maven
     - `build-frenchpress-ios.sh` — needs JDK 25 + Maven
+    - `build-rppairing-ios.sh` — needs rustup + `rustup target add aarch64-apple-ios`; `make native` builds it when missing. `cargo test --locked` in `Natives/RPPairing` runs its host test.
 
 If you cannot run the build, say so. Do not claim a change is verified when it isn't. Always run `make native` after changes to verify compilation.
 
@@ -119,7 +126,8 @@ Dependabot ([.github/dependabot.yml](.github/dependabot.yml)) bumps the pinned w
 weekly; nothing else here has a manifest it reads.
 
 Nothing commits automatically. `apps.json`'s `appPermissions.entitlements` must list every
-entitlement in the IPA's signature (stores check it), so update it when entitlements change.
+entitlement in the IPA's signature and `appPermissions.privacy` every `NS…UsageDescription` (stores
+check both), so update them when entitlements or Info.plist privacy keys change.
 
 ### On-device runs need JIT
 
@@ -143,7 +151,7 @@ see [README.md](README.md). Consequences when debugging:
 
 ## Keep the docs current, and short
 
-`ROADMAP.md`, `README.md` and `CHANGELOG.md` are maintained as part of the change, not
+`ENGINEERING.md`, `README.md` and `CHANGELOG.md` are maintained as part of the change, not
 afterwards. Every change that alters behaviour, adds an invariant, or resolves an
 investigation updates them **in the same pass**.
 
@@ -152,7 +160,7 @@ investigation updates them **in the same pass**.
   the blow-by-blow.
 - **Delete as you add.** When something is fixed, remove the open-question text it
   replaces; do not leave both. Contradictory sections are worse than no section.
-- **ROADMAP.md is for what is still load-bearing:** invariants that prevent regressions,
+- **ENGINEERING.md is for what is still load-bearing:** invariants that prevent regressions,
   open gaps, live diagnostics, and a short condensed history. If a section no longer
   changes anyone's decisions, cut it.
 - **README.md is end-user facing.** Install, JIT setup, troubleshooting, build. No internals.
@@ -217,6 +225,9 @@ Common types: `feat`, `fix`, `perf`, `chore`, `test`, `docs`.
 - Update submodule pointers as a side effect of an unrelated change.
 - Add new top-level files or directories.
 - Introduce new third-party dependencies.
+- Edit anything Getdown digests in the game folder outside the mod apply path and `SKServers` (which
+  rewrites only `deployment.properties` in `config.jar`, and the launcher refuses to start a private
+  server while `updatePendingForGameAtPath:` is true: the updater would revert the edit).
 - Commit secrets or signing certificates.
 - **Attempt to bypass Cacio.** Cacio is strictly required on iOS; without it, the JVM falls back to the macOS AWT stack, which will crash.
 - **Change the touch-control layout, defaults or settings without checking SKapsule.**

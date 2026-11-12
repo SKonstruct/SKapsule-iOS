@@ -48,17 +48,26 @@ targets:
           - 'awt_xawt'
           - 'Info.plist'
           - 'JITHelper'
+          - 'Tests'
     settings:
       CODE_SIGN_IDENTITY: 'Apple Development'
       ENABLE_USER_SCRIPT_SANDBOXING: NO
       INFOPLIST_FILE: 'Natives/Info.plist'
       OTHER_CFLAGS: '-DGLES_SILENCE_DEPRECATION=1'
+      # On-device pairing (Natives/RPPairing), built by scripts/build-rppairing-ios.sh.
+      LIBRARY_SEARCH_PATHS: '$(inherited) $(SRCROOT)/out/rppairing'
+      OTHER_LDFLAGS: '$(inherited) -lskrppairing'
       # To diagnose heap corruption again, uncomment this and rebuild gl4es with
       # SK_ASAN=1 ./scripts/build-gl4es-ios.sh. It links the AddressSanitizer runtime into
       # the app so it is loaded from process start -- without it ASan arrives when LWJGL
       # dlopens the instrumented libgl4es and aborts with "Interceptors are not working".
       # Linker only: the app's own code stays uninstrumented.
       # OTHER_LDFLAGS: '$(inherited) -fsanitize=address'
+    preBuildScripts:
+      - name: Build on-device pairing library
+        basedOnDependencyAnalysis: false
+        script: |
+          [ -f "$SRCROOT/out/rppairing/libskrppairing.a" ] || "$SRCROOT/scripts/build-rppairing-ios.sh"
     postBuildScripts:
       - name: Stage JRE and Assets
         basedOnDependencyAnalysis: false

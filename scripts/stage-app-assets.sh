@@ -87,6 +87,12 @@ stage "$REPO_ROOT/assets/skapsule-jit.js" \
     echo "  (assets/skapsule-jit.js missing)"
 
 echo
+echo "=== Licences of the Rust crates in the pairing library ==="
+stage "$REPO_ROOT/out/rppairing/LICENSES-rppairing-crates.txt" \
+      "$APP_DIR/legal/LICENSES-rppairing-crates.txt" ||
+    echo "  (run ./scripts/build-rppairing-ios.sh first)"
+
+echo
 echo "=== LWJGL Modules ==="
 LWJGL_MODS="$REPO_ROOT/out/lwjgl3/lwjgl-3.4.1-ios-modules.zip"
 if [[ -f "$LWJGL_MODS" ]]; then

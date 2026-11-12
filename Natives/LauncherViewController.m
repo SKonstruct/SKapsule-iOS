@@ -3,17 +3,27 @@
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #import "GameViewController.h"
 #import "SKBuiltinJIT.h"
+#import "SKJITSetupViewController.h"
 #import "SKControlsEditorViewController.h"
+#import "SKCredentials.h"
 #import "SKInstaller.h"
 #import "SKModManager.h"
 #import "SKNewsFeed.h"
 #import "SKReporter.h"
+#import "SKServers.h"
 #import "SKZipUtils.h"
 #import "config.h"
 #import "utils.h"
 
+/// Steam only knows Steam players; the count is scaled for standalone installs, as KnightLauncher does.
+static const float kPlayerEstimateMult = 1.4f;
+
 @interface LauncherViewController ()
 @property (nonatomic, strong) UISegmentedControl *modeSegmentedControl;
+@property (nonatomic, strong) UIStackView *serverStack;
+@property (nonatomic, strong) UILabel *serverNameLabel;
+@property (nonatomic, strong) UIControl *serverPick;
+@property (nonatomic, strong) UIButton *serverActionButton;
 @property (nonatomic, strong) UIButton *btnLaunch;
 @property (nonatomic, strong) UILabel *subtitleLabel;
 @property (nonatomic, strong) UIView *newsCard;
@@ -29,7 +39,6 @@
 @property (nonatomic, strong) NSMutableDictionary<NSString *, UIImage *> *newsImages;
 @property (nonatomic, strong) NSMutableSet<NSString *> *newsImageRequests;
 @property (nonatomic, strong) UIColor *newsChipColor;
-@property (nonatomic, strong) UIDocumentPickerViewController *pairingPicker;
 @property (nonatomic, assign) NSInteger liveSteamPlayers;
 @property (nonatomic, assign) NSInteger previewSteamPlayers;
 @property (nonatomic, strong) UILabel *titleLabel;
@@ -145,7 +154,14 @@
     [self.modeSegmentedControl addTarget:self
                                   action:@selector(onSegmentChanged:)
                         forControlEvents:UIControlEventValueChanged];
-    [self.view addSubview:self.modeSegmentedControl];
+    // Server picker above the Web/Steam switch; the switch is Official's only, so showSelectedServer
+    // hides it for a private server and the stack closes the gap.
+    self.serverStack = [[UIStackView alloc] initWithArrangedSubviews:@[ [self makeServerSelector], self.modeSegmentedControl ]];
+    self.serverStack.axis = UILayoutConstraintAxisVertical;
+    self.serverStack.alignment = UIStackViewAlignmentCenter;
+    self.serverStack.spacing = 12;
+    self.serverStack.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:self.serverStack];
 
     // Restore persistent segmented selection
     NSString *savedMode = [[NSUserDefaults standardUserDefaults] stringForKey:@"login_mode"] ?: @"Web";
@@ -506,14 +522,14 @@
         [titleLabel.bottomAnchor constraintEqualToAnchor:self.subtitleLabel.topAnchor constant:-4],
 
         [self.subtitleLabel.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
-        [self.subtitleLabel.bottomAnchor constraintEqualToAnchor:self.modeSegmentedControl.topAnchor constant:-30],
+        [self.subtitleLabel.bottomAnchor constraintEqualToAnchor:self.serverStack.topAnchor constant:-30],
         [self.updateButton.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
         [self.updateButton.topAnchor constraintEqualToAnchor:self.subtitleLabel.bottomAnchor constant:2],
         [self.updateButton.heightAnchor constraintEqualToConstant:26],
 
-        // Segmented Control Layout
-        [self.modeSegmentedControl.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
-        [self.modeSegmentedControl.bottomAnchor constraintEqualToAnchor:self.btnLaunch.topAnchor constant:-20],
+        // Server picker + segmented control
+        [self.serverStack.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+        [self.serverStack.bottomAnchor constraintEqualToAnchor:self.btnLaunch.topAnchor constant:-20],
         [self.modeSegmentedControl.widthAnchor constraintEqualToConstant:240],
         [self.modeSegmentedControl.heightAnchor constraintEqualToConstant:48],
 
@@ -694,6 +710,7 @@
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    [self showSelectedServer];
     [self updateLogoutButtonVisibility];
     [self refreshJITStatus];
     [self startNewsRotation];
@@ -745,8 +762,22 @@
     if (isJITEnabled(NO)) {
         return;
     }
+    // Built-in JIT with nothing paired yet has only one thing to offer: the way to pair.
+    if (SKBuiltinJIT.selected && !SKBuiltinJIT.hasPairingFile) {
+        [self onJITSetup:self.jitStatusButton];
+        return;
+    }
     [SKBuiltinJIT requestJITWithFailure:^(NSString *message) {
-      [self showAlertWithTitle:@"Couldn't enable JIT" message:message];
+      UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Couldn't enable JIT"
+                                                                     message:message
+                                                              preferredStyle:UIAlertControllerStyleAlert];
+      [alert addAction:[UIAlertAction actionWithTitle:@"JIT Setup"
+                                                style:UIAlertActionStyleDefault
+                                              handler:^(UIAlertAction *action) {
+                                                [self onJITSetup:self.jitStatusButton];
+                                              }]];
+      [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleCancel handler:nil]];
+      [self presentViewController:alert animated:YES completion:nil];
     }];
 }
 
@@ -1241,77 +1272,9 @@ static int SKCompareVersions(NSString *a, NSString *b) {
 
 #pragma mark - JIT setup
 
-/// Chooses between built-in JIT and StikDebug and manages the pairing file. Built-in JIT
-/// needs that file plus LocalDevVPN; StikDebug needs nothing set up here any more, since
-/// the JIT script now travels in its URL.
+/// The JIT walkthrough, as a bottom sheet: ways to get JIT, their steps, and the pairing.
 - (void)onJITSetup:(UIView *)sender {
-    BOOL builtin = SKBuiltinJIT.selected;
-    BOOL paired = SKBuiltinJIT.hasPairingFile;
-    NSString *reason = SKBuiltinJIT.unavailableReason;
-    NSMutableString *message = [NSMutableString
-        stringWithFormat:@"Method: %@\nPairing file: %@", builtin ? @"Built-in" : @"StikDebug app",
-                         paired ? @"imported" : @"not imported"];
-    if (reason) [message appendFormat:@"\n\n%@", reason];
-    if (!reason && builtin) {
-        [message appendString:@"\n\nBuilt-in JIT needs Developer Mode and LocalDevVPN connected."];
-    }
-
-    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:@"JIT Setup"
-                                                                   message:message
-                                                            preferredStyle:UIAlertControllerStyleActionSheet];
-    [sheet addAction:[UIAlertAction actionWithTitle:builtin ? @"Use the StikDebug App" : @"Use Built-in JIT"
-                                              style:UIAlertActionStyleDefault
-                                            handler:^(UIAlertAction *action) {
-                                              SKBuiltinJIT.selected = !builtin;
-                                            }]];
-    [sheet addAction:[UIAlertAction actionWithTitle:paired ? @"Replace Pairing File…" : @"Import Pairing File…"
-                                              style:UIAlertActionStyleDefault
-                                            handler:^(UIAlertAction *action) {
-                                              [self presentPairingPicker];
-                                            }]];
-    if (builtin && paired && !reason) {
-        [sheet addAction:[UIAlertAction actionWithTitle:@"Check Setup"
-                                                  style:UIAlertActionStyleDefault
-                                                handler:^(UIAlertAction *action) {
-                                                  [SKBuiltinJIT perform:@"prepare"
-                                                             completion:^(BOOL ok, NSString *result) {
-                                                               [self showAlertWithTitle:ok ? @"Ready" : @"Not ready"
-                                                                                message:result];
-                                                             }];
-                                                }]];
-        [sheet addAction:[UIAlertAction actionWithTitle:@"Reset Developer Disk Image"
-                                                  style:UIAlertActionStyleDestructive
-                                                handler:^(UIAlertAction *action) {
-                                                  [SKBuiltinJIT perform:@"reset"
-                                                             completion:^(BOOL ok, NSString *result) {
-                                                               [self showAlertWithTitle:@"JIT Setup" message:result];
-                                                             }];
-                                                }]];
-    }
-    [sheet addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
-    sheet.popoverPresentationController.sourceView = sender;
-    sheet.popoverPresentationController.sourceRect = sender.bounds;
-    [self presentViewController:sheet animated:YES completion:nil];
-}
-
-- (void)presentPairingPicker {
-    UIDocumentPickerViewController *picker;
-    picker = [[UIDocumentPickerViewController alloc]
-        initForOpeningContentTypes:@[UTTypePropertyList, UTTypeData]
-                            asCopy:YES];
-    picker.delegate = (id)self;
-    self.pairingPicker = picker;
-    [self presentViewController:picker animated:YES completion:nil];
-}
-
-- (void)documentPicker:(UIDocumentPickerViewController *)controller didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls {
-    if (controller != self.pairingPicker || !urls.firstObject) return;
-    self.pairingPicker = nil;
-    NSString *error = [SKBuiltinJIT importPairingFileFromURL:urls.firstObject];
-    // The picker handed us a private copy of a device credential; nothing else needs it.
-    [NSFileManager.defaultManager removeItemAtURL:urls.firstObject error:nil];
-    [self showAlertWithTitle:error ? @"Pairing file not imported" : @"Pairing file imported"
-                     message:error ?: @"Built-in JIT is now selected. Connect LocalDevVPN, then tap Enable JIT."];
+    [self presentViewController:[SKJITSetupViewController sheet] animated:YES completion:nil];
 }
 
 - (void)showAlertWithTitle:(NSString *)title message:(NSString *)message {
@@ -1324,11 +1287,320 @@ static int SKCompareVersions(NSString *a, NSString *b) {
 
 - (void)onLaunchPressed {
     SKLoginMode mode = (self.modeSegmentedControl.selectedSegmentIndex == 1) ? SKLoginModeSteam : SKLoginModeWeb;
-    if (mode == SKLoginModeSteam) {
-        [self onPlaySteam];
-    } else {
-        [self onPlayWeb];
+    NSDictionary *server = SKServers.selectedServer;
+    // Steam tickets belong to Official; a private server gets the stock logon window instead.
+    if (server) mode = SKLoginModeWeb;
+    [self pointGameAtServer:server then:^{
+      if (mode == SKLoginModeSteam) {
+          [self onPlaySteam];
+      } else {
+          [self onPlayWeb];
+      }
+    }];
+}
+
+/// Writes the server's connection settings (Official's when nil) into the game's config.jar, then runs
+/// @c proceed. Official is written too, so a game left pointing at a private server is healed before
+/// anything of Official's (a Steam token) is sent; that write failing stops the launch.
+- (void)pointGameAtServer:(NSDictionary *)server then:(void (^)(void))proceed {
+    const char *homeEnv = getenv("SKAPSULE_HOME");
+    NSString *jar = homeEnv ? [[[NSString stringWithUTF8String:homeEnv] stringByAppendingPathComponent:@"sk"]
+                                  stringByAppendingPathComponent:@"code/config.jar"]
+                            : nil;
+    [self setButtonsEnabled:NO];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+      NSError *error = nil;
+      BOOL ok = NO;
+      if (jar) {
+          [SKModManager preservePristineCodeJarNamed:@"config.jar"];
+          ok = [SKServers applyServer:server toConfigJar:jar error:&error];
+      }
+      BOOL updatePending = ok && server && [SKServers updatePendingForGameAtPath:[jar stringByDeletingLastPathComponent].stringByDeletingLastPathComponent];
+      dispatch_async(dispatch_get_main_queue(), ^{
+        [self setButtonsEnabled:YES];
+        BOOL notInstalled = !ok && jar && error.code == 1;
+        if (updatePending) {
+            [self showAlertWithTitle:@"Servers"
+                             message:@"The game has an update. Select Official and launch once so it updates, "
+                                     @"then connect to this server."];
+        } else if (ok || (notInstalled && !server)) {
+            // Not installed yet and heading for Official: the first launch downloads Official's files.
+            proceed();
+        } else if (notInstalled) {
+            [self showAlertWithTitle:@"Servers"
+                             message:@"Launch the game once on Official first, so its files are downloaded, "
+                                     @"then connect to this server."];
+        } else {
+            [self showAlertWithTitle:@"Servers"
+                             message:[NSString stringWithFormat:@"Couldn't point the game at this server: %@",
+                                                                error.localizedDescription ?: @"unknown error"]];
+        }
+      });
+    });
+}
+
+/// The picker above the Web/Steam switch: a split control, the server name (tap to choose) and
+/// an action (add when Official is selected, edit for a private server).
+- (UIView *)makeServerSelector {
+    UIColor *dim = [UIColor colorWithWhite:0.6 alpha:1.0];
+    UIView *box = [[UIView alloc] init];
+    box.layer.cornerRadius = 24;
+    box.layer.borderWidth = 1;
+    box.layer.borderColor = [UIColor colorWithWhite:0.2 alpha:1.0].CGColor;
+    box.clipsToBounds = YES;
+    box.translatesAutoresizingMaskIntoConstraints = NO;
+
+    UIButton *pick = [UIButton buttonWithType:UIButtonTypeCustom];
+    pick.translatesAutoresizingMaskIntoConstraints = NO;
+    pick.isAccessibilityElement = YES;
+    pick.accessibilityTraits = UIAccessibilityTraitButton;
+    pick.accessibilityHint = @"Choose a server";
+    // A dropdown: the menu opens from the control itself (rebuilt on every open, so it is never stale).
+    pick.showsMenuAsPrimaryAction = YES;
+    pick.menu = [UIMenu menuWithChildren:@[ [UIDeferredMenuElement elementWithUncachedProvider:^(void (^completion)(NSArray<UIMenuElement *> *)) {
+                 completion([self serverMenuItems]);
+               }] ]];
+    [pick addTarget:self action:@selector(onServerPickDown:) forControlEvents:UIControlEventTouchDown | UIControlEventTouchDragEnter];
+    [pick addTarget:self
+                  action:@selector(onServerPickUp:)
+        forControlEvents:UIControlEventTouchUpInside | UIControlEventTouchUpOutside | UIControlEventTouchCancel |
+                         UIControlEventTouchDragExit | UIControlEventMenuActionTriggered];
+    self.serverPick = pick;
+
+    UIImageView *icon = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"server.rack"]];
+    icon.tintColor = dim;
+    icon.contentMode = UIViewContentModeScaleAspectFit;
+    UILabel *caption = [[UILabel alloc] init];
+    caption.text = @"Server";
+    caption.font = [UIFont systemFontOfSize:11];
+    caption.textColor = dim;
+    self.serverNameLabel = [[UILabel alloc] init];
+    self.serverNameLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightBold];
+    self.serverNameLabel.textColor = UIColor.whiteColor;
+    self.serverNameLabel.lineBreakMode = NSLineBreakByTruncatingTail;
+    UIStackView *labels = [[UIStackView alloc] initWithArrangedSubviews:@[ caption, self.serverNameLabel ]];
+    labels.axis = UILayoutConstraintAxisVertical;
+    labels.userInteractionEnabled = NO;
+    UIImageView *chevron = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"chevron.down"]];
+    chevron.tintColor = dim;
+    chevron.contentMode = UIViewContentModeScaleAspectFit;
+    for (UIView *v in @[ icon, labels, chevron ]) {
+        v.translatesAutoresizingMaskIntoConstraints = NO;
+        v.userInteractionEnabled = NO;
+        [pick addSubview:v];
     }
+
+    UIView *divider = [[UIView alloc] init];
+    divider.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1.0];
+    divider.translatesAutoresizingMaskIntoConstraints = NO;
+    self.serverActionButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    self.serverActionButton.tintColor = UIColor.whiteColor;
+    self.serverActionButton.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.serverActionButton addTarget:self action:@selector(onServerAction) forControlEvents:UIControlEventTouchUpInside];
+
+    for (UIView *v in @[ pick, divider, self.serverActionButton ]) [box addSubview:v];
+    [NSLayoutConstraint activateConstraints:@[
+        [box.widthAnchor constraintEqualToConstant:240], [box.heightAnchor constraintEqualToConstant:48],
+        [pick.leadingAnchor constraintEqualToAnchor:box.leadingAnchor], [pick.topAnchor constraintEqualToAnchor:box.topAnchor],
+        [pick.bottomAnchor constraintEqualToAnchor:box.bottomAnchor],
+        [pick.trailingAnchor constraintEqualToAnchor:divider.leadingAnchor],
+        [divider.widthAnchor constraintEqualToConstant:1], [divider.heightAnchor constraintEqualToConstant:24],
+        [divider.centerYAnchor constraintEqualToAnchor:box.centerYAnchor],
+        [divider.trailingAnchor constraintEqualToAnchor:self.serverActionButton.leadingAnchor],
+        [self.serverActionButton.trailingAnchor constraintEqualToAnchor:box.trailingAnchor],
+        [self.serverActionButton.topAnchor constraintEqualToAnchor:box.topAnchor],
+        [self.serverActionButton.bottomAnchor constraintEqualToAnchor:box.bottomAnchor],
+        [self.serverActionButton.widthAnchor constraintEqualToConstant:48],
+        [icon.leadingAnchor constraintEqualToAnchor:pick.leadingAnchor constant:16],
+        [icon.centerYAnchor constraintEqualToAnchor:pick.centerYAnchor], [icon.widthAnchor constraintEqualToConstant:18],
+        [labels.leadingAnchor constraintEqualToAnchor:icon.trailingAnchor constant:10],
+        [labels.centerYAnchor constraintEqualToAnchor:pick.centerYAnchor],
+        [labels.trailingAnchor constraintEqualToAnchor:chevron.leadingAnchor constant:-6],
+        [chevron.trailingAnchor constraintEqualToAnchor:pick.trailingAnchor constant:-8],
+        [chevron.centerYAnchor constraintEqualToAnchor:pick.centerYAnchor], [chevron.widthAnchor constraintEqualToConstant:18],
+    ]];
+    return box;
+}
+
+- (void)onServerPickDown:(UIControl *)pick {
+    pick.backgroundColor = [UIColor colorWithWhite:1 alpha:0.08];
+}
+
+- (void)onServerPickUp:(UIControl *)pick {
+    pick.backgroundColor = UIColor.clearColor;
+}
+
+/// The "Fight alongside ~N other Spiral Knights!" subtitle, or nil until a count has arrived.
+- (nullable NSString *)playerCountText {
+    NSInteger total = (NSInteger)roundf(self.liveSteamPlayers * kPlayerEstimateMult) +
+                      (NSInteger)roundf(self.previewSteamPlayers * kPlayerEstimateMult);
+    return total > 0 ? [NSString stringWithFormat:@"Fight alongside ~%ld other Spiral Knights!", (long)total] : nil;
+}
+
+/// Shows which server Play connects to. Steam sign-in belongs to Official, so the Web/Steam switch is
+/// hidden for a private server and Play uses Web (onLaunchPressed); the saved choice is left alone.
+- (void)showSelectedServer {
+    NSDictionary *server = SKServers.selectedServer;
+    NSString *name = server[SKServerNameKey] ?: @"Official";
+    self.serverNameLabel.text = name;
+    self.serverPick.accessibilityLabel = [NSString stringWithFormat:@"Server: %@", name];
+    [self.serverActionButton setImage:[UIImage systemImageNamed:server ? @"pencil" : @"plus"] forState:UIControlStateNormal];
+    self.serverActionButton.accessibilityLabel = server ? @"Edit server" : @"Add server";
+    self.modeSegmentedControl.hidden = server != nil;
+    // The player count is Official's.
+    self.subtitleLabel.text = (server ? nil : [self playerCountText]) ?: @"Spiral Knights for iOS";
+}
+
+/// The pencil edits the selected private server; the plus (Official selected) adds one.
+- (void)onServerAction {
+    [self presentServerForm:SKServers.selectedServer draft:nil];
+}
+
+/// The dropdown's rows: Official and the saved servers (a check on the one in use), then Add Server.
+/// The pencil beside the picker edits the selected one.
+- (NSArray<UIMenuElement *> *)serverMenuItems {
+    NSDictionary *selected = SKServers.selectedServer;
+    __weak typeof(self) weakSelf = self;
+    UIAction *official = [UIAction actionWithTitle:@"Official"
+                                             image:[UIImage systemImageNamed:@"globe"]
+                                        identifier:nil
+                                           handler:^(UIAction *action) {
+                                             [SKServers selectServerWithId:nil];
+                                             [weakSelf showSelectedServer];
+                                           }];
+    official.state = selected ? UIMenuElementStateOff : UIMenuElementStateOn;
+    NSMutableArray<UIMenuElement *> *rows = [NSMutableArray arrayWithObject:official];
+    for (NSDictionary *server in SKServers.servers) {
+        UIAction *row = [UIAction actionWithTitle:server[SKServerNameKey]
+                                            image:[UIImage systemImageNamed:@"server.rack"]
+                                       identifier:nil
+                                          handler:^(UIAction *action) {
+                                            [SKServers selectServerWithId:server[SKServerIdKey]];
+                                            [weakSelf showSelectedServer];
+                                          }];
+        row.state = [server[SKServerIdKey] isEqualToString:selected[SKServerIdKey]] ? UIMenuElementStateOn : UIMenuElementStateOff;
+        [rows addObject:row];
+    }
+    UIAction *add = [UIAction actionWithTitle:@"Add Server…"
+                                        image:[UIImage systemImageNamed:@"plus"]
+                                   identifier:nil
+                                      handler:^(UIAction *action) {
+                                        [weakSelf presentServerForm:nil draft:nil];
+                                      }];
+    return @[
+        [UIMenu menuWithTitle:@"" image:nil identifier:nil options:UIMenuOptionsDisplayInline children:rows],
+        [UIMenu menuWithTitle:@"" image:nil identifier:nil options:UIMenuOptionsDisplayInline children:@[ add ]],
+    ];
+}
+
+/// Add a server, or edit or delete @c existing. @c draft holds what was typed when a previous try was rejected.
+- (void)presentServerForm:(NSDictionary *)existing draft:(NSDictionary *)draft {
+    NSDictionary *shown = draft ?: existing;
+    UIAlertController *alert = [UIAlertController
+        alertControllerWithTitle:existing ? @"Edit Server" : @"Add Server"
+                         message:@"Leave the key and URLs blank to use Official's."
+                  preferredStyle:UIAlertControllerStyleAlert];
+    NSArray *fields = @[
+        @[@"Name", SKServerNameKey], @[@"Address", SKServerHostKey], @[@"Port", SKServerPortKey],
+        @[@"Public key (modulus#exponent)", SKServerPublicKeyKey], @[@"Client URL (optional)", SKServerClientURLKey],
+        @[@"Content URL (optional)", SKServerContentURLKey],
+        @[@"Username (optional, for quick login)", @"loginUser"],
+        @[@"Password (optional)", @"loginPass"],
+    ];
+    NSDictionary *savedLogin = existing ? [SKCredentials loginForServerId:existing[SKServerIdKey]] : nil;
+    for (NSArray *field in fields) {
+        [alert addTextFieldWithConfigurationHandler:^(UITextField *tf) {
+          tf.placeholder = field[0];
+          id value = shown[field[1]];
+          if (!value && [field[1] isEqualToString:SKServerPortKey]) value = @47624;
+          if ([field[1] isEqualToString:@"loginUser"]) value = draft ? draft[@"loginUser"] : savedLogin[@"username"];
+          if ([field[1] isEqualToString:@"loginPass"]) {
+              value = nil;
+              tf.secureTextEntry = YES;
+              if (savedLogin) tf.placeholder = @"New password (blank keeps it)";
+          }
+          tf.text = [value isKindOfClass:NSNumber.class] ? [value stringValue] : value;
+          tf.autocorrectionType = UITextAutocorrectionTypeNo;
+          tf.autocapitalizationType = UITextAutocapitalizationTypeNone;
+          tf.keyboardType = [field[1] isEqualToString:SKServerPortKey] ? UIKeyboardTypeNumberPad : UIKeyboardTypeDefault;
+        }];
+    }
+    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    if (existing) {
+        [alert addAction:[UIAlertAction actionWithTitle:@"Delete"
+                                                  style:UIAlertActionStyleDestructive
+                                                handler:^(UIAlertAction *action) {
+                                                  [SKServers deleteServerWithId:existing[SKServerIdKey]];
+                                                  [SKCredentials deleteLoginForServerId:existing[SKServerIdKey]];
+                                                  [self showSelectedServer];
+                                                }]];
+    }
+    __weak UIAlertController *weakAlert = alert;
+    [alert addAction:[UIAlertAction actionWithTitle:@"Save"
+                                              style:UIAlertActionStyleDefault
+                                            handler:^(UIAlertAction *action) {
+                                              NSArray<UITextField *> *tf = weakAlert.textFields;
+                                              NSCharacterSet *ws = NSCharacterSet.whitespaceAndNewlineCharacterSet;
+                                              NSDictionary *candidate = @{
+                                                  SKServerIdKey: existing[SKServerIdKey] ?: [SKServers newServerId],
+                                                  SKServerNameKey: [tf[0].text stringByTrimmingCharactersInSet:ws] ?: @"",
+                                                  SKServerHostKey: [tf[1].text stringByTrimmingCharactersInSet:ws] ?: @"",
+                                                  SKServerPortKey: @([[tf[2].text stringByTrimmingCharactersInSet:ws] integerValue]),
+                                                  SKServerPublicKeyKey: [tf[3].text stringByTrimmingCharactersInSet:ws] ?: @"",
+                                                  SKServerClientURLKey: [tf[4].text stringByTrimmingCharactersInSet:ws] ?: @"",
+                                                  SKServerContentURLKey: [tf[5].text stringByTrimmingCharactersInSet:ws] ?: @"",
+                                              };
+                                              NSString *loginUser = [tf[6].text stringByTrimmingCharactersInSet:ws] ?: @"";
+                                              NSString *typedPass = tf[7].text ?: @"";
+                                              NSString *loginPass = typedPass.length ? typedPass : (savedLogin[@"password"] ?: @"");
+                                              // The draft keeps the username across a rejected try; the password is never kept.
+                                              NSMutableDictionary *draftForRetry = [candidate mutableCopy];
+                                              draftForRetry[@"loginUser"] = loginUser;
+                                              SKServerProblem problem = [SKServers validateServer:candidate against:SKServers.servers];
+                                              BOOL badLogin = (!loginUser.length && typedPass.length) || (loginUser.length && !loginPass.length) ||
+                                                              [[loginUser stringByAppendingString:typedPass] containsString:@"\n"] ||
+                                                              loginUser.length > 100 || typedPass.length > 100;
+                                              if (problem != SKServerProblemNone || badLogin) {
+                                                  [self presentServerProblem:problem retry:^{
+                                                    [self presentServerForm:existing draft:draftForRetry];
+                                                  }];
+                                                  return;
+                                              }
+                                              [SKServers saveServer:candidate];
+                                              if (loginUser.length) {
+                                                  if (![SKCredentials saveUsername:loginUser password:loginPass forServerId:candidate[SKServerIdKey]]) {
+                                                      [self showAlertWithTitle:@"Servers" message:@"Couldn't save the login on this device."];
+                                                  }
+                                              } else {
+                                                  [SKCredentials deleteLoginForServerId:candidate[SKServerIdKey]];
+                                              }
+                                              // A server you just added or edited is the one you mean to play on.
+                                              [SKServers selectServerWithId:candidate[SKServerIdKey]];
+                                              [self showSelectedServer];
+                                            }]];
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)presentServerProblem:(SKServerProblem)problem retry:(void (^)(void))retry {
+    NSString *text = @"Check the server's details.";
+    switch (problem) {
+        case SKServerProblemName: text = @"Enter a name of up to 40 characters."; break;
+        case SKServerProblemDuplicate: text = @"A server with that name already exists."; break;
+        case SKServerProblemHost: text = @"Enter a valid server address."; break;
+        case SKServerProblemPort: text = @"Enter a port from 1 to 65535."; break;
+        case SKServerProblemKey: text = @"The key must look like modulus#exponent, in hex."; break;
+        case SKServerProblemURL: text = @"URLs must start with http:// or https://."; break;
+        case SKServerProblemNone: text = @"Enter both a username and a password, or leave both blank."; break;
+    }
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Servers"
+                                                                   message:text
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"OK"
+                                              style:UIAlertActionStyleDefault
+                                            handler:^(UIAlertAction *action) {
+                                              retry();
+                                            }]];
+    [self presentViewController:alert animated:YES completion:nil];
 }
 
 - (void)setButtonsEnabled:(BOOL)enabled {
@@ -1440,6 +1712,14 @@ static int SKCompareVersions(NSString *a, NSString *b) {
     gameVC.loginMode = mode;
     gameVC.steamUser = user;
     gameVC.steamPass = pass;
+    // A private server's saved login, if it has one; the game withholds it unless it is set up for that server.
+    NSDictionary *server = SKServers.selectedServer;
+    if (mode == SKLoginModeWeb && server) {
+        NSDictionary *login = [SKCredentials loginForServerId:server[SKServerIdKey]];
+        gameVC.webUser = login[@"username"];
+        gameVC.webPass = login[@"password"];
+        gameVC.loginHost = [SKServers connectionPropertiesForServer:server][@"server_host"];
+    }
     gameVC.modalPresentationStyle = UIModalPresentationFullScreen;
     [self presentViewController:gameVC animated:YES completion:nil];
 }
@@ -1458,7 +1738,6 @@ static int SKCompareVersions(NSString *a, NSString *b) {
  * same arithmetic KnightLauncher does, so the two agree.
  */
 - (void)fetchPlayerCount {
-    static const float kPlayerEstimateMult = 1.4f;
     static const int kAppIdLive = 99900;
     static const int kAppIdPreview = 99920;
 
@@ -1499,12 +1778,10 @@ static int SKCompareVersions(NSString *a, NSString *b) {
 
       self.liveSteamPlayers = MAX(live, 0);
       self.previewSteamPlayers = MAX(preview, 0);
-      NSInteger total = (NSInteger)roundf(self.liveSteamPlayers * kPlayerEstimateMult) +
-                        (NSInteger)roundf(self.previewSteamPlayers * kPlayerEstimateMult);
-      if (total > 0) {
-          self.subtitleLabel.text =
-            [NSString stringWithFormat:@"Fight alongside ~%ld other Spiral Knights!",
-                                       (long)total];
+      // The count is Official's.
+      NSString *countText = [self playerCountText];
+      if (countText && !SKServers.selectedServer) {
+          self.subtitleLabel.text = countText;
           // Once: this runs on every refresh, and stacked recognizers would fire together.
           if (!self.subtitleLabel.userInteractionEnabled) {
               self.subtitleLabel.userInteractionEnabled = YES;
@@ -1519,6 +1796,7 @@ static int SKCompareVersions(NSString *a, NSString *b) {
 
 /// Explains where the number in the subtitle comes from.
 - (void)onPlayerCountTapped {
+    if (SKServers.selectedServer) return;
     NSInteger live = (NSInteger)roundf(self.liveSteamPlayers * 1.4f);
     NSInteger preview = (NSInteger)roundf(self.previewSteamPlayers * 1.4f);
     [self showAlertWithTitle:@"Players online"

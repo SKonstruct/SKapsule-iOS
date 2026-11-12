@@ -83,7 +83,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: out
-          key: native-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('external/**') }}-${{ hashFiles('scripts/build-*.sh') }}
+          key: native-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('external/**') }}-${{ hashFiles('scripts/build-*.sh') }}-${{ hashFiles('Natives/RPPairing/**') }}
 
       - name: Build native submodules
         if: steps.cache-out.outputs.cache-hit != 'true'
@@ -96,6 +96,7 @@ jobs:
           ./scripts/build-lwjgl3-ios.sh
           ./scripts/build-cacio-ios.sh
           ./scripts/build-frenchpress-ios.sh
+          ./scripts/build-rppairing-ios.sh
           ./scripts/build-bootstrap.sh
 
       # The JRE zip is an LFS object, which the checkout fetches. If it came back as a pointer
@@ -138,7 +139,9 @@ jobs:
               'Payload/SKapsule.app/Frameworks/libopenal.dylib' \
               'Payload/SKapsule.app/libs/' \
               'Payload/SKapsule.app/libs_lwjgl/lwjgl.jar' \
-              'Payload/SKapsule.app/Frameworks/liblwjgl.dylib'; do
+              'Payload/SKapsule.app/Frameworks/liblwjgl.dylib' \
+              'Payload/SKapsule.app/PlugIns/SKJITHelper.appex/SKJITHelper' \
+              'Payload/SKapsule.app/legal/LICENSES-rppairing-crates.txt'; do
               grep -qF "$need" <<<"$listing" || { echo "::error::$ipa is missing $need"; exit 1; }
             done
           done

@@ -4,6 +4,43 @@ Notable changes per release. Versions are the git tags the IPAs are built from
 (`vX.Y.Z` → `SKapsule.ipa` on that release). Before releasing, rename **Unreleased** to the new
 version: the Release workflow publishes that section as the release notes.
 
+## 1.0.3
+
+### Added
+
+- **Connect to custom servers.** A **Server** picker above Web / Steam lists Official and the servers you
+  add: tap it to choose one, and use the **+** beside it to add a server (name, address, port, and
+  optionally the server's public key, client and content URLs and a username and password for quick
+  login, kept in the Keychain and only handed to the game if the game is set up for that server) or the
+  pencil to edit or delete the selected one. The chosen server is written into the game's `config.jar` at
+  every launch, so switching back to Official undoes it. A private server uses the game's own logon
+  window, so the Web / Steam switch is hidden while one is selected. If the game has an update pending, the
+  launcher asks you to update on Official first, because the updater would otherwise replace the edit
+  and quietly connect you to Official.
+- **JIT Setup has an Automatic method** (the default): it uses the StikDebug app when it is installed
+  and built-in JIT otherwise. You can still pin either one.
+- **Built-in JIT connects LocalDevVPN for you.** If it isn't routing, SKapsule opens LocalDevVPN to
+  connect, and carries on when you come back. Failures explain a replaced pairing file, another VPN,
+  or cellular data (which breaks LocalDevVPN's loopback).
+- **A pairing file left at `Documents/pairingFile.plist`** (where iloader and most JIT apps put it) is
+  picked up automatically, like the one under `StikJIT/`.
+- **JIT Setup is a bottom sheet** with every way to get JIT and its numbered steps: pair on this
+  device, use a pairing file, StikDebug, TrollStore and a jailbreak (both before iOS 26). It walks
+  through LocalDevVPN, Check setup and Enable JIT, and says what to do when one of them fails.
+- **Pair on This Device** (iOS 27 and later): built-in JIT can now make its own pairing file, with no
+  computer. Start it in the sheet, then in Settings > Privacy & Security > Developer Mode tap "Pair with
+  SKapsule" and enter the code shown. The pairing keeps running while you are in Settings.
+- iOS now asks for **Local Network** access: built-in JIT needs it on iOS 26 and later to find the
+  device's debug service, and a private server on your network needs it to be reached.
+
+### Changed
+
+- **Built-in JIT on iOS 26 and later looks up the device's debug port** instead of assuming one, and
+  its debugger now handles JIT memory at any address (a bundled StikJIT patch). Both are for devices where
+  the old assumptions failed; they have not been tested on every device.
+- **A JIT request nothing answers no longer kills the app silently.** The game screen says JIT was not
+  enabled and what to do.
+
 ## 1.0.2
 
 ### Fixed

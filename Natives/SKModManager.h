@@ -32,6 +32,12 @@ NS_ASSUME_NONNULL_BEGIN
                     completion:
                         (void (^)(BOOL success, NSString *_Nullable summary, NSError *_Nullable error))completionBlock;
 
+/**
+ Keeps a verified copy of a code jar ("config.jar") before something other than the game edits it,
+ so a later restore needs no network. Does nothing if the jar isn't the game's own. Call off the main queue.
+ */
++ (void)preservePristineCodeJarNamed:(NSString *)name;
+
 @end
 
 NS_ASSUME_NONNULL_END

@@ -17,7 +17,7 @@
 
 ## Checklist
 
-- [ ] Docs updated in the same change (README / ROADMAP / AGENTS), or nothing needed updating
+- [ ] Docs updated in the same change (README / ENGINEERING / AGENTS), or nothing needed updating
 - [ ] New files under `Natives/` — ran `xcodegen generate` and committed `SKapsule.xcodeproj`
       (the project is generated *and* checked in; nothing regenerates it at build time)
 - [ ] No new third-party dependencies, or they're called out above and justified

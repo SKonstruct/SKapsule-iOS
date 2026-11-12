@@ -5,6 +5,9 @@
 #import <mach-o/dyld.h>
 #import <sys/mman.h>
 #import <os/proc.h>
+#import <signal.h>
+#import <stdatomic.h>
+#import <sys/ucontext.h>
 #import <sys/sysctl.h>
 #import <unistd.h>
 
@@ -164,6 +167,36 @@ NSString *skStageJITScriptToDocuments(void) {
     [data writeToFile:dst atomically:YES];  // overwrite each launch so updates propagate
     NSLog(@"[JIT] Staged JIT script for StikJIT import: %@", dst);
     return dst;
+}
+
+static atomic_int skJITTrapSkipped;
+
+static void skJITTrapHandler(int sig, siginfo_t *info, void *context) {
+    static const uint32_t kBrk0x69 = 0xD4200D20;  // brk #0x69, BreakGetJITMapping in libjvm
+    ucontext_t *uc = context;
+    uint64_t pc = uc->uc_mcontext->__ss.__pc;
+    if ((pc & 3) == 0 && *(const uint32_t *)(uintptr_t)pc == kBrk0x69) {
+        uc->uc_mcontext->__ss.__pc = pc + 4;
+        uc->uc_mcontext->__ss.__x[0] = 0;
+        atomic_store(&skJITTrapSkipped, 1);
+        static const char msg[] = "[JIT26] brk #0x69 was not serviced by a debugger; skipping it\n";
+        write(STDERR_FILENO, msg, sizeof(msg) - 1);
+        return;
+    }
+    // Not ours: put the default back so the instruction traps again and crashes with a report.
+    signal(sig, SIG_DFL);
+}
+
+void skInstallJITTrapGuard(void) {
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_flags = SA_SIGINFO;
+    sa.sa_sigaction = skJITTrapHandler;
+    sigaction(SIGTRAP, &sa, NULL);
+}
+
+BOOL skJITTrapWasSkipped(void) {
+    return atomic_load(&skJITTrapSkipped) != 0;
 }
 
 BOOL skDebuggerAttached(void) {

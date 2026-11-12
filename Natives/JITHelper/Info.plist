@@ -23,6 +23,11 @@
 		<!-- Not a real AR viewer: com.apple.ar.viewer is a generic extension point an app may
 		     start for itself through NSExtension, which is all SKBuiltinJIT.m needs. The
 		     activation rule keeps it from ever being offered to other apps. -->
+		<!-- The helper reads the device's RemotePairing port from this Bonjour service (iOS 26+). -->
+		<key>NSBonjourServices</key>
+		<array>
+			<string>_remotepairing._tcp</string>
+		</array>
 		<key>NSExtension</key>
 		<dict>
 			<key>NSExtensionAttributes</key>
