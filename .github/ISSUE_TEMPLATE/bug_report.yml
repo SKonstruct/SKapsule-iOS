@@ -141,12 +141,6 @@ body:
     validations:
       required: true
 
-  - type: input
-    id: sentry
-    attributes:
-      label: Sentry event ID
-      description: Optional. If the app reported the crash, paste the ID it showed.
-
   - type: textarea
     id: mods
     attributes:

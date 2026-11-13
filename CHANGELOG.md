@@ -4,6 +4,14 @@ Notable changes per release. Versions are the git tags the IPAs are built from
 (`vX.Y.Z` → `SKapsule.ipa` on that release). Before releasing, rename **Unreleased** to the new
 version: the Release workflow publishes that section as the release notes.
 
+## 1.0.4
+
+### Fixed
+
+- **Game froze when opening the friends list with Steam sign-in.** The game's 10 November update added a
+  Steam call the Steam stand-in did not have, which stopped the game's render loop. The friends list now
+  opens.
+
 ## 1.0.3
 
 ### Added
