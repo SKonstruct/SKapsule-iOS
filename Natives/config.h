@@ -1,9 +1,9 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#define CONFIG_VERSION "1.0.2"
+#define CONFIG_VERSION "1.0.4"
 #define CONFIG_BRANCH "main"
-#define CONFIG_COMMIT "adbd169"
+#define CONFIG_COMMIT "af76aeb"
 
 /* #undef CONFIG_RELEASE */
 #ifdef CONFIG_RELEASE
