@@ -218,53 +218,84 @@
 "You're on v%s, which is newer than the latest release (v%@)." = "أنت تستخدم الإصدار v%1$s، وهو أحدث من الإصدار الأخير (v%2$@).";
 
 /* Layouts */
-"Layouts…" = "Layouts…";
+"Layouts…" = "المخططات…";
 
-"Layouts" = "Layouts";
+"Layouts" = "المخططات";
 
-"Default (built-in)" = "Default (built-in)";
+"Default (built-in)" = "الافتراضي (مدمج)";
 
-"＋ Save current layout as preset…" = "＋ Save current layout as preset…";
+"＋ Save current layout as preset…" = "＋ حفظ المخطط الحالي كإعداد مسبق…";
 
-"Export current layout to file…" = "Export current layout to file…";
+"Export current layout to file…" = "تصدير المخطط الحالي إلى ملف…";
 
-"Import layout from file…" = "Import layout from file…";
+"Import layout from file…" = "استيراد مخطط من ملف…";
 
-"Apply \"%@\"?" = "Apply \"%@\"?";
+"Apply \"%@\"?" = "تطبيق \"%@\"؟";
 
-"This replaces your current arrangement. Save it as a preset first to keep it." = "This replaces your current arrangement. Save it as a preset first to keep it.";
+"This replaces your current arrangement. Save it as a preset first to keep it." = "يستبدل هذا ترتيبك الحالي. احفظه كإعداد مسبق أولاً للاحتفاظ به.";
 
-"Apply" = "Apply";
+"Apply" = "تطبيق";
 
-"Applied \"%@\"" = "Applied \"%@\"";
+"Applied \"%@\"" = "تم تطبيق \"%@\"";
 
-"Delete \"%@\"?" = "Delete \"%@\"?";
+"Delete \"%@\"?" = "حذف \"%@\"؟";
 
-"The preset is removed. The layout on screen is not changed." = "The preset is removed. The layout on screen is not changed.";
+"The preset is removed. The layout on screen is not changed." = "تتم إزالة الإعداد المسبق. لا يتغير المخطط على الشاشة.";
 
-"Deleted \"%@\"" = "Deleted \"%@\"";
+"Deleted \"%@\"" = "تم حذف \"%@\"";
 
-"Save current layout" = "Save current layout";
+"Save current layout" = "حفظ المخطط الحالي";
 
-"Preset name" = "Preset name";
+"Preset name" = "اسم الإعداد المسبق";
 
-"Preset list is full (%ld). Delete one first." = "Preset list is full (%ld). Delete one first.";
+"Preset list is full (%ld). Delete one first." = "قائمة الإعدادات المسبقة ممتلئة (%ld). احذف واحدًا أولاً.";
 
-"Saved as \"%@\"" = "Saved as \"%@\"";
+"Saved as \"%@\"" = "تم الحفظ باسم \"%@\"";
 
-"Layout exported" = "Layout exported";
+"Layout exported" = "تم تصدير المخطط";
 
-"Could not write the file" = "Could not write the file";
+"Could not write the file" = "تعذرت كتابة الملف";
 
-"That layout was made by a newer version of SKapsule." = "That layout was made by a newer version of SKapsule.";
+"That layout was made by a newer version of SKapsule." = "تم إنشاء هذا المخطط بواسطة إصدار أحدث من SKapsule.";
 
-"That file is too large to be a layout." = "That file is too large to be a layout.";
+"That file is too large to be a layout." = "هذا الملف كبير جدًا ليكون مخططًا.";
 
-"That file isn't a valid SKapsule controls layout." = "That file isn't a valid SKapsule controls layout.";
+"That file isn't a valid SKapsule controls layout." = "هذا الملف ليس مخطط تحكم صالحًا لـ SKapsule.";
 
-"Could not read the file" = "Could not read the file";
+"Could not read the file" = "تعذرت قراءة الملف";
 
-"Imported as \"%@\"." = "Imported as \"%@\".";
+"Imported as \"%@\"." = "تم الاستيراد باسم \"%@\".";
 
-"My layout" = "My layout";
+"My layout" = "مخططي";
+
+/* Modpack button */
+"Update Modpack" = "تحديث حزمة التعديلات";
+
+"Modpack up to date" = "حزمة التعديلات محدثة";
+
+/* Graphics in the sidebar */
+"Show FPS counter" = "إظهار عداد FPS";
+
+"Sharpening: off" = "الحدة: معطلة";
+
+"Sharpening: %ld%%" = "الحدة: %ld%%";
+
+"Sharp HUD (experimental)" = "واجهة مستخدم واضحة (تجريبي)";
+
+"Sharpening and Sharp HUD draw the game off-screen first." = "تقوم الحدة والواجهة الواضحة برسم اللعبة خارج الشاشة أولاً.";
+
+"Sharp HUD draws the HUD at full resolution, so it gets smaller: raise the game's UI scale to compensate." = "ترسم الواجهة الواضحة بدقة كاملة (تصبح أصغر): ارفع مقياس واجهة اللعبة للتعويض.";
+
+"Sharp HUD needs Resolution below 100%." = "تتطلب الواجهة الواضحة دقة أقل من 100%.";
+
+/* Touch editor pages */
+"Edit" = "تعديل";
+
+"Close" = "إغلاق";
+
+"Floating left stick" = "عصا يسرى عائمة";
+
+"Floating right stick" = "عصا يمنى عائمة";
+
+"A floating stick appears where your thumb lands and follows it." = "تظهر العصا العائمة حيث يلامس إبهامك الشاشة وتتبعه.";
 

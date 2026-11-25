@@ -408,13 +408,21 @@ usually belongs in the other.
   store, a port of Android's `touch/TouchLayoutShare.kt` + `TouchLayoutPresets.kt`. An export from either
   app must import on the other, so the two must accept and refuse the same files. The file is
   `{format:"skapsule-controls", version:1 (an integer), name, globalOpacity, actionBarVisible, nodes:[{id,
-  xPercent, yPercent, scale, visible}]}`. Only the arrangement is shared (not `renderScale` or
+  xPercent, yPercent, scale, visible, floating?}]}` (`floating`: optional boolean, written only when true,
+  joystick-only when applied; a non-boolean refuses the file). Only the arrangement is shared (not `renderScale` or
   `controlsEnabled`), and a file is untrusted: size capped at 64 KB, at most 64 nodes, finite numbers clamped
   to the editor's own ranges, a repeated known id refused, unknown ids ignored, and any structural error
   refuses the whole file. `-[SKTouchLayout applySharedLayout:]` lays the values over the app's own nodes by id,
   so a file can move controls but never change what they send. `Natives/Tests/SKLayoutShareTests.m`
   (`make test`) and Android's `TouchLayoutShareTest.kt` parse the same two fixtures, one written by each app
   (`Natives/Tests/fixtures/`, copied to Android's `src/test/resources/`); keep them identical.
+- **Editor pages and floating sticks.** The overlay's tab strip (Edit | Settings | Close; Close is hidden in the
+  standalone editor, which has Done) switches `_page`: Edit shows the selected control's own dialog, docked by
+  `SKDockPlacement.h` (never over that control or the tab strip/Done, least cover of other controls; same rule and
+  cases as Android's `DialogDock.kt`), Settings the full panel with controls shown untouchable. A floating stick
+  (`SKControlNode.floating`) is claimed in `hitTest:` only when the touch would otherwise reach the game (buttons
+  and other controls win), moves under the thumb in `touchesBegan:`, drags its base past 0.6 of its radius, and
+  goes home on release (the overlay's layout skips a held stick).
 - `Natives/SKKeyboardBridge.{h,m}`: offscreen `UIKeyInput` first responder.
 - **Touch routing differs by necessity.** iOS relies on UIKit hit testing: each control is
   a real subview with its own `UITouch`, and the overlay's `hitTest:` returns nil in the

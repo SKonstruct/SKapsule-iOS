@@ -49,6 +49,7 @@ Natives/               iOS app (Objective-C) + CMake build
   JavaLauncher.*       JVM bootstrap (dlopen libjli, JLI_Launch)
   SKTouchControls.*    touch-control node model + persisted layout
   SKTouchControlOverlay.*   touch-control overlay, edit mode, settings panel
+  SKDockPlacement.h    where the selected control's dialog docks in the editor (header-only, tested by `make test`)
   SKLayoutShare.*      layout export/import format + presets (Foundation only; same file as Android's)
   SKControlsEditorViewController.*  controls editor opened from the launcher sidebar
   SKMouseButtons.h     per-button mouse/trackpad press tracking (header-only)

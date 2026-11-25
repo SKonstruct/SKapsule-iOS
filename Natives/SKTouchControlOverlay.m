@@ -1,4 +1,5 @@
 #import "SKTouchControlOverlay.h"
+#import "SKDockPlacement.h"
 
 extern void sk_input_push_key(int key, int action, int modifiers);
 extern void sk_gamepad_set_virtual_active(BOOL active);
@@ -160,6 +161,10 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
 #pragma mark - Joystick
 
 @interface SKJoystickControl : SKControlView
+/// A floating stick at rest in play mode: drawn faintly, where it will reappear.
+@property (nonatomic, assign) BOOL idleGhost;
+/// Being held, so the overlay must not move it back to its saved spot.
+@property (nonatomic, readonly) BOOL isHeld;
 @end
 
 @implementation SKJoystickControl {
@@ -168,6 +173,15 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
     NSInteger _aimGeneration;
     int _axisX;
     int _axisY;
+}
+
+- (BOOL)isHeld {
+    return _dragging;
+}
+
+- (void)setIdleGhost:(BOOL)idleGhost {
+    _idleGhost = idleGhost;
+    [self setNeedsDisplay];
 }
 
 - (instancetype)initWithNode:(SKControlNode *)node {
@@ -198,7 +212,9 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
                                                     startAngle:0
                                                       endAngle:M_PI * 2
                                                      clockwise:YES];
-    [[UIColor colorWithWhite:0.12 alpha:0.40] setFill];
+    // A floating stick waiting for a thumb is only a faint hint of where it will appear.
+    BOOL ghost = self.idleGhost && !_dragging;
+    [[UIColor colorWithWhite:0.12 alpha:ghost ? 0.19 : 0.40] setFill];
     [base fill];
 
     UIBezierPath *knob = [UIBezierPath bezierPathWithArcCenter:_knob
@@ -206,15 +222,40 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
                                                     startAngle:0
                                                       endAngle:M_PI * 2
                                                      clockwise:YES];
-    [[UIColor colorWithWhite:0.62 alpha:0.80] setFill];
+    [[UIColor colorWithWhite:0.62 alpha:ghost ? 0.30 : 0.80] setFill];
     [knob fill];
 }
 
+/// A floating stick starts under the thumb (kept on screen), not at its saved spot.
+- (void)floatToTouch:(UITouch *)touch {
+    UIView *parent = self.superview;
+    if (!parent) return;
+    CGPoint p = [touch locationInView:parent];
+    CGFloat halfW = self.bounds.size.width * 0.5f, halfH = self.bounds.size.height * 0.5f;
+    self.center = CGPointMake(MIN(MAX(p.x, halfW), MAX(halfW, parent.bounds.size.width - halfW)),
+                              MIN(MAX(p.y, halfH), MAX(halfH, parent.bounds.size.height - halfH)));
+}
+
 - (void)updateForTouch:(UITouch *)touch {
-    CGPoint point = [touch locationInView:self];
-    CGPoint centre = CGPointMake(CGRectGetMidX(self.bounds), CGRectGetMidY(self.bounds));
     CGFloat radius = MIN(self.bounds.size.width, self.bounds.size.height) * 0.5f;
     CGFloat maxDistance = radius * kJoystickTravel;
+    UIView *parent = self.superview;
+
+    // Past its travel a floating stick's base is dragged along, so the thumb never runs out of room.
+    if (self.node.floating && parent && maxDistance > 0) {
+        CGPoint p = [touch locationInView:parent];
+        CGFloat ex = p.x - self.center.x, ey = p.y - self.center.y;
+        CGFloat d = hypot(ex, ey);
+        if (d > maxDistance) {
+            CGFloat pull = (d - maxDistance) / d;
+            CGFloat halfW = self.bounds.size.width * 0.5f, halfH = self.bounds.size.height * 0.5f;
+            self.center = CGPointMake(MIN(MAX(self.center.x + ex * pull, halfW), MAX(halfW, parent.bounds.size.width - halfW)),
+                                      MIN(MAX(self.center.y + ey * pull, halfH), MAX(halfH, parent.bounds.size.height - halfH)));
+        }
+    }
+
+    CGPoint point = [touch locationInView:self];
+    CGPoint centre = CGPointMake(CGRectGetMidX(self.bounds), CGRectGetMidY(self.bounds));
 
     CGFloat dx = point.x - centre.x;
     CGFloat dy = point.y - centre.y;
@@ -238,6 +279,7 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
 - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
     _dragging = YES;
     _aimGeneration++;
+    if (self.node.floating) [self floatToTouch:touches.anyObject];
     // Right stick doubles as attack: holding it charges, a tap fires.
     if (self.isRightStick) sk_gamepad_set_axis(5, 1.0f);
     [self updateForTouch:touches.anyObject];
@@ -252,6 +294,7 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
     _dragging = NO;
     _knob = CGPointMake(CGRectGetMidX(self.bounds), CGRectGetMidY(self.bounds));
     [self setNeedsDisplay];
+    [self.superview setNeedsLayout];  // a floating stick goes back to its saved spot
 
     if (self.isRightStick) {
         sk_gamepad_set_axis(5, -1.0f);
@@ -284,6 +327,7 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
     if (self.isRightStick) sk_gamepad_set_axis(5, -1.0f);
     _knob = CGPointMake(CGRectGetMidX(self.bounds), CGRectGetMidY(self.bounds));
     [self setNeedsDisplay];
+    [self.superview setNeedsLayout];
 }
 
 @end
@@ -313,6 +357,12 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
     UILabel *_nodeTitle;
     UISwitch *_visibleSwitch;
     UISlider *_scaleSlider;
+    UIStackView *_nodeStack;
+    UISegmentedControl *_tabs;
+    UISwitch *_floatLeftSwitch;
+    UISwitch *_floatRightSwitch;
+    /// 0 = arranging controls (a small dialog only for the selected one), 1 = the full settings panel.
+    NSInteger _page;
 
     BOOL _resetArmed;
     CGPoint _dragOffset;
@@ -343,7 +393,19 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
     UIView *hit = [super hitTest:point withEvent:event];
     if (self.editing) return hit ?: self;
-    return hit == self ? nil : hit;
+    // A floating stick takes touches anywhere on its half of the screen, but a button or the
+    // other controls under the thumb win: only a touch that would reach the game is claimed.
+    if (hit == self) return [self floatingStickAtPoint:point];
+    return hit;
+}
+
+- (SKJoystickControl *)floatingStickAtPoint:(CGPoint)point {
+    BOOL rightHalf = point.x >= self.bounds.size.width * 0.5f;
+    for (SKControlView *view in _controls.reverseObjectEnumerator) {
+        if (![view isKindOfClass:SKJoystickControl.class] || view.hidden || !view.node.floating) continue;
+        if ((view.node.type == SKControlTypeJoystickRight) == rightHalf) return (SKJoystickControl *)view;
+    }
+    return nil;
 }
 
 - (void)layoutSubviews {
@@ -358,8 +420,15 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
         CGFloat base = (node.type == SKControlTypeButton) ? baseButton : baseJoystick;
         CGFloat size = base * node.scale;
         view.bounds = CGRectMake(0, 0, size, size);
+        // A floating stick under a thumb moves itself; it goes home when released.
+        if ([view isKindOfClass:SKJoystickControl.class] && ((SKJoystickControl *)view).isHeld) continue;
         view.center = CGPointMake(width * node.xPercent, height * node.yPercent);
     }
+
+    // The tab strip sits at the top centre; everything else keeps clear of it.
+    CGFloat tabsWidth = MIN(_tabs.numberOfSegments >= 3 ? 300.0f : 210.0f, width - 180.0f);
+    _tabs.frame = CGRectMake((width - tabsWidth) * 0.5f, 10, tabsWidth, 32);
+    CGFloat top = CGRectGetMaxY(_tabs.frame) + 10;
 
     // The panel's height comes from its stack's constraints; sizeToFit would return the
     // frame unchanged because the panel itself is autoresizing-sized.
@@ -367,10 +436,33 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
     CGFloat contentHeight = [_panelStack systemLayoutSizeFittingSize:CGSizeMake(panelWidth - 32.0f, 0)
                                        withHorizontalFittingPriority:UILayoutPriorityRequired
                                              verticalFittingPriority:UILayoutPriorityFittingSizeLevel].height + 32.0f;
-    // Taller than the screen: the panel scrolls.
-    CGFloat panelHeight = MIN(contentHeight, height - 24.0f);
-    _panel.frame = CGRectMake((width - panelWidth) * 0.5f, (height - panelHeight) * 0.5f,
+    // Taller than the screen: the panel scrolls. It centres in the room below the tab strip.
+    CGFloat room = height - top - 12.0f;
+    CGFloat panelHeight = MIN(contentHeight, room);
+    _panel.frame = CGRectMake((width - panelWidth) * 0.5f, top + (room - panelHeight) * 0.5f,
                               panelWidth, panelHeight);
+
+    [self dockNodePanel];
+}
+
+/// The selected control's dialog goes where it never covers that control (the player is dragging it),
+/// the tab strip or Done, and covers as few other controls as it can (see SKDockPlacement.h).
+- (void)dockNodePanel {
+    if (_nodeSection.hidden || !_selected) return;
+    CGFloat width = self.bounds.size.width, height = self.bounds.size.height;
+    CGFloat dialogWidth = MIN(240.0f, width - 24.0f);
+    CGFloat dialogHeight = [_nodeStack systemLayoutSizeFittingSize:CGSizeMake(dialogWidth - 24.0f, 0)
+                                     withHorizontalFittingPriority:UILayoutPriorityRequired
+                                           verticalFittingPriority:UILayoutPriorityFittingSizeLevel].height + 24.0f;
+    CGRect reserved[2] = {CGRectInset(_tabs.frame, -8, -8), CGRectMake(width - 150, 0, 150, 64)};
+    CGRect others[64];
+    int count = 0;
+    for (SKControlView *view in _controls) {
+        if (view != _selected && count < 64) others[count++] = view.frame;
+    }
+    CGPoint origin = SKDockPlace(CGSizeMake(width, height), CGSizeMake(dialogWidth, dialogHeight), _selected.frame,
+                                 reserved, 2, others, count, 12, 16);
+    _nodeSection.frame = CGRectMake(origin.x, origin.y, dialogWidth, dialogHeight);
 }
 
 /**
@@ -397,21 +489,24 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
 }
 
 - (void)applyAppearance {
+    // Only the Edit page shows the arranging look; the Settings page shows the controls as they play, untouchable.
+    BOOL editLook = self.editing && _page == 0;
     for (SKControlView *view in _controls) {
         SKControlNode *node = view.node;
-        if (self.editing) {
+        if (editLook) {
             view.hidden = NO;
             BOOL shown = node.visible && ![self isHiddenByShowButtons:node];
             view.alpha = shown ? MAX(_layout.globalOpacity, kEditMinOpacity) : kEditHiddenOpacity;
-            view.userInteractionEnabled = NO;  // the overlay drives selection/drag itself
             view.outline.hidden = NO;
         } else {
             view.hidden =
               !(_layout.controlsEnabled && node.visible && ![self isHiddenByShowButtons:node]);
             view.alpha = _layout.globalOpacity;
-            view.userInteractionEnabled = YES;
             view.outline.hidden = YES;
         }
+        // While editing the overlay drives selection/drag itself, and the Settings page must not press anything.
+        view.userInteractionEnabled = !self.editing;
+        if ([view isKindOfClass:SKJoystickControl.class]) ((SKJoystickControl *)view).idleGhost = node.floating && !self.editing;
     }
     // SK only reads the virtual pad while it reports as connected, so this gate is what
     // actually disables the controls rather than merely hiding them.
@@ -432,13 +527,46 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
     // its button/axis stays latched in the gamepad mailbox.
     for (SKControlView *view in _controls) [view releaseInput];
     _editing = !_editing;
-    _panel.hidden = !_editing;
+    _tabs.hidden = !_editing;
     if (!_editing) {
         [self selectControl:nil];
         [_layout save];
     }
+    [self showPage:0];
+}
+
+/// 0 = Edit, 1 = Settings. The tab strip is the way between them; the panel and the selected
+/// control's dialog are never up together.
+- (void)showPage:(NSInteger)page {
+    _page = page;
+    _tabs.selectedSegmentIndex = page;
+    _panel.hidden = !(_editing && page == 1);
+    if (page == 1) [self selectControl:nil];
+    _nodeSection.hidden = !(_editing && page == 0 && _selected);
     [self applyAppearance];
     [self setNeedsLayout];
+}
+
+- (void)setCloseTabHidden:(BOOL)closeTabHidden {
+    _closeTabHidden = closeTabHidden;
+    BOOL hasClose = _tabs.numberOfSegments >= 3;
+    if (closeTabHidden && hasClose) {
+        [_tabs removeSegmentAtIndex:2 animated:NO];
+    } else if (!closeTabHidden && !hasClose) {
+        [_tabs insertSegmentWithTitle:NSLocalizedString(@"Close", nil) atIndex:2 animated:NO];
+    }
+    _tabs.selectedSegmentIndex = _page;
+    [self setNeedsLayout];
+}
+
+- (void)onTabChanged {
+    if (_tabs.selectedSegmentIndex == 2) {
+        _tabs.selectedSegmentIndex = _page;  // Close is a button, not a page
+        if (self.closeRequestHandler) self.closeRequestHandler();
+        else if (self.editing) [self toggleEditMode];
+        return;
+    }
+    [self showPage:_tabs.selectedSegmentIndex];
 }
 
 - (void)selectControl:(SKControlView *)control {
@@ -446,7 +574,7 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
     _selected = control;
     _selected.selectedForEdit = YES;
 
-    _nodeSection.hidden = (control == nil);
+    _nodeSection.hidden = !(_editing && _page == 0 && control);
     if (control) {
         _nodeTitle.text = [NSString stringWithFormat:@"Settings: %@",
                            control.node.label.length ? control.node.label : control.node.nodeId];
@@ -464,9 +592,11 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
 }
 
 - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    if (!self.editing) return;
+    // Only the Edit page arranges controls; on Settings a tap on the bare backdrop does nothing.
+    if (!self.editing || _page != 0) return;
     CGPoint point = [touches.anyObject locationInView:self];
     if (CGRectContainsPoint(_panel.frame, point)) return;
+    if (!_nodeSection.hidden && CGRectContainsPoint(_nodeSection.frame, point)) return;
 
     SKControlView *hit = [self controlAtPoint:point];
     [self selectControl:hit];
@@ -488,10 +618,12 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
 
 - (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
     _dragging = nil;
+    [self setNeedsLayout];  // re-dock the dialog for the control's new spot
 }
 
 - (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
     _dragging = nil;
+    [self setNeedsLayout];
 }
 
 #pragma mark Panel
@@ -604,15 +736,49 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
     _scaleSlider.maximumValue = SKMaxNodeScale;
     [_scaleSlider addTarget:self action:@selector(onScaleChanged) forControlEvents:UIControlEventValueChanged];
 
-    UIStackView *nodeStack = [[UIStackView alloc] initWithArrangedSubviews:@[
+    // The selected control's dialog: its own card, docked clear of the control (dockNodePanel), not part of the panel.
+    _nodeStack = [[UIStackView alloc] initWithArrangedSubviews:@[
         _nodeTitle,
         [self rowWithLabel:@"Visible" control:_visibleSwitch],
         [self rowWithLabel:@"Scale" control:_scaleSlider],
     ]];
-    nodeStack.axis = UILayoutConstraintAxisVertical;
-    nodeStack.spacing = 8;
-    _nodeSection = nodeStack;
+    _nodeStack.axis = UILayoutConstraintAxisVertical;
+    _nodeStack.spacing = 8;
+    _nodeStack.frame = CGRectMake(12, 12, 216, 100);
+    _nodeSection = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 240, 124)];
+    _nodeSection.backgroundColor = [UIColor colorWithWhite:0 alpha:0.70];
+    _nodeSection.layer.cornerRadius = 12;
+    _nodeStack.translatesAutoresizingMaskIntoConstraints = NO;
+    [_nodeSection addSubview:_nodeStack];
+    [NSLayoutConstraint activateConstraints:@[
+        [_nodeStack.leadingAnchor constraintEqualToAnchor:_nodeSection.leadingAnchor constant:12],
+        [_nodeStack.trailingAnchor constraintEqualToAnchor:_nodeSection.trailingAnchor constant:-12],
+        [_nodeStack.topAnchor constraintEqualToAnchor:_nodeSection.topAnchor constant:12],
+    ]];
     _nodeSection.hidden = YES;
+
+    // Floating sticks, one switch each (saved in the layout).
+    _floatLeftSwitch = [UISwitch new];
+    _floatLeftSwitch.onTintColor = SKThemeColor();
+    [_floatLeftSwitch addTarget:self action:@selector(onFloatChanged:) forControlEvents:UIControlEventValueChanged];
+    _floatRightSwitch = [UISwitch new];
+    _floatRightSwitch.onTintColor = SKThemeColor();
+    [_floatRightSwitch addTarget:self action:@selector(onFloatChanged:) forControlEvents:UIControlEventValueChanged];
+    UILabel *floatHint = [self panelLabel:NSLocalizedString(@"A floating stick appears where your thumb lands and follows it.", nil)];
+    floatHint.font = [UIFont systemFontOfSize:12];
+    floatHint.textColor = [UIColor colorWithWhite:1 alpha:0.7];
+    floatHint.numberOfLines = 0;
+    [self syncFloatSwitches];
+
+    _tabs = [[UISegmentedControl alloc] initWithItems:@[
+        NSLocalizedString(@"Edit", nil), NSLocalizedString(@"Settings", nil), NSLocalizedString(@"Close", nil)]];
+    _tabs.selectedSegmentIndex = 0;
+    _tabs.selectedSegmentTintColor = SKThemeColor();
+    [_tabs setTitleTextAttributes:@{NSForegroundColorAttributeName : UIColor.whiteColor} forState:UIControlStateNormal];
+    [_tabs setTitleTextAttributes:@{NSForegroundColorAttributeName : UIColor.whiteColor} forState:UIControlStateSelected];
+    _tabs.backgroundColor = [UIColor colorWithWhite:0 alpha:0.70];
+    _tabs.hidden = YES;
+    [_tabs addTarget:self action:@selector(onTabChanged) forControlEvents:UIControlEventValueChanged];
 
     UIStackView *stack = [[UIStackView alloc] initWithArrangedSubviews:@[
         [self panelLabel:@"Touch Controls"],
@@ -625,9 +791,11 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
         sharpenRow,
         [self rowWithLabel:@"Sharp HUD (experimental)" control:_hudSwitch],
         _gfxHint,
+        [self rowWithLabel:NSLocalizedString(@"Floating left stick", nil) control:_floatLeftSwitch],
+        [self rowWithLabel:NSLocalizedString(@"Floating right stick", nil) control:_floatRightSwitch],
+        floatHint,
         _layoutsButton,
         _resetButton,
-        _nodeSection,
     ]];
     stack.axis = UILayoutConstraintAxisVertical;
     stack.spacing = 10;
@@ -652,6 +820,23 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
         [stack.widthAnchor constraintEqualToAnchor:scroll.frameLayoutGuide.widthAnchor constant:-32],
     ]];
     [self addSubview:_panel];
+    [self addSubview:_nodeSection];
+    [self addSubview:_tabs];
+}
+
+- (void)syncFloatSwitches {
+    for (SKControlNode *node in _layout.nodes) {
+        if (node.type == SKControlTypeJoystickLeft) _floatLeftSwitch.on = node.floating;
+        if (node.type == SKControlTypeJoystickRight) _floatRightSwitch.on = node.floating;
+    }
+}
+
+- (void)onFloatChanged:(UISwitch *)sender {
+    SKControlType type = (sender == _floatLeftSwitch) ? SKControlTypeJoystickLeft : SKControlTypeJoystickRight;
+    for (SKControlNode *node in _layout.nodes) {
+        if (node.type == type) node.floating = sender.on;
+    }
+    [self applyAppearance];
 }
 
 - (void)onEnableChanged {
@@ -768,9 +953,11 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
             view.node.yPercent = fresh.yPercent;
             view.node.scale = fresh.scale;
             view.node.visible = fresh.visible;
+            view.node.floating = fresh.floating;
         }
     }
     [_layout save];
+    [self syncFloatSwitches];
 
     _enableSwitch.on = _layout.controlsEnabled;
     _actionBarSwitch.on = _layout.actionBarVisible;
@@ -798,6 +985,7 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
 
     _actionBarSwitch.on = _layout.actionBarVisible;
     _opacitySlider.value = _layout.globalOpacity;
+    [self syncFloatSwitches];
     [self selectControl:nil];
     [self applyAppearance];
     [self setNeedsLayout];

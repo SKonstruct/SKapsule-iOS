@@ -222,49 +222,80 @@
 
 "Layouts" = "Layouts";
 
-"Default (built-in)" = "Default (built-in)";
+"Default (built-in)" = "Standard (integriert)";
 
-"＋ Save current layout as preset…" = "＋ Save current layout as preset…";
+"＋ Save current layout as preset…" = "＋ Aktuelles Layout als Vorlage speichern…";
 
-"Export current layout to file…" = "Export current layout to file…";
+"Export current layout to file…" = "Aktuelles Layout in Datei exportieren…";
 
-"Import layout from file…" = "Import layout from file…";
+"Import layout from file…" = "Layout aus Datei importieren…";
 
-"Apply \"%@\"?" = "Apply \"%@\"?";
+"Apply \"%@\"?" = "„%@“ anwenden?";
 
-"This replaces your current arrangement. Save it as a preset first to keep it." = "This replaces your current arrangement. Save it as a preset first to keep it.";
+"This replaces your current arrangement. Save it as a preset first to keep it." = "Dadurch wird die aktuelle Anordnung ersetzt. Zuerst als Vorlage speichern, um sie zu behalten.";
 
-"Apply" = "Apply";
+"Apply" = "Anwenden";
 
-"Applied \"%@\"" = "Applied \"%@\"";
+"Applied \"%@\"" = "„%@“ angewendet";
 
-"Delete \"%@\"?" = "Delete \"%@\"?";
+"Delete \"%@\"?" = "„%@“ löschen?";
 
-"The preset is removed. The layout on screen is not changed." = "The preset is removed. The layout on screen is not changed.";
+"The preset is removed. The layout on screen is not changed." = "Die Vorlage wird entfernt. Das Layout auf dem Bildschirm bleibt unverändert.";
 
-"Deleted \"%@\"" = "Deleted \"%@\"";
+"Deleted \"%@\"" = "„%@“ gelöscht";
 
-"Save current layout" = "Save current layout";
+"Save current layout" = "Aktuelles Layout speichern";
 
-"Preset name" = "Preset name";
+"Preset name" = "Vorlagenname";
 
-"Preset list is full (%ld). Delete one first." = "Preset list is full (%ld). Delete one first.";
+"Preset list is full (%ld). Delete one first." = "Vorlagenliste ist voll (%ld). Zuerst eine löschen.";
 
-"Saved as \"%@\"" = "Saved as \"%@\"";
+"Saved as \"%@\"" = "Als „%@“ gespeichert";
 
-"Layout exported" = "Layout exported";
+"Layout exported" = "Layout exportiert";
 
-"Could not write the file" = "Could not write the file";
+"Could not write the file" = "Datei konnte nicht geschrieben werden";
 
-"That layout was made by a newer version of SKapsule." = "That layout was made by a newer version of SKapsule.";
+"That layout was made by a newer version of SKapsule." = "Dieses Layout wurde von einer neueren Version von SKapsule erstellt.";
 
-"That file is too large to be a layout." = "That file is too large to be a layout.";
+"That file is too large to be a layout." = "Diese Datei ist zu groß für ein Layout.";
 
-"That file isn't a valid SKapsule controls layout." = "That file isn't a valid SKapsule controls layout.";
+"That file isn't a valid SKapsule controls layout." = "Diese Datei ist kein gültiges SKapsule-Steuerungslayout.";
 
-"Could not read the file" = "Could not read the file";
+"Could not read the file" = "Datei konnte nicht gelesen werden";
 
-"Imported as \"%@\"." = "Imported as \"%@\".";
+"Imported as \"%@\"." = "Als „%@“ importiert.";
 
-"My layout" = "My layout";
+"My layout" = "Mein Layout";
+
+/* Modpack button */
+"Update Modpack" = "Modpack aktualisieren";
+
+"Modpack up to date" = "Modpack aktuell";
+
+/* Graphics in the sidebar */
+"Show FPS counter" = "FPS-Zähler anzeigen";
+
+"Sharpening: off" = "Schärfen: aus";
+
+"Sharpening: %ld%%" = "Schärfen: %ld%%";
+
+"Sharp HUD (experimental)" = "Scharfes HUD (experimentell)";
+
+"Sharpening and Sharp HUD draw the game off-screen first." = "Schärfen und scharfes HUD zeichnen das Spiel zuerst abseits des Bildschirms.";
+
+"Sharp HUD draws the HUD at full resolution, so it gets smaller: raise the game's UI scale to compensate." = "Scharfes HUD zeichnet das HUD in voller Auflösung (es wird kleiner): Erhöhe die UI-Skalierung im Spiel zum Ausgleich.";
+
+"Sharp HUD needs Resolution below 100%." = "Scharfes HUD erfordert eine Auflösung unter 100%.";
+
+/* Touch editor pages */
+"Edit" = "Bearbeiten";
+
+"Close" = "Schließen";
+
+"Floating left stick" = "Schwebender linker Stick";
+
+"Floating right stick" = "Schwebender rechter Stick";
+
+"A floating stick appears where your thumb lands and follows it." = "Ein schwebender Stick erscheint dort, wo der Daumen aufsetzt, und folgt ihm.";
 

@@ -58,6 +58,7 @@ static SKControlType SKControlTypeFromString(NSString *string) {
         @"keyCode": @(self.keyCode),
         @"isAxisTrigger": @(self.isAxisTrigger),
         @"isToggle": @(self.isToggle),
+        @"floating": @(self.floating),
         @"label": self.label ?: @"",
     };
 }
@@ -98,6 +99,7 @@ static NSString *SKLabelForNode(NSString *nodeId, NSString *persisted) {
     node.keyCode = [dict[@"keyCode"] ?: @(-1) integerValue];
     node.isAxisTrigger = [dict[@"isAxisTrigger"] boolValue];
     node.isToggle = [dict[@"isToggle"] boolValue];
+    node.floating = node.type != SKControlTypeButton && [dict[@"floating"] boolValue];
     node.label = SKLabelForNode(nodeId, dict[@"label"]);
     // A layout saved before `scale` existed would decode as 0 and lay out at zero size.
     CGFloat scale = [dict[@"scale"] doubleValue];
@@ -259,6 +261,7 @@ static NSString *SKLabelForNode(NSString *nodeId, NSString *persisted) {
         out.yPercent = node.yPercent;
         out.scale = node.scale;
         out.visible = node.visible;
+        out.floating = node.floating;
         [nodes addObject:out];
     }
     shared.nodes = nodes;
@@ -280,11 +283,14 @@ static NSString *SKLabelForNode(NSString *nodeId, NSString *persisted) {
             node.yPercent = state.yPercent;
             node.scale = state.scale;
             node.visible = state.visible;
+            // Only a joystick floats: a file cannot make a button do it.
+            node.floating = state.floating && node.type != SKControlTypeButton;
         } else if (fresh) {
             node.xPercent = fresh.xPercent;
             node.yPercent = fresh.yPercent;
             node.scale = fresh.scale;
             node.visible = fresh.visible;
+            node.floating = fresh.floating;
         }
     }
 }

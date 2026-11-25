@@ -17,7 +17,7 @@ The Android version is [SKapsule](https://github.com/SKonstruct/SKapsule).
 | **Play** | The real desktop client on iPhone and iPad, on iOS or iPadOS 17.4 and later. Sign in with **Web**, or with **Steam** by QR code or the Steam app: there is no Steam password to type. |
 | **Controls** | On-screen touch controls, Bluetooth controllers and keyboards, and mice and trackpads on iPad. **Edit Controls** moves, resizes and hides every control. Keep named presets, or export and import a layout as a file that also works on [SKapsule for Android](https://github.com/SKonstruct/SKapsule). |
 | **JIT** | Required for a playable speed. SKapsule can enable it itself, or through StikDebug (see [Enabling JIT](#enabling-jit)). |
-| **Graphics** | A resolution slider, **Sharpening**, **Sharp HUD** (experimental) and an FPS counter, all in the in-game settings panel. |
+| **Graphics** | A resolution slider, **Sharpening**, **Sharp HUD** (experimental) and an FPS counter, in the in-game settings panel; the last three are also in the sidebar. |
 | **Languages** | English, Arabic, German, Spanish, Estonian, French, Italian, Japanese, Polish, Brazilian Portuguese, Russian and Simplified and Traditional Chinese. See [Translating](#translating). |
 
 ## Contents
@@ -142,7 +142,8 @@ your own mods in the `mods` folder (**Open Folder**). **Apply Mods** installs th
 **Remove Mods** restores the game's original files. A few config files that often clash with
 game updates are never replaced, the same ones [KnightLauncher](https://github.com/lucasluqui/KnightLauncher) skips. Downloading the modpack
 never deletes mods you added yourself. Mods apply in an automatic order, with the broadest mod first (the one that
-changes the most files), so a small, targeted mod wins over a big one; there is nothing to sort by hand.
+changes the most files), so a small, targeted mod wins over a big one; there is nothing to sort by hand. The button
+says **Update Modpack** when the modpack has changed; SKapsule checks once when it starts.
 
 **Custom servers.** The **Server** picker above Web / Steam chooses Official or a saved server; the **+**
 beside it adds one (address, port, and optionally its public key and client/content URLs) and the pencil

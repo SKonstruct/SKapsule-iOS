@@ -6,11 +6,13 @@
 #import "SKJITSetupViewController.h"
 #import "SKControlsEditorViewController.h"
 #import "SKCredentials.h"
+#import "SKGfxSettings.h"
 #import "SKInstaller.h"
 #import "SKModManager.h"
 #import "SKNewsFeed.h"
 #import "SKReporter.h"
 #import "SKServers.h"
+#import "SKTouchControls.h"
 #import "SKZipUtils.h"
 #import "config.h"
 #import "utils.h"
@@ -56,11 +58,17 @@ static const float kPlayerEstimateMult = 1.4f;
 
 // Sidebar & Dimming Overlay
 @property (nonatomic, strong) UIView *dimmingView;
+@property (nonatomic, strong) UIButton *downloadModsButton;
 @property (nonatomic, strong) UIView *sidebarView;
 @property (nonatomic, strong) NSLayoutConstraint *sidebarTrailingConstraint;
 @property (nonatomic, strong) UIButton *btnLogout;
 @property (nonatomic, strong) UIView *logoutDivider;
 @property (nonatomic, strong) UISwitch *avoidEdgesSwitch;
+@property (nonatomic, strong) UISwitch *fpsSwitch;
+@property (nonatomic, strong) UILabel *sharpenLabel;
+@property (nonatomic, strong) UISlider *sharpenSlider;
+@property (nonatomic, strong) UISwitch *sharpHudSwitch;
+@property (nonatomic, strong) UILabel *gfxHintLabel;
 @property (nonatomic, strong) UISwitch *crashReportSwitch;
 @property (nonatomic, strong) UIButton *ramMinusButton;
 @property (nonatomic, strong) UIButton *ramPlusButton;
@@ -362,6 +370,15 @@ static const float kPlayerEstimateMult = 1.4f;
                                                           iconName:@"icloud.and.arrow.down"
                                                             action:@selector(onDownloadMods)];
     [stackView addArrangedSubview:btnDownloadMods];
+    // The button says Update when the modpack changed. GitHub is asked once per app start.
+    self.downloadModsButton = btnDownloadMods;
+    [self refreshModpackButton];
+    if (!SKModManager.sharedManager.modpackStatus) {
+        __weak typeof(self) weakSelf = self;
+        [SKModManager.sharedManager checkModpackStatusWithCompletion:^(SKModPackStatus *status) {
+          [weakSelf refreshModpackButton];
+        }];
+    }
 
     UIButton *btnApplyMods = [self createSidebarButtonWithTitle:NSLocalizedString(@"Apply Mods", nil)
                                                        iconName:@"hammer"
@@ -503,6 +520,42 @@ static const float kPlayerEstimateMult = 1.4f;
     [self refreshRamLabels];
 
     [stackView addArrangedSubview:avoidRow];
+
+    // Graphics: the same settings as the in-game panel
+    self.fpsSwitch = [[UISwitch alloc] init];
+    [self.fpsSwitch addTarget:self action:@selector(onFpsChanged:) forControlEvents:UIControlEventValueChanged];
+    [stackView addArrangedSubview:[self sidebarSwitchRowWithTitle:NSLocalizedString(@"Show FPS counter", nil)
+                                                       switchView:self.fpsSwitch
+                                                        tintColor:themeColor]];
+
+    self.sharpenLabel = [[UILabel alloc] init];
+    self.sharpenLabel.textColor = UIColor.whiteColor;
+    self.sharpenLabel.font = [UIFont systemFontOfSize:14];
+    [stackView addArrangedSubview:self.sharpenLabel];
+
+    self.sharpenSlider = [[UISlider alloc] init];
+    self.sharpenSlider.minimumValue = 0;
+    self.sharpenSlider.maximumValue = 100;
+    self.sharpenSlider.minimumTrackTintColor = themeColor;
+    [self.sharpenSlider addTarget:self action:@selector(onSharpenSliding:) forControlEvents:UIControlEventValueChanged];
+    // Applied on release, like the in-game slider: the game surface may be rebuilt.
+    [self.sharpenSlider addTarget:self
+                           action:@selector(onSharpenReleased:)
+                 forControlEvents:UIControlEventTouchUpInside | UIControlEventTouchUpOutside];
+    [stackView addArrangedSubview:self.sharpenSlider];
+
+    self.sharpHudSwitch = [[UISwitch alloc] init];
+    [self.sharpHudSwitch addTarget:self action:@selector(onSharpHudChanged:) forControlEvents:UIControlEventValueChanged];
+    [stackView addArrangedSubview:[self sidebarSwitchRowWithTitle:NSLocalizedString(@"Sharp HUD (experimental)", nil)
+                                                       switchView:self.sharpHudSwitch
+                                                        tintColor:themeColor]];
+
+    self.gfxHintLabel = [[UILabel alloc] init];
+    self.gfxHintLabel.textColor = [UIColor colorWithWhite:0.67 alpha:1.0];
+    self.gfxHintLabel.font = [UIFont systemFontOfSize:12];
+    self.gfxHintLabel.numberOfLines = 0;
+    [stackView addArrangedSubview:self.gfxHintLabel];
+    [self refreshGraphicsSettings];
 
     // Crash reporting row
     UIView *crashRow = [[UIView alloc] init];
@@ -745,6 +798,7 @@ static const float kPlayerEstimateMult = 1.4f;
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    [self refreshGraphicsSettings];
     [self showSelectedServer];
     [self updateLogoutButtonVisibility];
     [self refreshJITStatus];
@@ -887,6 +941,71 @@ static const float kPlayerEstimateMult = 1.4f;
 
 - (void)onCrashReportingChanged:(UISwitch *)sender {
     [NSUserDefaults.standardUserDefaults setBool:sender.on forKey:SKReportingEnabledKey];
+}
+
+/// A label with a switch at the trailing edge, laid out like the avoid-edges row.
+- (UIView *)sidebarSwitchRowWithTitle:(NSString *)title switchView:(UISwitch *)switchView tintColor:(UIColor *)tint {
+    UIView *row = [[UIView alloc] init];
+    row.translatesAutoresizingMaskIntoConstraints = NO;
+    UILabel *label = [[UILabel alloc] init];
+    label.text = title;
+    label.textColor = UIColor.whiteColor;
+    label.font = [UIFont systemFontOfSize:14];
+    label.numberOfLines = 0;
+    // A long title wraps instead of pushing the switch past the edge.
+    [label setContentCompressionResistancePriority:UILayoutPriorityDefaultLow forAxis:UILayoutConstraintAxisHorizontal];
+    label.translatesAutoresizingMaskIntoConstraints = NO;
+    [row addSubview:label];
+    switchView.onTintColor = tint;
+    switchView.translatesAutoresizingMaskIntoConstraints = NO;
+    [row addSubview:switchView];
+    [NSLayoutConstraint activateConstraints:@[
+        [label.leadingAnchor constraintEqualToAnchor:row.leadingAnchor constant:8],
+        [label.centerYAnchor constraintEqualToAnchor:row.centerYAnchor],
+        [label.trailingAnchor constraintLessThanOrEqualToAnchor:switchView.leadingAnchor constant:-8],
+        [switchView.trailingAnchor constraintEqualToAnchor:row.trailingAnchor constant:-8],
+        [switchView.centerYAnchor constraintEqualToAnchor:row.centerYAnchor],
+        [row.heightAnchor constraintEqualToConstant:44],
+    ]];
+    return row;
+}
+
+/// The in-game panel changes the same settings, so they are read again whenever the launcher appears.
+- (void)refreshGraphicsSettings {
+    self.fpsSwitch.on = SKGfxShowFps();
+    int sharpen = SKGfxSharpenPercent();
+    self.sharpenSlider.value = sharpen;
+    [self updateSharpenLabel:sharpen];
+    self.sharpHudSwitch.on = SKGfxSharpHud();
+    // Sharp HUD needs a scene smaller than the window, so it is greyed out at 100% resolution.
+    BOOL applies = SKGfxSharpHudApplies((float)[SKTouchLayout loadLayout].renderScale);
+    self.sharpHudSwitch.enabled = applies;
+    self.sharpHudSwitch.alpha = applies ? 1.0 : 0.4;
+    self.gfxHintLabel.text = [NSString
+        stringWithFormat:@"%@\n%@", NSLocalizedString(@"Sharpening and Sharp HUD draw the game off-screen first.", nil),
+                         applies ? NSLocalizedString(@"Sharp HUD draws the HUD at full resolution, so it gets smaller: raise the game's UI scale to compensate.", nil)
+                                 : NSLocalizedString(@"Sharp HUD needs Resolution below 100%.", nil)];
+}
+
+- (void)updateSharpenLabel:(int)percent {
+    self.sharpenLabel.text = percent <= 0 ? NSLocalizedString(@"Sharpening: off", nil)
+                                          : [NSString stringWithFormat:NSLocalizedString(@"Sharpening: %ld%%", nil), (long)percent];
+}
+
+- (void)onFpsChanged:(UISwitch *)sender {
+    SKGfxSetShowFps(sender.on);
+}
+
+- (void)onSharpenSliding:(UISlider *)sender {
+    [self updateSharpenLabel:(int)lroundf(sender.value)];
+}
+
+- (void)onSharpenReleased:(UISlider *)sender {
+    SKGfxSetSharpenPercent((int)lroundf(sender.value));
+}
+
+- (void)onSharpHudChanged:(UISwitch *)sender {
+    SKGfxSetSharpHud(sender.on);
 }
 
 - (void)onAvoidEdgesChanged:(UISwitch *)sender {
@@ -1834,6 +1953,18 @@ static int SKCompareVersions(NSString *a, NSString *b) {
     }
 }
 
+/// "Download Modpack", "Update Modpack" when the modpack changed, "Modpack up to date" when it matches.
+- (void)refreshModpackButton {
+    SKModPackStatus *status = SKModManager.sharedManager.modpackStatus;
+    NSString *title = NSLocalizedString(@"Download Modpack", nil);
+    if (status.state == SKModPackStateUpdate) {
+        title = NSLocalizedString(@"Update Modpack", nil);
+    } else if (status.state == SKModPackStateCurrent) {
+        title = NSLocalizedString(@"Modpack up to date", nil);
+    }
+    [self.downloadModsButton setTitle:[NSString stringWithFormat:@"  %@", title] forState:UIControlStateNormal];
+}
+
 - (void)onDownloadMods {
     UIAlertController *alert = [self createProgressAlertWithTitle:NSLocalizedString(@"Downloading Mods", nil)];
     [self presentViewController:alert animated:YES completion:nil];
@@ -1849,6 +1980,7 @@ static int SKCompareVersions(NSString *a, NSString *b) {
             [alert dismissViewControllerAnimated:YES
                                       completion:^{
                                         if (success) {
+                                            [self refreshModpackButton];
                                             [self showAlertWithTitle:NSLocalizedString(@"Download Modpack", nil) message:summary];
                                         } else {
                                             [self showAlertWithTitle:NSLocalizedString(@"Download Failed", nil)

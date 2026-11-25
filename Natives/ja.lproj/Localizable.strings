@@ -218,53 +218,84 @@
 "You're on v%s, which is newer than the latest release (v%@)." = "最新リリース (v%2$@) より新しいバージョン (v%1$s) を使用しています。";
 
 /* Layouts */
-"Layouts…" = "Layouts…";
+"Layouts…" = "レイアウト…";
 
-"Layouts" = "Layouts";
+"Layouts" = "レイアウト";
 
-"Default (built-in)" = "Default (built-in)";
+"Default (built-in)" = "デフォルト (内蔵)";
 
-"＋ Save current layout as preset…" = "＋ Save current layout as preset…";
+"＋ Save current layout as preset…" = "＋現在のレイアウトをプリセットに保存…";
 
-"Export current layout to file…" = "Export current layout to file…";
+"Export current layout to file…" = "現在のレイアウトをファイルに書き出す…";
 
-"Import layout from file…" = "Import layout from file…";
+"Import layout from file…" = "ファイルからレイアウトを読み込む…";
 
-"Apply \"%@\"?" = "Apply \"%@\"?";
+"Apply \"%@\"?" = "「%@」を適用しますか？";
 
-"This replaces your current arrangement. Save it as a preset first to keep it." = "This replaces your current arrangement. Save it as a preset first to keep it.";
+"This replaces your current arrangement. Save it as a preset first to keep it." = "現在の配置が置き換わります。残す場合は先にプリセットとして保存してください。";
 
-"Apply" = "Apply";
+"Apply" = "適用";
 
-"Applied \"%@\"" = "Applied \"%@\"";
+"Applied \"%@\"" = "「%@」を適用しました";
 
-"Delete \"%@\"?" = "Delete \"%@\"?";
+"Delete \"%@\"?" = "「%@」を削除しますか？";
 
-"The preset is removed. The layout on screen is not changed." = "The preset is removed. The layout on screen is not changed.";
+"The preset is removed. The layout on screen is not changed." = "プリセットが削除されます。画面上のレイアウトは変更されません。";
 
-"Deleted \"%@\"" = "Deleted \"%@\"";
+"Deleted \"%@\"" = "「%@」を削除しました";
 
-"Save current layout" = "Save current layout";
+"Save current layout" = "現在のレイアウトを保存";
 
-"Preset name" = "Preset name";
+"Preset name" = "プリセット名";
 
-"Preset list is full (%ld). Delete one first." = "Preset list is full (%ld). Delete one first.";
+"Preset list is full (%ld). Delete one first." = "プリセットリストがいっぱいです（%ld個）。先に1つ削除してください。";
 
-"Saved as \"%@\"" = "Saved as \"%@\"";
+"Saved as \"%@\"" = "「%@」として保存しました";
 
-"Layout exported" = "Layout exported";
+"Layout exported" = "レイアウトを書き出しました";
 
-"Could not write the file" = "Could not write the file";
+"Could not write the file" = "ファイルを書き込めませんでした";
 
-"That layout was made by a newer version of SKapsule." = "That layout was made by a newer version of SKapsule.";
+"That layout was made by a newer version of SKapsule." = "このレイアウトは新しいバージョンのSKapsuleで作成されています。";
 
-"That file is too large to be a layout." = "That file is too large to be a layout.";
+"That file is too large to be a layout." = "ファイルサイズが大きすぎてレイアウトとして読み込めません。";
 
-"That file isn't a valid SKapsule controls layout." = "That file isn't a valid SKapsule controls layout.";
+"That file isn't a valid SKapsule controls layout." = "有効なSKapsule操作レイアウトファイルではありません。";
 
-"Could not read the file" = "Could not read the file";
+"Could not read the file" = "ファイルを読み込めませんでした";
 
-"Imported as \"%@\"." = "Imported as \"%@\".";
+"Imported as \"%@\"." = "「%@」として読み込みました。";
 
-"My layout" = "My layout";
+"My layout" = "マイレイアウト";
+
+/* Modpack button */
+"Update Modpack" = "Modパックを更新";
+
+"Modpack up to date" = "Modパックは最新です";
+
+/* Graphics in the sidebar */
+"Show FPS counter" = "FPSカウンターを表示";
+
+"Sharpening: off" = "シャープ化: オフ";
+
+"Sharpening: %ld%%" = "シャープ化: %ld%%";
+
+"Sharp HUD (experimental)" = "シャープHUD (実験的機能)";
+
+"Sharpening and Sharp HUD draw the game off-screen first." = "シャープ化とシャープHUDは、ゲームをまず画面外にレンダリングします。";
+
+"Sharp HUD draws the HUD at full resolution, so it gets smaller: raise the game's UI scale to compensate." = "シャープHUDはHUDを最大解像度で描画します (縮小されます)。ゲーム内のUIスケールを上げて調整してください。";
+
+"Sharp HUD needs Resolution below 100%." = "シャープHUDを使用するには解像度を100%未満にする必要があります。";
+
+/* Touch editor pages */
+"Edit" = "編集";
+
+"Close" = "閉じる";
+
+"Floating left stick" = "フローティング左スティック";
+
+"Floating right stick" = "フローティング右スティック";
+
+"A floating stick appears where your thumb lands and follows it." = "親指を置いた位置にスティックが現れ、指の動きに追従します。";
 

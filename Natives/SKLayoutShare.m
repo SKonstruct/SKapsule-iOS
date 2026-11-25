@@ -105,7 +105,9 @@ static double SKClamp(double v, double lo, double hi) { return MIN(MAX(v, lo), h
         double x = 0, y = 0, scale = 0;
         if (![entry isKindOfClass:NSDictionary.class] || ![entry[@"id"] isKindOfClass:NSString.class] ||
             !SKFiniteNumber(entry[@"xPercent"], &x) || !SKFiniteNumber(entry[@"yPercent"], &y) ||
-            !SKFiniteNumber(entry[@"scale"], &scale) || !SKIsBool(entry[@"visible"])) {
+            !SKFiniteNumber(entry[@"scale"], &scale) || !SKIsBool(entry[@"visible"]) ||
+            // Optional, so a file from before floating sticks still parses; present, it must be a boolean.
+            (entry[@"floating"] != nil && !SKIsBool(entry[@"floating"]))) {
             SKRefuse(error, SKLayoutShareErrorInvalid, @"bad node");
             return nil;
         }
@@ -124,6 +126,7 @@ static double SKClamp(double v, double lo, double hi) { return MIN(MAX(v, lo), h
         node.yPercent = SKClamp(y, 0, 1);
         node.scale = SKClamp(scale, SKMinNodeScale, SKMaxNodeScale);
         node.visible = [entry[@"visible"] boolValue];
+        node.floating = [entry[@"floating"] boolValue];
         [nodes addObject:node];
     }
     double opacity = 0;
@@ -142,13 +145,16 @@ static double SKClamp(double v, double lo, double hi) { return MIN(MAX(v, lo), h
 - (NSDictionary *)dictionary {
     NSMutableArray *out = [NSMutableArray arrayWithCapacity:self.nodes.count];
     for (SKSharedNode *n in self.nodes) {
-        [out addObject:@{
+        NSMutableDictionary *entry = [@{
             @"id" : n.nodeId,
             @"xPercent" : @(n.xPercent),
             @"yPercent" : @(n.yPercent),
             @"scale" : @(n.scale),
             @"visible" : @(n.visible),
-        }];
+        } mutableCopy];
+        // Written only when on, so a file from before floating sticks reads as not floating.
+        if (n.floating) entry[@"floating"] = @YES;
+        [out addObject:entry];
     }
     return @{
         @"format" : kFormat,

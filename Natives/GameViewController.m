@@ -361,6 +361,8 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
     self.layoutLibrary = [[SKLayoutLibrary alloc] initWithPresenter:self overlay:self.touchControls];
     __weak typeof(self) weakLibraryOwner = self;
     self.touchControls.layoutLibraryHandler = ^{ [weakLibraryOwner.layoutLibrary show]; };
+    // The tab strip's Close does what the gear's second tap does, so the gear icon follows.
+    self.touchControls.closeRequestHandler = ^{ [weakLibraryOwner onToggleEditLayout]; };
 
     self.keyboardBridge = [[SKKeyboardBridge alloc] initWithFrame:CGRectZero];
     [self.view addSubview:self.keyboardBridge];

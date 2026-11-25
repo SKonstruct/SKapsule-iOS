@@ -218,53 +218,84 @@
 "You're on v%s, which is newer than the latest release (v%@)." = "Sul on v%1$s, mis on uuem kui viimane väljalase (v%2$@).";
 
 /* Layouts */
-"Layouts…" = "Layouts…";
+"Layouts…" = "Paigutused…";
 
-"Layouts" = "Layouts";
+"Layouts" = "Paigutused";
 
-"Default (built-in)" = "Default (built-in)";
+"Default (built-in)" = "Vaikimisi (sisseehitatud)";
 
-"＋ Save current layout as preset…" = "＋ Save current layout as preset…";
+"＋ Save current layout as preset…" = "＋ Salvesta praegune paigutus eelseadena…";
 
-"Export current layout to file…" = "Export current layout to file…";
+"Export current layout to file…" = "Ekspordi praegune paigutus faili…";
 
-"Import layout from file…" = "Import layout from file…";
+"Import layout from file…" = "Impordi paigutus failist…";
 
-"Apply \"%@\"?" = "Apply \"%@\"?";
+"Apply \"%@\"?" = "Kas rakendada „%@”?";
 
-"This replaces your current arrangement. Save it as a preset first to keep it." = "This replaces your current arrangement. Save it as a preset first to keep it.";
+"This replaces your current arrangement. Save it as a preset first to keep it." = "See asendab praeguse asetuse. Alles hoidmiseks salvesta see esmalt eelseadena.";
 
-"Apply" = "Apply";
+"Apply" = "Rakenda";
 
-"Applied \"%@\"" = "Applied \"%@\"";
+"Applied \"%@\"" = "„%@” rakendatud";
 
-"Delete \"%@\"?" = "Delete \"%@\"?";
+"Delete \"%@\"?" = "Kas kustutada „%@”?";
 
-"The preset is removed. The layout on screen is not changed." = "The preset is removed. The layout on screen is not changed.";
+"The preset is removed. The layout on screen is not changed." = "Eelseade eemaldatakse. Ekraanil olevat paigutust ei muudeta.";
 
-"Deleted \"%@\"" = "Deleted \"%@\"";
+"Deleted \"%@\"" = "„%@” kustutatud";
 
-"Save current layout" = "Save current layout";
+"Save current layout" = "Salvesta praegune paigutus";
 
-"Preset name" = "Preset name";
+"Preset name" = "Eelseade nimi";
 
-"Preset list is full (%ld). Delete one first." = "Preset list is full (%ld). Delete one first.";
+"Preset list is full (%ld). Delete one first." = "Eelseadete loend on täis (%ld). Kustuta esmalt üks.";
 
-"Saved as \"%@\"" = "Saved as \"%@\"";
+"Saved as \"%@\"" = "Salvestatud nimega „%@”";
 
-"Layout exported" = "Layout exported";
+"Layout exported" = "Paigutus eksporditud";
 
-"Could not write the file" = "Could not write the file";
+"Could not write the file" = "Faili ei õnnestunud kirjutada";
 
-"That layout was made by a newer version of SKapsule." = "That layout was made by a newer version of SKapsule.";
+"That layout was made by a newer version of SKapsule." = "See paigutus loodi SKapsule'i uuema versiooniga.";
 
-"That file is too large to be a layout." = "That file is too large to be a layout.";
+"That file is too large to be a layout." = "See fail on paigutuse jaoks liiga suur.";
 
-"That file isn't a valid SKapsule controls layout." = "That file isn't a valid SKapsule controls layout.";
+"That file isn't a valid SKapsule controls layout." = "See fail ei ole kehtiv SKapsule'i juhtnuppude paigutus.";
 
-"Could not read the file" = "Could not read the file";
+"Could not read the file" = "Faili ei õnnestunud lugeda";
 
-"Imported as \"%@\"." = "Imported as \"%@\".";
+"Imported as \"%@\"." = "Imporditud nimega „%@”.";
 
-"My layout" = "My layout";
+"My layout" = "Minu paigutus";
+
+/* Modpack button */
+"Update Modpack" = "Värskenda modipakki";
+
+"Modpack up to date" = "Modipakk on ajakohane";
+
+/* Graphics in the sidebar */
+"Show FPS counter" = "Kuva FPS-i loendur";
+
+"Sharpening: off" = "Teravustamine: väljas";
+
+"Sharpening: %ld%%" = "Teravustamine: %ld%%";
+
+"Sharp HUD (experimental)" = "Terav HUD (eksperimentaalne)";
+
+"Sharpening and Sharp HUD draw the game off-screen first." = "Teravustamine ja terav HUD renderdavad mängu esmalt ekraaniväliselt.";
+
+"Sharp HUD draws the HUD at full resolution, so it gets smaller: raise the game's UI scale to compensate." = "Terav HUD joonistatakse täiseraldusvõimega (muutub väiksemaks): kompenseerimiseks suurenda mängu liidese skaalat.";
+
+"Sharp HUD needs Resolution below 100%." = "Terav HUD vajab eraldusvõimet alla 100%.";
+
+/* Touch editor pages */
+"Edit" = "Muuda";
+
+"Close" = "Sulge";
+
+"Floating left stick" = "Ujuv vasak kang";
+
+"Floating right stick" = "Ujuv parem kang";
+
+"A floating stick appears where your thumb lands and follows it." = "Ujuv kang ilmub kohta, kuhu pöial maandub, ja järgib seda.";
 

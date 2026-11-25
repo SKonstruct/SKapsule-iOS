@@ -24,6 +24,11 @@
 
 - (void)toggleEditMode;
 
+/// The editor's tab strip (Edit | Settings | Close). Close asks the host to leave edit mode; a host
+/// that has its own Done button (the standalone editor) hides the tab instead.
+@property (nonatomic, copy) void (^closeRequestHandler)(void);
+@property (nonatomic, assign) BOOL closeTabHidden;
+
 /// Set by the host (the standalone editor and the game) to open the layout library (presets,
 /// export, import); setting it is what reveals the panel's "Layouts…" button.
 @property (nonatomic, copy) void (^layoutLibraryHandler)(void);

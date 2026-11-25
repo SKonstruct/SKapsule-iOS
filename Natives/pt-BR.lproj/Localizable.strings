@@ -222,49 +222,80 @@
 
 "Layouts" = "Layouts";
 
-"Default (built-in)" = "Default (built-in)";
+"Default (built-in)" = "Padrão (integrado)";
 
-"＋ Save current layout as preset…" = "＋ Save current layout as preset…";
+"＋ Save current layout as preset…" = "＋ Salvar layout atual como predefinição…";
 
-"Export current layout to file…" = "Export current layout to file…";
+"Export current layout to file…" = "Exportar layout atual para arquivo…";
 
-"Import layout from file…" = "Import layout from file…";
+"Import layout from file…" = "Importar layout de arquivo…";
 
-"Apply \"%@\"?" = "Apply \"%@\"?";
+"Apply \"%@\"?" = "Aplicar \"%@\"?";
 
-"This replaces your current arrangement. Save it as a preset first to keep it." = "This replaces your current arrangement. Save it as a preset first to keep it.";
+"This replaces your current arrangement. Save it as a preset first to keep it." = "Isso substitui a organização atual. Salve-a como predefinição primeiro para mantê-la.";
 
-"Apply" = "Apply";
+"Apply" = "Aplicar";
 
-"Applied \"%@\"" = "Applied \"%@\"";
+"Applied \"%@\"" = "\"%@\" aplicado";
 
-"Delete \"%@\"?" = "Delete \"%@\"?";
+"Delete \"%@\"?" = "Excluir \"%@\"?";
 
-"The preset is removed. The layout on screen is not changed." = "The preset is removed. The layout on screen is not changed.";
+"The preset is removed. The layout on screen is not changed." = "A predefinição é removida. O layout na tela não é alterado.";
 
-"Deleted \"%@\"" = "Deleted \"%@\"";
+"Deleted \"%@\"" = "\"%@\" excluído";
 
-"Save current layout" = "Save current layout";
+"Save current layout" = "Salvar layout atual";
 
-"Preset name" = "Preset name";
+"Preset name" = "Nome da predefinição";
 
-"Preset list is full (%ld). Delete one first." = "Preset list is full (%ld). Delete one first.";
+"Preset list is full (%ld). Delete one first." = "A lista de predefinições está cheia (%ld). Exclua uma primeiro.";
 
-"Saved as \"%@\"" = "Saved as \"%@\"";
+"Saved as \"%@\"" = "Salvo como \"%@\"";
 
-"Layout exported" = "Layout exported";
+"Layout exported" = "Layout exportado";
 
-"Could not write the file" = "Could not write the file";
+"Could not write the file" = "Não foi possível gravar o arquivo";
 
-"That layout was made by a newer version of SKapsule." = "That layout was made by a newer version of SKapsule.";
+"That layout was made by a newer version of SKapsule." = "Esse layout foi feito por uma versão mais recente do SKapsule.";
 
-"That file is too large to be a layout." = "That file is too large to be a layout.";
+"That file is too large to be a layout." = "Esse arquivo é grande demais para ser um layout.";
 
-"That file isn't a valid SKapsule controls layout." = "That file isn't a valid SKapsule controls layout.";
+"That file isn't a valid SKapsule controls layout." = "Esse arquivo não é um layout de controles válido do SKapsule.";
 
-"Could not read the file" = "Could not read the file";
+"Could not read the file" = "Não foi possível ler o arquivo";
 
-"Imported as \"%@\"." = "Imported as \"%@\".";
+"Imported as \"%@\"." = "Importado como \"%@\".";
 
-"My layout" = "My layout";
+"My layout" = "Meu layout";
+
+/* Modpack button */
+"Update Modpack" = "Atualizar modpack";
+
+"Modpack up to date" = "Modpack atualizado";
+
+/* Graphics in the sidebar */
+"Show FPS counter" = "Exibir contador de FPS";
+
+"Sharpening: off" = "Nitidez: desativada";
+
+"Sharpening: %ld%%" = "Nitidez: %ld%%";
+
+"Sharp HUD (experimental)" = "HUD nítido (experimental)";
+
+"Sharpening and Sharp HUD draw the game off-screen first." = "Nitidez e HUD nítido renderizam o jogo fora da tela primeiro.";
+
+"Sharp HUD draws the HUD at full resolution, so it gets smaller: raise the game's UI scale to compensate." = "O HUD nítido é desenhado na resolução máxima (fica menor): aumente a escala da interface no jogo para compensar.";
+
+"Sharp HUD needs Resolution below 100%." = "O HUD nítido requer resolução abaixo de 100%.";
+
+/* Touch editor pages */
+"Edit" = "Editar";
+
+"Close" = "Fechar";
+
+"Floating left stick" = "Analógico esquerdo flutuante";
+
+"Floating right stick" = "Analógico direito flutuante";
+
+"A floating stick appears where your thumb lands and follows it." = "Um analógico flutuante aparece onde seu polegar toca e o acompanha.";
 

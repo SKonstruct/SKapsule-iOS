@@ -39,6 +39,7 @@ add_executable(SKapsule
   SKZipUtils.m
   SKModManager.m
   SKModOrder.m
+  SKModPack.m
   SKServers.m
   SKCredentials.m
   GameViewController.m

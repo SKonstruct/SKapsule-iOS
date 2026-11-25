@@ -25,6 +25,8 @@ typedef NS_ENUM(NSInteger, SKControlType) {
 @property (nonatomic, assign) BOOL isAxisTrigger;
 /// Latching: press flips the state, release emits nothing.
 @property (nonatomic, assign) BOOL isToggle;
+/// A joystick that appears where the thumb lands instead of sitting at its saved spot.
+@property (nonatomic, assign) BOOL floating;
 @property (nonatomic, copy) NSString *label;
 /// Part of the bottom action row (attacks + items), which has its own show/hide switch.
 @property (nonatomic, assign) BOOL isActionBar;

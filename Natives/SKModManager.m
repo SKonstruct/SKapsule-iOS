@@ -407,6 +407,80 @@ static NSString *SKDownloadVerified(NSURL *url, NSString *destPath, NSString *ex
     return sharedInstance;
 }
 
+- (void)checkModpackStatusWithCompletion:(void (^)(SKModPackStatus *_Nullable status))completion {
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+      SKModPackStatus *status = [self readModpackStatus];
+      dispatch_async(dispatch_get_main_queue(), ^{
+        if (status) self.modpackStatus = status;
+        completion(status);
+      });
+    });
+}
+
+/// Nil when the listing could not be read (no home, offline, rate-limited, an empty or odd answer).
+- (SKModPackStatus *)readModpackStatus {
+    const char *homeEnv = getenv("SKAPSULE_HOME");
+    if (!homeEnv) return nil;
+    NSString *modsPath = [[NSString stringWithUTF8String:homeEnv] stringByAppendingPathComponent:@"sk/mods"];
+
+    NSURL *url = [NSURL URLWithString:@"https://api.github.com/repos/SirDank/Spiral-Knights-Modpack/contents/mods"];
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url
+                                                          cachePolicy:NSURLRequestReloadIgnoringLocalCacheData
+                                                      timeoutInterval:15];
+    [request setValue:@"SKapsule-Launcher-iOS" forHTTPHeaderField:@"User-Agent"];
+    dispatch_semaphore_t sem = dispatch_semaphore_create(0);
+    __block NSData *data = nil;
+    __block NSInteger statusCode = 0;
+    [[NSURLSession.sharedSession dataTaskWithRequest:request
+                                   completionHandler:^(NSData *d, NSURLResponse *resp, NSError *err) {
+                                     data = err ? nil : d;
+                                     if ([resp isKindOfClass:NSHTTPURLResponse.class]) {
+                                         statusCode = ((NSHTTPURLResponse *)resp).statusCode;
+                                     }
+                                     dispatch_semaphore_signal(sem);
+                                   }] resume];
+    dispatch_semaphore_wait(sem, DISPATCH_TIME_FOREVER);
+    if (!data || statusCode != 200) return nil;
+
+    NSArray *listing = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+    if (![listing isKindOfClass:NSArray.class]) return nil;
+    NSMutableArray<NSString *> *names = [NSMutableArray array];
+    NSMutableDictionary<NSString *, NSDictionary *> *byName = [NSMutableDictionary dictionary];
+    for (id file in listing) {
+        if (![file isKindOfClass:NSDictionary.class] || ![file[@"type"] isEqual:@"file"] ||
+            !SKValidModFileName(file[@"name"])) {
+            continue;
+        }
+        [names addObject:file[@"name"]];
+        byName[file[@"name"]] = file;
+    }
+    if (names.count == 0) return nil;
+
+    NSMutableSet<NSString *> *synced = [NSMutableSet set];
+    for (id name in [NSUserDefaults.standardUserDefaults arrayForKey:@"mod_sync_files"]) {
+        if (SKValidModFileName(name)) [synced addObject:name];
+    }
+
+    NSFileManager *fm = NSFileManager.defaultManager;
+    return [SKModPackStatus statusForRemoteNames:names
+        synced:synced
+        exists:^BOOL(NSString *name) { return [fm fileExistsAtPath:[modsPath stringByAppendingPathComponent:name]]; }
+        isCurrent:^BOOL(NSString *name) {
+          NSDictionary *mod = byName[name];
+          id shaValue = mod[@"sha"];
+          NSString *sha = [shaValue isKindOfClass:NSString.class] && [shaValue length] == 40 ? shaValue : nil;
+          NSString *path = [modsPath stringByAppendingPathComponent:name];
+          if (!sha || ![fm fileExistsAtPath:path]) return NO;
+          // A size that differs from the listing's is out of date without reading the file.
+          id size = mod[@"size"];
+          if ([size isKindOfClass:NSNumber.class] &&
+              [fm attributesOfItemAtPath:path error:nil].fileSize != [size unsignedLongLongValue]) {
+              return NO;
+          }
+          return [[SKZipUtils calculateGitBlobShaOfFile:path] isEqualToString:sha.lowercaseString];
+        }];
+}
+
 - (void)downloadModsWithProgress:(void (^)(float progress, NSString *status))progressBlock
                       completion:(void (^)(BOOL success, NSString *_Nullable summary,
                                            NSError *_Nullable error))completionBlock {
@@ -582,6 +656,8 @@ static NSString *SKDownloadVerified(NSURL *url, NSString *destPath, NSString *ex
             stringWithFormat:@"Sync complete!\nDownloaded: %ld\nSkipped: %ld\nDeleted: %ld", (long)downloaded,
                              (long)skipped, (long)deleted];
         if (failed > 0) [stats appendFormat:@"\nFailed: %ld (try again)", (long)failed];
+        // Every file now matches the listing only if none failed.
+        if (failed == 0) self.modpackStatus = [SKModPackStatus currentStatus];
         completionBlock(YES, stats, nil);
       });
     });

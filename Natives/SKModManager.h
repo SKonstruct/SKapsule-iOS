@@ -1,12 +1,25 @@
 #pragma once
 
 #import <Foundation/Foundation.h>
+#import "SKModPack.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
 @interface SKModManager : NSObject
 
 + (instancetype)sharedManager;
+
+/// What the last check or download found since the app started; nil until then. The launcher asks
+/// GitHub once per start and shows Download, Update or "up to date" from this.
+@property (nonatomic, strong, nullable) SKModPackStatus *modpackStatus;
+
+/**
+ Reads the modpack listing and compares it with the mods folder without changing anything: a file whose
+ size differs from the listing's is out of date without being read, only the others are hashed.
+ Calls completion on the main queue with the status, or nil when it could not be found out (offline,
+ rate-limited): that is not an error, the button just keeps its default.
+ */
+- (void)checkModpackStatusWithCompletion:(void (^)(SKModPackStatus *_Nullable status))completion;
 
 /**
  Downloads mods from the remote mod repository on GitHub, checking local SHA hashes.

@@ -348,6 +348,12 @@ test:
 	xcrun clang -fobjc-arc -Wall -framework Foundation -I$(SOURCEDIR)/Natives \
 		$(SOURCEDIR)/Natives/Tests/SKModOrderTests.m $(SOURCEDIR)/Natives/SKModOrder.m -o $(WORKINGDIR)/sk-mod-order-tests
 	$(WORKINGDIR)/sk-mod-order-tests
+	xcrun clang -fobjc-arc -Wall -framework Foundation -I$(SOURCEDIR)/Natives \
+		$(SOURCEDIR)/Natives/Tests/SKModPackTests.m $(SOURCEDIR)/Natives/SKModPack.m -o $(WORKINGDIR)/sk-mod-pack-tests
+	$(WORKINGDIR)/sk-mod-pack-tests
+	xcrun clang -fobjc-arc -Wall -framework Foundation -framework CoreGraphics -I$(SOURCEDIR)/Natives \
+		$(SOURCEDIR)/Natives/Tests/SKDockPlacementTests.m -o $(WORKINGDIR)/sk-dock-tests
+	$(WORKINGDIR)/sk-dock-tests
 	echo '[SKapsule v$(VERSION)] test - end'
 
 # iOS Simulator (scripts/sim/): its own build/sim and out/sim, so none of the device targets above are involved.

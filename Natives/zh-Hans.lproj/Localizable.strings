@@ -218,53 +218,84 @@
 "You're on v%s, which is newer than the latest release (v%@)." = "当前版本为v%1$s，新于最新正式发布版本 (v%2$@)。";
 
 /* Layouts */
-"Layouts…" = "Layouts…";
+"Layouts…" = "布局…";
 
-"Layouts" = "Layouts";
+"Layouts" = "布局";
 
-"Default (built-in)" = "Default (built-in)";
+"Default (built-in)" = "默认（内置）";
 
-"＋ Save current layout as preset…" = "＋ Save current layout as preset…";
+"＋ Save current layout as preset…" = "＋将当前布局保存为预设…";
 
-"Export current layout to file…" = "Export current layout to file…";
+"Export current layout to file…" = "将当前布局导出到文件…";
 
-"Import layout from file…" = "Import layout from file…";
+"Import layout from file…" = "从文件导入布局…";
 
-"Apply \"%@\"?" = "Apply \"%@\"?";
+"Apply \"%@\"?" = "应用“%@”？";
 
-"This replaces your current arrangement. Save it as a preset first to keep it." = "This replaces your current arrangement. Save it as a preset first to keep it.";
+"This replaces your current arrangement. Save it as a preset first to keep it." = "这会替换当前的按键排列。如需保留，请先保存为预设。";
 
-"Apply" = "Apply";
+"Apply" = "应用";
 
-"Applied \"%@\"" = "Applied \"%@\"";
+"Applied \"%@\"" = "已应用“%@”";
 
-"Delete \"%@\"?" = "Delete \"%@\"?";
+"Delete \"%@\"?" = "删除“%@”？";
 
-"The preset is removed. The layout on screen is not changed." = "The preset is removed. The layout on screen is not changed.";
+"The preset is removed. The layout on screen is not changed." = "该预设将被移除，屏幕上的布局不会改变。";
 
-"Deleted \"%@\"" = "Deleted \"%@\"";
+"Deleted \"%@\"" = "已删除“%@”";
 
-"Save current layout" = "Save current layout";
+"Save current layout" = "保存当前布局";
 
-"Preset name" = "Preset name";
+"Preset name" = "预设名称";
 
-"Preset list is full (%ld). Delete one first." = "Preset list is full (%ld). Delete one first.";
+"Preset list is full (%ld). Delete one first." = "预设列表已满（%ld）。请先删除一个。";
 
-"Saved as \"%@\"" = "Saved as \"%@\"";
+"Saved as \"%@\"" = "已保存为“%@”";
 
-"Layout exported" = "Layout exported";
+"Layout exported" = "布局已导出";
 
-"Could not write the file" = "Could not write the file";
+"Could not write the file" = "无法写入文件";
 
-"That layout was made by a newer version of SKapsule." = "That layout was made by a newer version of SKapsule.";
+"That layout was made by a newer version of SKapsule." = "该布局由更新版本的SKapsule创建。";
 
-"That file is too large to be a layout." = "That file is too large to be a layout.";
+"That file is too large to be a layout." = "该文件过大，不是有效布局。";
 
-"That file isn't a valid SKapsule controls layout." = "That file isn't a valid SKapsule controls layout.";
+"That file isn't a valid SKapsule controls layout." = "该文件不是有效的SKapsule控制布局。";
 
-"Could not read the file" = "Could not read the file";
+"Could not read the file" = "无法读取文件";
 
-"Imported as \"%@\"." = "Imported as \"%@\".";
+"Imported as \"%@\"." = "已导入为“%@”。";
 
-"My layout" = "My layout";
+"My layout" = "我的布局";
+
+/* Modpack button */
+"Update Modpack" = "更新模组包";
+
+"Modpack up to date" = "模组包已是最新";
+
+/* Graphics in the sidebar */
+"Show FPS counter" = "显示FPS计数器";
+
+"Sharpening: off" = "锐化：关闭";
+
+"Sharpening: %ld%%" = "锐化：%ld%%";
+
+"Sharp HUD (experimental)" = "清晰HUD（实验性）";
+
+"Sharpening and Sharp HUD draw the game off-screen first." = "锐化和清晰HUD会先在离屏缓冲区渲染游戏画面。";
+
+"Sharp HUD draws the HUD at full resolution, so it gets smaller: raise the game's UI scale to compensate." = "清晰HUD以完整分辨率绘制HUD（界面会变小）：请调大游戏内UI缩放比例以作补偿。";
+
+"Sharp HUD needs Resolution below 100%." = "清晰HUD需要分辨率低于100%。";
+
+/* Touch editor pages */
+"Edit" = "编辑";
+
+"Close" = "关闭";
+
+"Floating left stick" = "浮动左摇杆";
+
+"Floating right stick" = "浮动右摇杆";
+
+"A floating stick appears where your thumb lands and follows it." = "浮动摇杆会出现在拇指按下的位置并跟随移动。";
 

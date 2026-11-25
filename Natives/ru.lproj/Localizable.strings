@@ -218,53 +218,84 @@
 "You're on v%s, which is newer than the latest release (v%@)." = "У вас установлена v%1$s, которая новее последнего релиза (v%2$@).";
 
 /* Layouts */
-"Layouts…" = "Layouts…";
+"Layouts…" = "Раскладки…";
 
-"Layouts" = "Layouts";
+"Layouts" = "Раскладки";
 
-"Default (built-in)" = "Default (built-in)";
+"Default (built-in)" = "По умолчанию (встроенная)";
 
-"＋ Save current layout as preset…" = "＋ Save current layout as preset…";
+"＋ Save current layout as preset…" = "＋ Сохранить текущую раскладку…";
 
-"Export current layout to file…" = "Export current layout to file…";
+"Export current layout to file…" = "Экспортировать раскладку в файл…";
 
-"Import layout from file…" = "Import layout from file…";
+"Import layout from file…" = "Импортировать раскладку из файла…";
 
-"Apply \"%@\"?" = "Apply \"%@\"?";
+"Apply \"%@\"?" = "Применить «%@»?";
 
-"This replaces your current arrangement. Save it as a preset first to keep it." = "This replaces your current arrangement. Save it as a preset first to keep it.";
+"This replaces your current arrangement. Save it as a preset first to keep it." = "Текущее расположение будет заменено. Сначала сохраните его как пресет, чтобы не потерять.";
 
-"Apply" = "Apply";
+"Apply" = "Применить";
 
-"Applied \"%@\"" = "Applied \"%@\"";
+"Applied \"%@\"" = "Применено: «%@»";
 
-"Delete \"%@\"?" = "Delete \"%@\"?";
+"Delete \"%@\"?" = "Удалить «%@»?";
 
-"The preset is removed. The layout on screen is not changed." = "The preset is removed. The layout on screen is not changed.";
+"The preset is removed. The layout on screen is not changed." = "Пресет будет удален. Раскладка на экране не изменится.";
 
-"Deleted \"%@\"" = "Deleted \"%@\"";
+"Deleted \"%@\"" = "Удалено: «%@»";
 
-"Save current layout" = "Save current layout";
+"Save current layout" = "Сохранить раскладку";
 
-"Preset name" = "Preset name";
+"Preset name" = "Название пресета";
 
-"Preset list is full (%ld). Delete one first." = "Preset list is full (%ld). Delete one first.";
+"Preset list is full (%ld). Delete one first." = "Список пресетов заполнен (%ld). Сначала удалите один.";
 
-"Saved as \"%@\"" = "Saved as \"%@\"";
+"Saved as \"%@\"" = "Сохранено как «%@»";
 
-"Layout exported" = "Layout exported";
+"Layout exported" = "Раскладка экспортирована";
 
-"Could not write the file" = "Could not write the file";
+"Could not write the file" = "Не удалось записать файл";
 
-"That layout was made by a newer version of SKapsule." = "That layout was made by a newer version of SKapsule.";
+"That layout was made by a newer version of SKapsule." = "Эта раскладка создана в более новой версии SKapsule.";
 
-"That file is too large to be a layout." = "That file is too large to be a layout.";
+"That file is too large to be a layout." = "Этот файл слишком велик для раскладки.";
 
-"That file isn't a valid SKapsule controls layout." = "That file isn't a valid SKapsule controls layout.";
+"That file isn't a valid SKapsule controls layout." = "Этот файл не является корректной раскладкой управления SKapsule.";
 
-"Could not read the file" = "Could not read the file";
+"Could not read the file" = "Не удалось прочитать файл";
 
-"Imported as \"%@\"." = "Imported as \"%@\".";
+"Imported as \"%@\"." = "Импортировано как «%@».";
 
-"My layout" = "My layout";
+"My layout" = "Моя раскладка";
+
+/* Modpack button */
+"Update Modpack" = "Обновить модпак";
+
+"Modpack up to date" = "Модпак актуален";
+
+/* Graphics in the sidebar */
+"Show FPS counter" = "Показывать счетчик FPS";
+
+"Sharpening: off" = "Резкость: выкл";
+
+"Sharpening: %ld%%" = "Резкость: %ld%%";
+
+"Sharp HUD (experimental)" = "Четкий интерфейс (эксперим.)";
+
+"Sharpening and Sharp HUD draw the game off-screen first." = "Резкость и четкий интерфейс сначала отрисовывают игру вне экрана.";
+
+"Sharp HUD draws the HUD at full resolution, so it gets smaller: raise the game's UI scale to compensate." = "Четкий интерфейс отрисовывается в полном разрешении (становится мельче): увеличьте масштаб интерфейса в игре для компенсации.";
+
+"Sharp HUD needs Resolution below 100%." = "Для четкого интерфейса требуется разрешение ниже 100%.";
+
+/* Touch editor pages */
+"Edit" = "Изменить";
+
+"Close" = "Закрыть";
+
+"Floating left stick" = "Плавающий левый стик";
+
+"Floating right stick" = "Плавающий правый стик";
+
+"A floating stick appears where your thumb lands and follows it." = "Плавающий стик появляется в месте касания большого пальца и следует за ним.";
 

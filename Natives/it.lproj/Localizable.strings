@@ -218,53 +218,84 @@
 "You're on v%s, which is newer than the latest release (v%@)." = "Sei su v%1$s, più recente rispetto all'ultima release (v%2$@).";
 
 /* Layouts */
-"Layouts…" = "Layouts…";
+"Layouts…" = "Layout…";
 
-"Layouts" = "Layouts";
+"Layouts" = "Layout";
 
-"Default (built-in)" = "Default (built-in)";
+"Default (built-in)" = "Predefinito (integrato)";
 
-"＋ Save current layout as preset…" = "＋ Save current layout as preset…";
+"＋ Save current layout as preset…" = "＋ Salva layout attuale come preset…";
 
-"Export current layout to file…" = "Export current layout to file…";
+"Export current layout to file…" = "Esporta layout attuale su file…";
 
-"Import layout from file…" = "Import layout from file…";
+"Import layout from file…" = "Importa layout da file…";
 
-"Apply \"%@\"?" = "Apply \"%@\"?";
+"Apply \"%@\"?" = "Applicare «%@»?";
 
-"This replaces your current arrangement. Save it as a preset first to keep it." = "This replaces your current arrangement. Save it as a preset first to keep it.";
+"This replaces your current arrangement. Save it as a preset first to keep it." = "Questo sostituisce la disposizione attuale. Salvala prima come preset per conservarla.";
 
-"Apply" = "Apply";
+"Apply" = "Applica";
 
-"Applied \"%@\"" = "Applied \"%@\"";
+"Applied \"%@\"" = "«%@» applicato";
 
-"Delete \"%@\"?" = "Delete \"%@\"?";
+"Delete \"%@\"?" = "Eliminare «%@»?";
 
-"The preset is removed. The layout on screen is not changed." = "The preset is removed. The layout on screen is not changed.";
+"The preset is removed. The layout on screen is not changed." = "Il preset viene rimosso. Il layout sullo schermo non cambia.";
 
-"Deleted \"%@\"" = "Deleted \"%@\"";
+"Deleted \"%@\"" = "«%@» eliminato";
 
-"Save current layout" = "Save current layout";
+"Save current layout" = "Salva layout attuale";
 
-"Preset name" = "Preset name";
+"Preset name" = "Nome preset";
 
-"Preset list is full (%ld). Delete one first." = "Preset list is full (%ld). Delete one first.";
+"Preset list is full (%ld). Delete one first." = "L'elenco dei preset è pieno (%ld). Eliminane prima uno.";
 
-"Saved as \"%@\"" = "Saved as \"%@\"";
+"Saved as \"%@\"" = "Salvato come «%@»";
 
-"Layout exported" = "Layout exported";
+"Layout exported" = "Layout esportato";
 
-"Could not write the file" = "Could not write the file";
+"Could not write the file" = "Impossibile scrivere il file";
 
-"That layout was made by a newer version of SKapsule." = "That layout was made by a newer version of SKapsule.";
+"That layout was made by a newer version of SKapsule." = "Questo layout è stato creato da una versione più recente di SKapsule.";
 
-"That file is too large to be a layout." = "That file is too large to be a layout.";
+"That file is too large to be a layout." = "Questo file è troppo grande per essere un layout.";
 
-"That file isn't a valid SKapsule controls layout." = "That file isn't a valid SKapsule controls layout.";
+"That file isn't a valid SKapsule controls layout." = "Questo file non è un layout controlli SKapsule valido.";
 
-"Could not read the file" = "Could not read the file";
+"Could not read the file" = "Impossibile leggere il file";
 
-"Imported as \"%@\"." = "Imported as \"%@\".";
+"Imported as \"%@\"." = "Importato come «%@».";
 
-"My layout" = "My layout";
+"My layout" = "Il mio layout";
+
+/* Modpack button */
+"Update Modpack" = "Aggiorna modpack";
+
+"Modpack up to date" = "Modpack aggiornato";
+
+/* Graphics in the sidebar */
+"Show FPS counter" = "Mostra contatore FPS";
+
+"Sharpening: off" = "Nitidezza: disattivata";
+
+"Sharpening: %ld%%" = "Nitidezza: %ld%%";
+
+"Sharp HUD (experimental)" = "HUD nitido (sperimentale)";
+
+"Sharpening and Sharp HUD draw the game off-screen first." = "La nitidezza e l'HUD nitido disegnano prima il gioco fuori schermo.";
+
+"Sharp HUD draws the HUD at full resolution, so it gets smaller: raise the game's UI scale to compensate." = "L'HUD nitido viene disegnato a piena risoluzione (diventa più piccolo): aumenta la scala interfaccia di gioco per compensare.";
+
+"Sharp HUD needs Resolution below 100%." = "L'HUD nitido richiede una risoluzione inferiore al 100%.";
+
+/* Touch editor pages */
+"Edit" = "Modifica";
+
+"Close" = "Chiudi";
+
+"Floating left stick" = "Stick sinistro flottante";
+
+"Floating right stick" = "Stick destro flottante";
+
+"A floating stick appears where your thumb lands and follows it." = "Uno stick flottante appare dove si posa il pollice e lo segue.";
 

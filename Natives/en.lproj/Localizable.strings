@@ -268,3 +268,34 @@
 
 "My layout" = "My layout";
 
+/* Modpack button */
+"Update Modpack" = "Update Modpack";
+
+"Modpack up to date" = "Modpack up to date";
+
+/* Graphics in the sidebar */
+"Show FPS counter" = "Show FPS counter";
+
+"Sharpening: off" = "Sharpening: off";
+
+"Sharpening: %ld%%" = "Sharpening: %ld%%";
+
+"Sharp HUD (experimental)" = "Sharp HUD (experimental)";
+
+"Sharpening and Sharp HUD draw the game off-screen first." = "Sharpening and Sharp HUD draw the game off-screen first.";
+
+"Sharp HUD draws the HUD at full resolution, so it gets smaller: raise the game's UI scale to compensate." = "Sharp HUD draws the HUD at full resolution, so it gets smaller: raise the game's UI scale to compensate.";
+
+"Sharp HUD needs Resolution below 100%." = "Sharp HUD needs Resolution below 100%.";
+
+/* Touch editor pages */
+"Edit" = "Edit";
+
+"Close" = "Close";
+
+"Floating left stick" = "Floating left stick";
+
+"Floating right stick" = "Floating right stick";
+
+"A floating stick appears where your thumb lands and follows it." = "A floating stick appears where your thumb lands and follows it.";
+

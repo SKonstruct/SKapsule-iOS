@@ -218,53 +218,84 @@
 "You're on v%s, which is newer than the latest release (v%@)." = "Masz wersję v%1$s, nowszą niż ostatnie wydanie (v%2$@).";
 
 /* Layouts */
-"Layouts…" = "Layouts…";
+"Layouts…" = "Układy…";
 
-"Layouts" = "Layouts";
+"Layouts" = "Układy";
 
-"Default (built-in)" = "Default (built-in)";
+"Default (built-in)" = "Domyślny (wbudowany)";
 
-"＋ Save current layout as preset…" = "＋ Save current layout as preset…";
+"＋ Save current layout as preset…" = "＋ Zapisz układ jako preset…";
 
-"Export current layout to file…" = "Export current layout to file…";
+"Export current layout to file…" = "Eksportuj obecny układ do pliku…";
 
-"Import layout from file…" = "Import layout from file…";
+"Import layout from file…" = "Importuj układ z pliku…";
 
-"Apply \"%@\"?" = "Apply \"%@\"?";
+"Apply \"%@\"?" = "Zastosować „%@”?";
 
-"This replaces your current arrangement. Save it as a preset first to keep it." = "This replaces your current arrangement. Save it as a preset first to keep it.";
+"This replaces your current arrangement. Save it as a preset first to keep it." = "Spowoduje to zastąpienie obecnego układu. Najpierw zapisz go jako preset, aby go zachować.";
 
-"Apply" = "Apply";
+"Apply" = "Zastosuj";
 
-"Applied \"%@\"" = "Applied \"%@\"";
+"Applied \"%@\"" = "Zastosowano „%@”";
 
-"Delete \"%@\"?" = "Delete \"%@\"?";
+"Delete \"%@\"?" = "Usunąć „%@”?";
 
-"The preset is removed. The layout on screen is not changed." = "The preset is removed. The layout on screen is not changed.";
+"The preset is removed. The layout on screen is not changed." = "Preset zostanie usunięty. Układ na ekranie nie ulegnie zmianie.";
 
-"Deleted \"%@\"" = "Deleted \"%@\"";
+"Deleted \"%@\"" = "Usunięto „%@”";
 
-"Save current layout" = "Save current layout";
+"Save current layout" = "Zapisz obecny układ";
 
-"Preset name" = "Preset name";
+"Preset name" = "Nazwa presetu";
 
-"Preset list is full (%ld). Delete one first." = "Preset list is full (%ld). Delete one first.";
+"Preset list is full (%ld). Delete one first." = "Lista presetów jest pełna (%ld). Najpierw usuń jeden.";
 
-"Saved as \"%@\"" = "Saved as \"%@\"";
+"Saved as \"%@\"" = "Zapisano jako „%@”";
 
-"Layout exported" = "Layout exported";
+"Layout exported" = "Układ wyeksportowany";
 
-"Could not write the file" = "Could not write the file";
+"Could not write the file" = "Nie udało się zapisać pliku";
 
-"That layout was made by a newer version of SKapsule." = "That layout was made by a newer version of SKapsule.";
+"That layout was made by a newer version of SKapsule." = "Ten układ został utworzony w nowszej wersji SKapsule.";
 
-"That file is too large to be a layout." = "That file is too large to be a layout.";
+"That file is too large to be a layout." = "Ten plik jest zbyt duży jak na układ.";
 
-"That file isn't a valid SKapsule controls layout." = "That file isn't a valid SKapsule controls layout.";
+"That file isn't a valid SKapsule controls layout." = "Ten plik nie jest prawidłowym układem sterowania SKapsule.";
 
-"Could not read the file" = "Could not read the file";
+"Could not read the file" = "Nie udało się odczytać pliku";
 
-"Imported as \"%@\"." = "Imported as \"%@\".";
+"Imported as \"%@\"." = "Zaimportowano jako „%@”.";
 
-"My layout" = "My layout";
+"My layout" = "Mój układ";
+
+/* Modpack button */
+"Update Modpack" = "Zaktualizuj modpack";
+
+"Modpack up to date" = "Modpack aktualny";
+
+/* Graphics in the sidebar */
+"Show FPS counter" = "Pokaż licznik FPS";
+
+"Sharpening: off" = "Wyostrzanie: wył.";
+
+"Sharpening: %ld%%" = "Wyostrzanie: %ld%%";
+
+"Sharp HUD (experimental)" = "Ostry interfejs HUD (eksperyment)";
+
+"Sharpening and Sharp HUD draw the game off-screen first." = "Wyostrzanie i ostry HUD renderują grę najpierw poza ekranem.";
+
+"Sharp HUD draws the HUD at full resolution, so it gets smaller: raise the game's UI scale to compensate." = "Ostry HUD renderuje się w pełnej rozdzielczości (staje się mniejszy): zwiększ skalę interfejsu w grze, aby zrekompensować.";
+
+"Sharp HUD needs Resolution below 100%." = "Ostry HUD wymaga rozdzielczości poniżej 100%.";
+
+/* Touch editor pages */
+"Edit" = "Edytuj";
+
+"Close" = "Zamknij";
+
+"Floating left stick" = "Pływający lewy drążek";
+
+"Floating right stick" = "Pływający prawy drążek";
+
+"A floating stick appears where your thumb lands and follows it." = "Pływający drążek pojawia się w miejscu dotknięcia kciukiem i podąża za nim.";
 
