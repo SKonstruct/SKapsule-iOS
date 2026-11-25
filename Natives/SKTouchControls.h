@@ -1,4 +1,5 @@
 #import <UIKit/UIKit.h>
+#import "SKLayoutShare.h"
 
 typedef NS_ENUM(NSInteger, SKControlType) {
     SKControlTypeButton,
@@ -39,6 +40,18 @@ typedef NS_ENUM(NSInteger, SKControlType) {
 + (instancetype)defaultLayout;
 + (instancetype)loadLayout;
 - (void)save;
+@end
+
+/// Presets and export/import (see SKLayoutShare.h). Only the arrangement moves: what a control
+/// sends is never read from a shared layout.
+@interface SKTouchLayout (Sharing)
+/// The node ids this build has: the only ones an imported layout may touch.
++ (NSSet<NSString *> *)knownNodeIds;
+- (SKSharedLayout *)sharedLayoutNamed:(NSString *)name;
+/// Lays `shared` over the live nodes (position, size, visibility) plus opacity and "Show
+/// Buttons"; nil means the built-in default arrangement. A node the layout doesn't mention takes
+/// its default. `controlsEnabled` and `renderScale` are left alone. Doesn't save.
+- (void)applySharedLayout:(SKSharedLayout *)shared;
 @end
 
 extern const CGFloat SKMinOpacity;

@@ -8,26 +8,28 @@ NS_ASSUME_NONNULL_BEGIN
 typedef void (^SKBootStatusBlock)(NSString *message);
 typedef void (^SKRenderReadyBlock)(void);
 
-// Steam Guard credential prompt callbacks (JVM → UI, blocking)
-typedef void (^SKPromptDeviceCodeBlock)(BOOL prevWrong);
-typedef void (^SKPromptEmailCodeBlock)(NSString *email, BOOL prevWrong);
+// Steam sign-in callbacks (JVM → UI). qrModules is rows separated by "\n", '1' dark and '0' light,
+// without a quiet zone.
+typedef void (^SKShowSignInBlock)(NSString *challengeUrl, NSString *qrModules);
+typedef void (^SKHideSignInBlock)(void);
 
 @interface SKNativeBridge : NSObject
 
 // Register callbacks from GameViewController
 + (void)setBootStatusHandler:(SKBootStatusBlock)handler;
 + (void)setRenderReadyHandler:(SKRenderReadyBlock)handler;
-+ (void)setPromptDeviceCodeHandler:(SKPromptDeviceCodeBlock)handler;
-+ (void)setPromptEmailCodeHandler:(SKPromptEmailCodeBlock)handler;
++ (void)setShowSignInHandler:(nullable SKShowSignInBlock)handler;
++ (void)setHideSignInHandler:(nullable SKHideSignInBlock)handler;
 
 // Called from JVM thread (via JNI registered natives in SkBootstrap)
 + (void)onLaunchStatus:(NSString *)message;
 + (void)onRenderReady;
-+ (NSString *)promptForDeviceCode:(BOOL)prevWrong;
-+ (NSString *)promptForEmailCode:(NSString *)email prevWrong:(BOOL)prevWrong;
++ (void)onShowSignIn:(NSString *)challengeUrl modules:(NSString *)qrModules;
++ (void)onHideSignIn;
++ (BOOL)signInCancelled;
 
-// Called from UI thread to unblock a parked prompt
-+ (void)submitCode:(NSString *)code;
+// Called from UI thread when the user cancels the sign-in
++ (void)cancelSignIn;
 
 @end
 

@@ -7,6 +7,7 @@
 #import "SKKeyboardBridge.h"
 #import "SKMouseButtons.h"
 #import "SKReporter.h"
+#import "SKLayoutLibrary.h"
 #import "SKTouchControlOverlay.h"
 #import "utils.h"
 
@@ -22,7 +23,11 @@
 extern void sk_input_push_cursor(int x, int y);
 extern void sk_input_push_framebuffer_size(int width, int height);
 extern void sk_gl_request_resize(void);
+extern int sk_gl_context_taken(void);
 extern void sk_gl_set_drawable_size(int width, int height);
+extern void sk_gl_set_gfx_config(int enabled, float scale, float sharpen, int hud, int nativeWidth, int nativeHeight);
+extern uint64_t sk_gfx_frame_count(void);
+#import "SKGfxSettings.h"
 extern void sk_gl_reset_render_ready(void);
 extern void sk_input_push_mouse_button(int button, BOOL pressed);
 extern void sk_input_push_scroll(int ticks);
@@ -262,13 +267,31 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
 @interface GameViewController () <SKTouchControlOverlayDelegate>
 @property (nonatomic, strong) UIView *surfaceView;
 @property (nonatomic, strong) SKTouchControlOverlay *touchControls;
+/// Presets and export/import for the in-game editor (the standalone editor has its own).
+@property (nonatomic, strong) SKLayoutLibrary *layoutLibrary;
 @property (nonatomic, strong) UIButton *editLayoutButton;
 @property (nonatomic, strong) UIButton *keyboardButton;
 @property (nonatomic, strong) SKKeyboardBridge *keyboardBridge;
 @property (nonatomic, assign) CGSize lastDrawableSize;
 @property (nonatomic, assign) CGFloat renderScaleFactor;
+@property (nonatomic, assign) CGFloat layoutRenderScale;  // the resolution slider's value
+@property (nonatomic, assign) BOOL gfxOffscreen;          // the offscreen pass is on (see SKGfxSettings.h)
+@property (nonatomic, strong) UIView *fpsPill;
+@property (nonatomic, strong) UILabel *fpsLabel;
+@property (nonatomic, strong) NSTimer *fpsTimer;
+@property (nonatomic, assign) uint64_t fpsLastFrames;
+@property (nonatomic, assign) NSTimeInterval fpsLastTime;
 @property (nonatomic, strong) UILabel *bootStatus;
 @property (nonatomic, strong) UIView *bootOverlay;
+@property (nonatomic, strong) UIView *signInOverlay;
+@property (nonatomic, strong) UIImageView *signInQR;
+@property (nonatomic, strong) UIStackView *signInRow;
+@property (nonatomic, strong) UIStackView *signInText;
+/// Raised when the portrait sign-in phase ends: the drawable still has the portrait size.
+@property (nonatomic, assign) BOOL resyncDrawableAfterPortrait;
+@property (nonatomic, strong) UILabel *signInBody;
+@property (nonatomic, copy) NSString *signInURL;
+@property (nonatomic, assign) UIBackgroundTaskIdentifier signInTask;
 @property (nonatomic, strong) UIActivityIndicatorView *spinner;
 @property (nonatomic, strong) UITouch *primaryTouch;
 @property (nonatomic, assign) BOOL jvmKicked;
@@ -309,10 +332,11 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
     // contentScaleFactor to layer.contentsScale whenever the view joins a window or lays
     // out, so a value written straight to the layer here is silently reset to the screen
     // scale and the game comes up at full resolution.
-    self.renderScaleFactor = UIScreen.mainScreen.scale * [SKTouchLayout loadLayout].renderScale;
+    self.layoutRenderScale = [SKTouchLayout loadLayout].renderScale;
+    [self applyGfxConfig];
     self.surfaceView.contentScaleFactor = self.renderScaleFactor;
-    NSLog(@"[gl] render scale %.2f -> contentsScale %.2f", [SKTouchLayout loadLayout].renderScale,
-          self.renderScaleFactor);
+    NSLog(@"[gl] render scale %.2f -> contentsScale %.2f%@", self.layoutRenderScale, self.renderScaleFactor,
+          self.gfxOffscreen ? @" (offscreen pass)" : @"");
     gEAGLLayer.drawableProperties =
         @{kEAGLDrawablePropertyRetainedBacking: @(NO), kEAGLDrawablePropertyColorFormat: kEAGLColorFormatRGBA8};
 
@@ -333,6 +357,10 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
     self.touchControls = [[SKTouchControlOverlay alloc] initWithFrame:self.surfaceView.frame];
     self.touchControls.delegate = self;
     [self.view addSubview:self.touchControls];
+    // The handler is what reveals the panel's "Layouts…" button.
+    self.layoutLibrary = [[SKLayoutLibrary alloc] initWithPresenter:self overlay:self.touchControls];
+    __weak typeof(self) weakLibraryOwner = self;
+    self.touchControls.layoutLibraryHandler = ^{ [weakLibraryOwner.layoutLibrary show]; };
 
     self.keyboardBridge = [[SKKeyboardBridge alloc] initWithFrame:CGRectZero];
     [self.view addSubview:self.keyboardBridge];
@@ -346,6 +374,7 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
     self.buttonsToggle = [self chromeButtonWithSymbol:@"eye" action:@selector(onToggleButtons)];
     [self refreshButtonsToggleIcon];
     [self migrateChromeLayoutOnce];
+    [self setupFpsPill];
 
     UIHoverGestureRecognizer *hover = [[UIHoverGestureRecognizer alloc] initWithTarget:self
                                                                                 action:@selector(handlePointerHover:)];
@@ -388,7 +417,7 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
     [self.view addSubview:self.bootOverlay];
 
     self.bootStatus = [[UILabel alloc] init];
-    self.bootStatus.text = @"Starting Java runtime…";
+    self.bootStatus.text = NSLocalizedString(@"Starting Java runtime…", nil);
     self.bootStatus.textColor = UIColor.whiteColor;
     self.bootStatus.font = [UIFont systemFontOfSize:14];
     self.bootStatus.textAlignment = NSTextAlignmentCenter;
@@ -413,6 +442,7 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
 
     // Register NativeBridge callbacks
     __weak typeof(self) weakSelf = self;
+    self.signInTask = UIBackgroundTaskInvalid;
 
     [SKNativeBridge setBootStatusHandler:^(NSString *message) {
       weakSelf.bootStatus.text = message;
@@ -434,16 +464,12 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
           }];
     }];
 
-    [SKNativeBridge setPromptDeviceCodeHandler:^(BOOL prevWrong) {
-      [weakSelf showSteamGuardPromptWithTitle:@"Steam Guard"
-                                      message:prevWrong ? @"Incorrect code. Enter your Steam Guard authenticator code:"
-                                                        : @"Enter your Steam Guard authenticator code:"];
+    [SKNativeBridge setShowSignInHandler:^(NSString *url, NSString *modules) {
+      [weakSelf showSignInURL:url modules:modules];
     }];
 
-    [SKNativeBridge setPromptEmailCodeHandler:^(NSString *email, BOOL prevWrong) {
-      NSString *msg = prevWrong ? [NSString stringWithFormat:@"Incorrect code. Enter the code sent to %@:", email]
-                                : [NSString stringWithFormat:@"Enter the Steam Guard code sent to %@:", email];
-      [weakSelf showSteamGuardPromptWithTitle:@"Steam Guard (Email)" message:msg];
+    [SKNativeBridge setHideSignInHandler:^{
+      [weakSelf hideSignIn];
     }];
 }
 
@@ -592,7 +618,15 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
     CGFloat width = self.surfaceView.bounds.size.width;
     if (width <= 0 || self.lastDrawableSize.width <= 0)
         return self.surfaceView.contentScaleFactor;
-    return self.lastDrawableSize.width / width;
+    CGFloat gameWidth = self.lastDrawableSize.width;
+    if (self.gfxOffscreen) {
+        // The drawable is native-sized; the game believes it is the scene's size (the full size with Sharp HUD).
+        int gameW, gameH;
+        SKGfxGameSize((int)self.lastDrawableSize.width, (int)self.lastDrawableSize.height,
+                      (float)self.layoutRenderScale, SKGfxSharpHud(), &gameW, &gameH);
+        gameWidth = gameW;
+    }
+    return gameWidth / width;
 }
 
 - (void)pushCursorAtPoint:(CGPoint)point {
@@ -718,53 +752,216 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
     [self pressesEnded:presses withEvent:event];
 }
 
-// Steam Guard prompt: alerts on main thread and submits asynchronously
-- (void)showSteamGuardPromptWithTitle:(NSString *)title message:(NSString *)message {
-    [self showSteamGuardPromptWithTitle:title message:message attempt:0];
+#pragma mark - Steam sign-in
+
+/// The module grid as an image: whitespace-free rows of '1' (dark) and '0', a white 4-module quiet zone,
+/// and an integer pixel size per module so scaling never blurs an edge.
+static UIImage *skQRImage(NSString *modules) {
+    NSMutableArray<NSString *> *rows = [NSMutableArray array];
+    NSUInteger cols = 0;
+    for (NSString *row in [modules componentsSeparatedByString:@"\n"]) {
+        if (row.length == 0) continue;
+        [rows addObject:row];
+        cols = MAX(cols, row.length);
+    }
+    if (rows.count == 0 || cols == 0) return nil;
+
+    const NSUInteger quiet = 4;
+    NSUInteger totalW = cols + 2 * quiet, totalH = rows.count + 2 * quiet;
+    NSUInteger px = MAX(1, 480 / MAX(totalW, totalH));
+
+    CGColorSpaceRef gray = CGColorSpaceCreateDeviceGray();
+    CGContextRef ctx = CGBitmapContextCreate(NULL, totalW * px, totalH * px, 8, 0, gray, (CGBitmapInfo)kCGImageAlphaNone);
+    CGColorSpaceRelease(gray);
+    if (!ctx) return nil;
+
+    CGContextSetGrayFillColor(ctx, 1, 1);
+    CGContextFillRect(ctx, CGRectMake(0, 0, totalW * px, totalH * px));
+    CGContextSetGrayFillColor(ctx, 0, 1);
+    for (NSUInteger r = 0; r < rows.count; r++) {
+        NSString *row = rows[r];
+        for (NSUInteger c = 0; c < row.length; c++) {
+            if ([row characterAtIndex:c] != '1') continue;
+            // The context's origin is bottom-left.
+            CGContextFillRect(ctx, CGRectMake((c + quiet) * px, (totalH - 1 - (r + quiet)) * px, px, px));
+        }
+    }
+    CGImageRef cg = CGBitmapContextCreateImage(ctx);
+    CGContextRelease(ctx);
+    if (!cg) return nil;
+    UIImage *image = [UIImage imageWithCGImage:cg];
+    CGImageRelease(cg);
+    return image;
 }
 
-/// UIKit silently drops a present while another alert is up or still animating away, which
-/// would leave the JVM thread waiting on a prompt nobody can see. Retry until it can be shown,
-/// and answer with an empty code (a cancel) if it never can.
-- (void)showSteamGuardPromptWithTitle:(NSString *)title message:(NSString *)message attempt:(int)attempt {
-    if (self.presentedViewController || !self.view.window) {
-        if (attempt >= 120) {
-            NSLog(@"[GameVC] Couldn't present the Steam Guard prompt; cancelling it");
-            [SKNativeBridge submitCode:@""];
-            return;
-        }
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-          [self showSteamGuardPromptWithTitle:title message:message attempt:attempt + 1];
-        });
+- (void)buildSignInOverlay {
+    UIView *overlay = [[UIView alloc] initWithFrame:self.view.bounds];
+    overlay.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    overlay.backgroundColor = [UIColor colorWithWhite:0 alpha:0.75];
+
+    UIView *card = [[UIView alloc] init];
+    card.backgroundColor = [UIColor colorWithWhite:0.13 alpha:1];
+    card.layer.cornerRadius = 16;
+    card.translatesAutoresizingMaskIntoConstraints = NO;
+    [overlay addSubview:card];
+
+    UIImageView *qr = [[UIImageView alloc] init];
+    qr.contentMode = UIViewContentModeScaleAspectFit;
+    qr.layer.magnificationFilter = kCAFilterNearest;
+    qr.layer.cornerRadius = 6;
+    qr.clipsToBounds = YES;
+    qr.isAccessibilityElement = YES;
+    qr.accessibilityLabel = NSLocalizedString(@"Steam sign-in QR code", nil);
+    qr.translatesAutoresizingMaskIntoConstraints = NO;
+    [NSLayoutConstraint activateConstraints:@[
+        [qr.widthAnchor constraintEqualToConstant:200],
+        [qr.heightAnchor constraintEqualToConstant:200],
+    ]];
+
+    UILabel *title = [[UILabel alloc] init];
+    title.text = NSLocalizedString(@"Sign in to Steam", nil);
+    title.textColor = UIColor.whiteColor;
+    title.font = [UIFont systemFontOfSize:20 weight:UIFontWeightSemibold];
+
+    UILabel *body = [[UILabel alloc] init];
+    body.text = NSLocalizedString(@"Scan this code with the Steam mobile app on another device and approve the sign-in, or "
+                @"open the Steam app on this one.", nil);
+    body.textColor = [UIColor colorWithWhite:0.8 alpha:1];
+    body.font = [UIFont systemFontOfSize:14];
+    body.numberOfLines = 0;
+
+    UIButtonConfiguration *openConfig = [UIButtonConfiguration filledButtonConfiguration];
+    openConfig.title = NSLocalizedString(@"Open Steam app", nil);
+    openConfig.cornerStyle = UIButtonConfigurationCornerStyleCapsule;
+    UIButton *open = [UIButton buttonWithConfiguration:openConfig primaryAction:nil];
+    [open addTarget:self action:@selector(onSignInOpenSteam) forControlEvents:UIControlEventTouchUpInside];
+
+    UIButtonConfiguration *cancelConfig = [UIButtonConfiguration plainButtonConfiguration];
+    cancelConfig.title = NSLocalizedString(@"Cancel", nil);
+    UIButton *cancel = [UIButton buttonWithConfiguration:cancelConfig primaryAction:nil];
+    [cancel addTarget:self action:@selector(onSignInCancel) forControlEvents:UIControlEventTouchUpInside];
+
+    UIStackView *buttons = [[UIStackView alloc] initWithArrangedSubviews:@[ open, cancel ]];
+    buttons.spacing = 8;
+    buttons.alignment = UIStackViewAlignmentCenter;
+
+    UIStackView *text = [[UIStackView alloc] initWithArrangedSubviews:@[ title, body, buttons ]];
+    text.axis = UILayoutConstraintAxisVertical;
+    text.alignment = UIStackViewAlignmentLeading;
+    text.spacing = 12;
+    NSLayoutConstraint *textWidth = [text.widthAnchor constraintEqualToConstant:300];
+    textWidth.priority = UILayoutPriorityDefaultHigh;
+    textWidth.active = YES;
+
+    UIStackView *row = [[UIStackView alloc] initWithArrangedSubviews:@[ qr, text ]];
+    row.spacing = 24;
+    row.alignment = UIStackViewAlignmentCenter;
+    row.translatesAutoresizingMaskIntoConstraints = NO;
+    [card addSubview:row];
+
+    UILayoutGuide *safe = overlay.safeAreaLayoutGuide;
+    [NSLayoutConstraint activateConstraints:@[
+        [card.centerXAnchor constraintEqualToAnchor:overlay.centerXAnchor],
+        [card.centerYAnchor constraintEqualToAnchor:overlay.centerYAnchor],
+        [card.leadingAnchor constraintGreaterThanOrEqualToAnchor:safe.leadingAnchor constant:16],
+        [card.trailingAnchor constraintLessThanOrEqualToAnchor:safe.trailingAnchor constant:-16],
+        [row.topAnchor constraintEqualToAnchor:card.topAnchor constant:24],
+        [row.bottomAnchor constraintEqualToAnchor:card.bottomAnchor constant:-24],
+        [row.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:24],
+        [row.trailingAnchor constraintEqualToAnchor:card.trailingAnchor constant:-24],
+    ]];
+
+    self.signInOverlay = overlay;
+    self.signInQR = qr;
+    self.signInBody = body;
+    self.signInRow = row;
+    self.signInText = text;
+    [self updateSignInLayout];
+}
+
+/// QR beside the text in landscape, QR above it in portrait (where the sign-in normally runs).
+- (void)updateSignInLayout {
+    if (!self.signInRow) return;
+    BOOL portrait = self.view.bounds.size.width < self.view.bounds.size.height;
+    self.signInRow.axis = portrait ? UILayoutConstraintAxisVertical : UILayoutConstraintAxisHorizontal;
+    self.signInRow.spacing = portrait ? 20 : 24;
+    self.signInText.alignment = portrait ? UIStackViewAlignmentCenter : UIStackViewAlignmentLeading;
+    self.signInBody.textAlignment = portrait ? NSTextAlignmentCenter : NSTextAlignmentNatural;
+}
+
+/// Called again each time Steam rotates the challenge, so it updates the one overlay in place.
+- (void)showSignInURL:(NSString *)url modules:(NSString *)modules {
+    // A Cancel that landed first wins over a rotation already in flight.
+    if ([SKNativeBridge signInCancelled]) return;
+    UIImage *image = skQRImage(modules);
+    if (!image) {
+        NSLog(@"[GameVC] Unusable QR grid; cancelling sign-in");
+        [SKNativeBridge cancelSignIn];
         return;
     }
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:title
-                                                                   message:message
-                                                            preferredStyle:UIAlertControllerStyleAlert];
+    if (!self.signInOverlay) [self buildSignInOverlay];
+    self.signInURL = url;
+    self.signInQR.image = image;
+    if (!self.signInOverlay.superview) [self.view addSubview:self.signInOverlay];
+    [self.view bringSubviewToFront:self.signInOverlay];
 
-    [alert addTextFieldWithConfigurationHandler:^(UITextField *tf) {
-      tf.placeholder = @"Code";
-      tf.keyboardType = UIKeyboardTypeNumberPad;
-      tf.autocorrectionType = UITextAutocorrectionTypeNo;
-      // Lets iOS offer the code straight from Messages, and password managers offer their
-      // stored TOTP for the Steam entry.
-      tf.textContentType = UITextContentTypeOneTimeCode;
-    }];
+    // Approving in the Steam app backgrounds this one. The window iOS grants is short, so
+    // frenchpress starts a new challenge if the connection dies meanwhile.
+    if (self.signInTask == UIBackgroundTaskInvalid) {
+        __weak typeof(self) weakSelf = self;
+        self.signInTask = [UIApplication.sharedApplication beginBackgroundTaskWithName:@"SKapsule steam sign-in"
+                                                                     expirationHandler:^{
+                                                                       [weakSelf endSignInBackgroundTask];
+                                                                     }];
+    }
+}
 
-    [alert addAction:[UIAlertAction actionWithTitle:@"Submit"
-                                              style:UIAlertActionStyleDefault
-                                            handler:^(UIAlertAction *action) {
-                                              NSString *code = alert.textFields.firstObject.text ?: @"";
-                                              [SKNativeBridge submitCode:code];
-                                            }]];
+- (void)hideSignIn {
+    [self.signInOverlay removeFromSuperview];
+    self.signInURL = nil;
+    [self endSignInBackgroundTask];
+    // SkBootstrap hides once more when the sign-in phase is over, even if it never showed a code.
+    [self endPortraitSignInPhase];
+}
 
-    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel"
-                                              style:UIAlertActionStyleCancel
-                                            handler:^(UIAlertAction *action) {
-                                              [SKNativeBridge submitCode:@""];
-                                            }]];
+/// The sign-in runs in portrait and the game is landscape-only, so turn once it is over. iOS does
+/// not re-evaluate the supported orientations by itself (see the launcher's enforcePortraitOrientation).
+- (void)endPortraitSignInPhase {
+    if (!self.signInInPortrait) return;
+    self.signInInPortrait = NO;
+    self.resyncDrawableAfterPortrait = YES;
+    [self setNeedsUpdateOfSupportedInterfaceOrientations];
+    UIWindowScene *scene = self.view.window.windowScene;
+    if (scene) {
+        UIWindowSceneGeometryPreferencesIOS *landscape =
+          [[UIWindowSceneGeometryPreferencesIOS alloc]
+            initWithInterfaceOrientations:UIInterfaceOrientationMaskLandscape];
+        [scene requestGeometryUpdateWithPreferences:landscape errorHandler:nil];
+    }
+}
 
-    [self presentViewController:alert animated:YES completion:nil];
+- (void)endSignInBackgroundTask {
+    if (self.signInTask == UIBackgroundTaskInvalid) return;
+    [UIApplication.sharedApplication endBackgroundTask:self.signInTask];
+    self.signInTask = UIBackgroundTaskInvalid;
+}
+
+- (void)onSignInOpenSteam {
+    NSURL *url = self.signInURL ? [NSURL URLWithString:self.signInURL] : nil;
+    if (!url) return;
+    // Universal links only: without the Steam app this fails here instead of opening a web page.
+    [UIApplication.sharedApplication openURL:url
+                                     options:@{UIApplicationOpenURLOptionUniversalLinksOnly : @YES}
+                           completionHandler:^(BOOL opened) {
+                             if (opened) return;
+                             self.signInBody.text = NSLocalizedString(@"The Steam app did not open. Scan the code from another device "
+                                                    @"that has the Steam app, or install Steam on this one.", nil);
+                           }];
+}
+
+- (void)onSignInCancel {
+    [SKNativeBridge cancelSignIn];
+    [self hideSignIn];
 }
 
 /// UIKit's safe area is far too generous for a fullscreen game: in landscape it applies the
@@ -796,9 +993,11 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
         bounds = UIEdgeInsetsInsetRect(bounds, [self gameSafeAreaInsets]);
     }
     self.surfaceView.frame = bounds;
+    [self applyGfxConfig];
 
     self.touchControls.frame = bounds;
     [self layoutChromeButtons];
+    [self layoutFpsPill];
 
     // Rebuilding the drawable is GL work on the main thread. That is only safe before SK's
     // render thread takes gEAGLContext; afterwards the two would be issuing commands into
@@ -809,7 +1008,19 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
     if (self.renderScaleFactor > 0)
         self.surfaceView.contentScaleFactor = self.renderScaleFactor;
 
-    if (gEAGLContext && !self.jvmKicked) {
+    [self updateSignInLayout];
+
+    // The portrait sign-in phase is over and the screen is landscape now: the drawable still has the
+    // portrait size. Until the game's render thread has taken the context the renderbuffer is rebuilt
+    // right here; after that the render thread does it, as for the resolution slider.
+    BOOL leavingPortrait = self.resyncDrawableAfterPortrait && bounds.size.width > bounds.size.height;
+    if (leavingPortrait && sk_gl_context_taken()) {
+        self.resyncDrawableAfterPortrait = NO;
+        [self setDrawableSize:CGSizeMake(round(bounds.size.width * self.renderScaleFactor),
+                                         round(bounds.size.height * self.renderScaleFactor))];
+        sk_gl_request_resize();
+    } else if (gEAGLContext && (!self.jvmKicked || leavingPortrait)) {
+        if (leavingPortrait) self.resyncDrawableAfterPortrait = NO;
         [EAGLContext setCurrentContext:gEAGLContext];
         CGFloat contentsScale = self.renderScaleFactor;
 
@@ -876,19 +1087,19 @@ static BOOL skJITReady(void) {
 }
 
 - (void)waitForJITThenLaunch {
-    self.bootStatus.text = @"Waiting for JIT…";
+    self.bootStatus.text = NSLocalizedString(@"Waiting for JIT…", nil);
     [self.spinner startAnimating];
 
     UIAlertController *alert = [UIAlertController
-        alertControllerWithTitle:@"Waiting for JIT"
+        alertControllerWithTitle:NSLocalizedString(@"Waiting for JIT", nil)
                          message:SKBuiltinJIT.selected
-                                     ? @"Spiral Knights needs JIT. SKapsule is enabling it now (LocalDevVPN must be "
-                                       @"connected); the game continues automatically."
-                                     : @"Spiral Knights needs JIT. Approve the request in StikDebug and the game "
-                                       @"continues automatically."
+                                     ? NSLocalizedString(@"Spiral Knights needs JIT. SKapsule is enabling it now (LocalDevVPN must be "
+                                       @"connected); the game continues automatically.", nil)
+                                     : NSLocalizedString(@"Spiral Knights needs JIT. Approve the request in StikDebug and the game "
+                                       @"continues automatically.", nil)
                   preferredStyle:UIAlertControllerStyleAlert];
     __weak typeof(self) weakSelf = self;
-    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel"
+    [alert addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"Cancel", nil)
                                               style:UIAlertActionStyleCancel
                                             handler:^(UIAlertAction *action) {
                                               __strong typeof(weakSelf) self = weakSelf;
@@ -904,7 +1115,7 @@ static BOOL skJITReady(void) {
     [SKBuiltinJIT requestJITWithFailure:^(NSString *message) {
       __strong typeof(weakSelf) self = weakSelf;
       if (self.jitWaitAlert != alert) return;  // already cancelled or granted
-      alert.title = @"Couldn't enable JIT";
+      alert.title = NSLocalizedString(@"Couldn't enable JIT", nil);
       alert.message = message;
     }];
 
@@ -927,7 +1138,7 @@ static BOOL skJITReady(void) {
 }
 
 - (void)launchJVMNow {
-    self.bootStatus.text = @"Launching Spiral Knights…";
+    self.bootStatus.text = NSLocalizedString(@"Launching Spiral Knights…", nil);
     [self.spinner startAnimating];
 
     BOOL isSteam = (self.loginMode == 1);  // SKLoginModeSteam
@@ -937,13 +1148,17 @@ static BOOL skJITReady(void) {
     CGFloat scale = UIScreen.mainScreen.scale;
     int w = (int)(surfaceSize.width * scale);
     int h = (int)(surfaceSize.height * scale);
+    // The game is always landscape; a launch that starts in portrait (the Steam sign-in) must not
+    // size the virtual screen with the portrait edges.
+    if (w < h) {
+        int t = w;
+        w = h;
+        h = t;
+    }
 
     [self startHeapWatchdog];
 
     // The block gets the only copy; the property must not keep the password for the session.
-    NSString *steamUser = self.steamUser ?: @"";
-    __block NSString *steamPass = self.steamPass ?: @"";
-    self.steamPass = nil;
     NSString *webUser = self.webUser ?: @"";
     __block NSString *webPass = self.webPass ?: @"";
     NSString *loginHost = self.loginHost ?: @"";
@@ -958,8 +1173,7 @@ static BOOL skJITReady(void) {
         [self startBootWatchdog];
         [self watchForUnservicedJITTrap];
       });
-      int ret = launchJVM(steamUser, steamPass, webUser, webPass, loginHost, isSteam, w, h);
-      steamPass = nil;
+      int ret = launchJVM(webUser, webPass, loginHost, isSteam, w, h);
       webPass = nil;
       NSLog(@"[GameVC] JVM exited with code %d", ret);
       if (ret != 0) {
@@ -969,8 +1183,9 @@ static BOOL skJITReady(void) {
       }
       dispatch_async(dispatch_get_main_queue(), ^{
         // The JIT message is the cause; the exit code is only its aftermath.
-        if (!skJITTrapWasSkipped()) self.bootStatus.text = [NSString stringWithFormat:@"JVM exited (code %d)", ret];
+        if (!skJITTrapWasSkipped()) self.bootStatus.text = [NSString stringWithFormat:NSLocalizedString(@"JVM exited (code %d)", nil), ret];
         [self.spinner stopAnimating];
+        [self endPortraitSignInPhase];
       });
     });
 }
@@ -1143,8 +1358,85 @@ static const CGFloat kChromeButtonGap = 8.0f;
     [self.keyboardBridge toggle];
 }
 
+/// The settings -> what the surface and the native pass do. With the offscreen pass the layer stays
+/// native-sized and the pass does the scaling; otherwise Core Animation upscales a smaller layer.
+- (void)applyGfxConfig {
+    float scale = (float)self.layoutRenderScale;
+    int sharpen = SKGfxSharpenPercent();
+    BOOL hud = SKGfxSharpHud();
+    self.gfxOffscreen = SKGfxUsesOffscreen(scale, sharpen, hud);
+    CGFloat screenScale = UIScreen.mainScreen.scale;
+    self.renderScaleFactor = screenScale * (self.gfxOffscreen ? 1.0 : self.layoutRenderScale);
+    CGSize bounds = self.surfaceView.bounds.size;
+    sk_gl_set_gfx_config(self.gfxOffscreen, scale, sharpen / 100.0f, hud, (int)lround(bounds.width * screenScale),
+                         (int)lround(bounds.height * screenScale));
+}
+
+- (void)touchOverlayDidChangeGfx:(SKTouchControlOverlay *)overlay {
+    [self touchOverlay:overlay didChangeRenderScale:self.layoutRenderScale];
+}
+
+- (void)touchOverlay:(SKTouchControlOverlay *)overlay didChangeFpsVisible:(BOOL)visible {
+    [self setFpsVisible:visible];
+}
+
+#pragma mark FPS counter
+
+/// A native view above the game, so the game's own screenshots never contain it. The swap hook
+/// counts frames; this reads the count twice a second.
+- (void)setupFpsPill {
+    self.fpsPill = [[UIView alloc] init];
+    self.fpsPill.backgroundColor = [UIColor colorWithWhite:0 alpha:0.55];
+    self.fpsPill.layer.cornerRadius = 6;
+    self.fpsPill.userInteractionEnabled = NO;
+    self.fpsLabel = [[UILabel alloc] init];
+    self.fpsLabel.textColor = UIColor.whiteColor;
+    self.fpsLabel.font = [UIFont monospacedDigitSystemFontOfSize:11 weight:UIFontWeightMedium];
+    self.fpsLabel.text = @"FPS --";
+    self.fpsLabel.isAccessibilityElement = NO;
+    [self.fpsPill addSubview:self.fpsLabel];
+    [self.view addSubview:self.fpsPill];
+    [self setFpsVisible:SKGfxShowFps()];
+}
+
+- (void)setFpsVisible:(BOOL)visible {
+    [self.fpsTimer invalidate];
+    self.fpsTimer = nil;
+    self.fpsPill.hidden = !visible;
+    if (!visible) return;
+    self.fpsLastTime = 0;
+    __weak typeof(self) weakSelf = self;
+    self.fpsTimer = [NSTimer scheduledTimerWithTimeInterval:0.5 repeats:YES block:^(NSTimer *timer) {
+        [weakSelf updateFps];
+    }];
+}
+
+- (void)updateFps {
+    uint64_t frames = sk_gfx_frame_count();
+    NSTimeInterval now = NSProcessInfo.processInfo.systemUptime;
+    if (self.fpsLastTime > 0 && now > self.fpsLastTime) {
+        int fps = (int)lround((double)(frames - self.fpsLastFrames) / (now - self.fpsLastTime));
+        self.fpsLabel.text = [NSString stringWithFormat:@"FPS %d", fps];
+    }
+    self.fpsLastFrames = frames;
+    self.fpsLastTime = now;
+}
+
+/// Top-left corner of what the game fills, clear of the notch and any avoid-edges inset.
+- (void)layoutFpsPill {
+    CGSize text = [@"FPS 999" sizeWithAttributes:@{NSFontAttributeName: self.fpsLabel.font}];
+    CGFloat padX = 6, padY = 1;
+    self.fpsLabel.frame = CGRectMake(padX, padY, ceil(text.width), ceil(text.height));
+    UIEdgeInsets safe = self.view.safeAreaInsets;
+    CGFloat x = MAX(CGRectGetMinX(self.surfaceView.frame), safe.left) + 3;
+    CGFloat y = safe.top + 1;
+    self.fpsPill.frame = CGRectMake(x, y, ceil(text.width) + 2 * padX, ceil(text.height) + 2 * padY);
+    [self.view bringSubviewToFront:self.fpsPill];
+}
+
 - (void)touchOverlay:(SKTouchControlOverlay *)overlay didChangeRenderScale:(CGFloat)renderScale {
-    self.renderScaleFactor = UIScreen.mainScreen.scale * renderScale;
+    self.layoutRenderScale = renderScale;
+    [self applyGfxConfig];
     // contentScaleFactor is a UIKit property, not GL -- safe on the main thread, and it is
     // what CoreAnimation hands to renderbufferStorage:fromDrawable:.
     self.surfaceView.contentScaleFactor = self.renderScaleFactor;
@@ -1196,17 +1488,17 @@ static const CGFloat kChromeButtonGap = 8.0f;
                                         [timer invalidate];
                                         [self.bootWatchdog invalidate];
                                         self.bootStatus.text =
-                                            @"JIT was not enabled: the game asked for its JIT memory and "
+                                            NSLocalizedString(@"JIT was not enabled: the game asked for its JIT memory and "
                                             @"nothing answered.\nIn StikDebug, import skapsule-jit.js and "
-                                            @"assign it to SKapsule, then enable JIT again.";
+                                            @"assign it to SKapsule, then enable JIT again.", nil);
                                         [self.spinner stopAnimating];
                                       }];
 }
 
 - (void)onBootTimedOut {
     if (!self.bootOverlay.superview) return;  // first frame arrived; nothing to report
-    self.bootStatus.text = @"Spiral Knights did not finish starting.\n"
-                           @"Share Logs from the launcher sidebar to report it.";
+    self.bootStatus.text = NSLocalizedString(@"Spiral Knights did not finish starting.\n"
+                           @"Share Logs from the launcher sidebar to report it.", nil);
     [self.spinner stopAnimating];
     SKReportFailure(@"boot_timeout", @"no first frame or progress within 90s of JVM launch", nil);
 }
@@ -1264,12 +1556,13 @@ static const CGFloat kChromeButtonGap = 8.0f;
 }
 
 - (UIInterfaceOrientationMask)supportedInterfaceOrientations {
-    return UIInterfaceOrientationMaskLandscape;
+    return self.signInInPortrait ? UIInterfaceOrientationMaskPortrait : UIInterfaceOrientationMaskLandscape;
 }
 
 - (void)dealloc {
     [self.heapWatchdog invalidate];
     [self.bootWatchdog invalidate];
+    if (_signInTask != UIBackgroundTaskInvalid) [UIApplication.sharedApplication endBackgroundTask:_signInTask];
     [NSNotificationCenter.defaultCenter removeObserver:self];
     for (GCController *controller in GCController.controllers) {
         [self unregisterController:controller];

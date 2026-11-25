@@ -96,6 +96,12 @@ JITFlags DeviceGetJITFlags(void) {
           return;
       }
       cachedFlags = 0;
+#if TARGET_OS_SIMULATOR
+      // A simulator process is a macOS process: the kernel grants executable memory, there is no
+      // TXM, and nothing needs mirrored mapping. The runtime's iOS version must not imply otherwise.
+      NSLog(@"[JIT] Simulator: no TXM, plain executable mappings");
+      return;
+#endif
       if (@available(iOS 26.0, *)) {
           cachedFlags |= JIT_FLAG_IS_IOS_26;
           if (!DeviceCanCreateRXMap()) {
@@ -207,6 +213,9 @@ BOOL skDebuggerAttached(void) {
 
 BOOL isJITEnabled(BOOL checkCSFlags) {
     (void)checkCSFlags;
+#if TARGET_OS_SIMULATOR
+    return YES;  // no debugger is needed or possible; see DeviceGetJITFlags
+#endif
     uint32_t flags = 0;
     csops(getpid(), CS_OPS_STATUS, &flags, sizeof(flags));
     if ((flags & CS_DEBUGGED) == 0) {

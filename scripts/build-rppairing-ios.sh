@@ -12,7 +12,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CRATE="$REPO_ROOT/Natives/RPPairing"
 OUT_DIR="${OUT_DIR:-$REPO_ROOT/out/rppairing}"
-TARGET=aarch64-apple-ios
+# RP_TARGET=aarch64-apple-ios-sim builds the simulator slice (scripts/sim/build-libs.sh).
+TARGET="${RP_TARGET:-aarch64-apple-ios}"
 
 if ! command -v cargo > /dev/null; then
     # rustup's shims may not be on PATH in a non-login shell.

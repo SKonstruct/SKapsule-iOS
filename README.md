@@ -2,13 +2,23 @@
 
 Play **Spiral Knights** on iPhone and iPad. SKapsule runs the real desktop game client on
 your device: a bundled Java 25 runtime, the game's OpenGL renderer translated to OpenGL ES,
-OpenAL audio, touch and controller support, and Web or Steam login (including Steam Guard).
+OpenAL audio, touch and controller support, and Web or Steam login (Steam by QR code or the Steam app).
 
 SKapsule is an unofficial fan project, not affiliated with or endorsed by
 Grey Havens. It doesn't include the game: the client is downloaded from the official servers
 on first launch, exactly like on desktop, and you play on your own account.
 
 The Android version is [SKapsule](https://github.com/SKonstruct/SKapsule).
+
+## Highlights
+
+| | |
+| --- | --- |
+| **Play** | The real desktop client on iPhone and iPad, on iOS or iPadOS 17.4 and later. Sign in with **Web**, or with **Steam** by QR code or the Steam app: there is no Steam password to type. |
+| **Controls** | On-screen touch controls, Bluetooth controllers and keyboards, and mice and trackpads on iPad. **Edit Controls** moves, resizes and hides every control. Keep named presets, or export and import a layout as a file that also works on [SKapsule for Android](https://github.com/SKonstruct/SKapsule). |
+| **JIT** | Required for a playable speed. SKapsule can enable it itself, or through StikDebug (see [Enabling JIT](#enabling-jit)). |
+| **Graphics** | A resolution slider, **Sharpening**, **Sharp HUD** (experimental) and an FPS counter, all in the in-game settings panel. |
+| **Languages** | English, Arabic, German, Spanish, Estonian, French, Italian, Japanese, Polish, Brazilian Portuguese, Russian and Simplified and Traditional Chinese. See [Translating](#translating). |
 
 ## Contents
 
@@ -111,16 +121,28 @@ stays attached, so neither is offered there.
 If you tap **Launch** first, SKapsule asks for JIT itself and starts as soon as it is
 granted. The first launch downloads the game, so give it a few minutes.
 
+**Steam login.** SKapsule never asks for your Steam username or password. The first Steam launch
+shows a QR code in portrait, before the screen turns landscape for the game: scan it with the Steam mobile app on another device and approve, or tap **Open Steam
+app** to approve on this one. The sign-in is then remembered (encrypted on this device) until you
+tap **Logout**. Cancel the QR code to go on without Steam.
+
 **Controls.** On-screen touch controls appear in game. To rearrange them, tap ⚙ in game or
 **Edit Controls** in the sidebar: drag controls around, show or hide each one, and change
-their size, their opacity and the render resolution. Bluetooth controllers and keyboards
-are supported, and so are mice and trackpads on iPad (less tested).
+their size, their opacity and the render resolution. **Layouts…** in the same panel keeps named
+presets and exports or imports a layout as a `.json` file, which also works with SKapsule for Android.
+Bluetooth controllers and keyboards are supported, and so are mice and trackpads on iPad (less tested).
+
+**Graphics.** The settings panel (⚙ in game) also has **Show FPS counter** (on by default),
+**Sharpening** (0 to 100%, off by default) and **Sharp HUD** (experimental, off by default). Sharpening
+and Sharp HUD draw the game off-screen first; Sharp HUD needs Resolution below 100% and draws the HUD at
+the screen's full resolution, so the HUD comes out smaller.
 
 **Mods.** **Download Modpack** in the sidebar fetches the [Spiral Knights Modpack](https://github.com/SirDank/Spiral-Knights-Modpack); you can also put
 your own mods in the `mods` folder (**Open Folder**). **Apply Mods** installs them and
 **Remove Mods** restores the game's original files. A few config files that often clash with
 game updates are never replaced, the same ones [KnightLauncher](https://github.com/lucasluqui/KnightLauncher) skips. Downloading the modpack
-never deletes mods you added yourself.
+never deletes mods you added yourself. Mods apply in an automatic order, with the broadest mod first (the one that
+changes the most files), so a small, targeted mod wins over a big one; there is nothing to sort by hand.
 
 **Custom servers.** The **Server** picker above Web / Steam chooses Official or a saved server; the **+**
 beside it adds one (address, port, and optionally its public key and client/content URLs) and the pencil
@@ -224,6 +246,7 @@ contains code adapted from Amethyst-iOS (GPL-3.0). It builds on:
 | [StikJIT](https://github.com/StikDebug/StikJIT) | Built-in JIT | MPL-2.0, with one patch ([scripts/patches](scripts/patches)) |
 | [bootstrap](https://github.com/SKonstruct/bootstrap) | Game bootstrap, shared with Android | MIT |
 | [frenchpress](https://github.com/SKonstruct/frenchpress) | Steam login | |
+| [skgfx](https://github.com/SKonstruct/skgfx) | Graphics pass (FPS counter, sharpening, Sharp HUD), shared with Android | MIT |
 | [Getdown](https://github.com/threerings/getdown) (the official client's build) | Game downloads and updates | |
 | [DejaVu fonts](https://github.com/dejavu-fonts/dejavu-fonts) | Bundled fonts | [Bitstream Vera licence](assets/fonts/LICENSE) |
 | [Simple Icons](https://simpleicons.org) | Buy Me a Coffee glyph | CC0 |
@@ -231,3 +254,14 @@ contains code adapted from Amethyst-iOS (GPL-3.0). It builds on:
 Spiral Knights is © Grey Havens, LLC.
 
 If you enjoy SKapsule, you can [buy me a coffee](https://buymeacoffee.com/sirdankk).
+
+## Translating
+
+The text is in `Natives/en.lproj/Localizable.strings` (the key is the English text). Every language has the same file in
+`Natives/<language>.lproj` (`ar`, `de`, `es`, `et`, `fr`, `it`, `ja`, `pl`, `pt-BR`, `ru`, `zh-Hans`, `zh-Hant`), a copy of
+the English text until it is translated. Translate the right-hand side, keep `%@`, `%d`, `%ld` placeholders and `\n`.
+`scripts/check-localizations.py` (run by `make test`) fails when a language lacks a key, has an unknown one or loses a
+placeholder. New interface text is written `NSLocalizedString(@"English text", nil)`; refresh the English file with
+`genstrings -q -u -o Natives/en.lproj Natives/*.m` and add the new keys to the other languages. A new language needs a
+`.lproj` folder and an entry in `Info.plist` `CFBundleLocalizations`. The workflow, a prompt for a model and a review
+checklist are in the SKradle repository's `docs/translating.md`.

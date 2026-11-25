@@ -1,0 +1,270 @@
+/* SKapsule user interface strings. The key is the English text. Translate the right-hand side only and keep
+   %@, %d, %ld, %s and %1$@ style placeholders exactly. See scripts/check-localizations.py. */
+
+"  Checking…" = "  Verificando…";
+
+"  Logout" = "  Sair";
+
+" Launch" = " Iniciar";
+
+"- %@\n" = "- %@\n";
+
+"\n\nWarnings:\n" = "\n\nAvisos:\n";
+
+"A server with that name already exists." = "Já existe um servidor com esse nome.";
+
+"Add Server" = "Adicionar servidor";
+
+"Add server" = "Adicionar servidor";
+
+"Add Server…" = "Adicionar servidor…";
+
+"Address" = "Endereço";
+
+"Anonymous: device model, iOS version, app build and JVM crash logs." = "Anônimo: modelo do dispositivo, versão do iOS, build do app e relatórios de falha da JVM.";
+
+"Apply Failed" = "Falha ao aplicar";
+
+"Apply Mods" = "Aplicar mods";
+
+"Applying Mods" = "Aplicando mods";
+
+"Avoid screen edges" = "Evitar bordas da tela";
+
+"Cancel" = "Cancelar";
+
+"Check for Updates" = "Buscar atualizações";
+
+"Check the server's details." = "Verifique os detalhes do servidor.";
+
+"Check your connection and try again. GitHub also limits how often a network can ask, so a busy network may need to wait a while." = "Verifique sua conexão e tente novamente. O GitHub também limita requisições de rede, portanto redes ocupadas podem precisar esperar.";
+
+"Choose a server" = "Escolher um servidor";
+
+"Client URL (optional)" = "URL do cliente (opcional)";
+
+"Content URL (optional)" = "URL do conteúdo (opcional)";
+
+"Could not locate Documents directory." = "Não foi possível localizar o diretório Documents.";
+
+"Couldn't Check for Updates" = "Não foi possível verificar atualizações";
+
+"Couldn't enable JIT" = "Não foi possível ativar o JIT";
+
+"Couldn't point the game at this server: %@" = "Não foi possível direcionar o jogo para este servidor: %@";
+
+"Couldn't save the login on this device." = "Não foi possível salvar o login neste dispositivo.";
+
+"Delete" = "Excluir";
+
+"Development Build" = "Versão de desenvolvimento";
+
+"Done" = "Concluído";
+
+"Download Failed" = "Falha no download";
+
+"Download Modpack" = "Baixar modpack";
+
+"Downloading Mods" = "Baixando mods";
+
+"Edit Controls" = "Editar controles";
+
+"Edit Server" = "Editar servidor";
+
+"Edit server" = "Editar servidor";
+
+"Enable JIT" = "Ativar JIT";
+
+"Enter a name of up to 40 characters." = "Digite um nome de até 40 caracteres.";
+
+"Enter a port from 1 to 65535." = "Digite uma porta de 1 a 65535.";
+
+"Enter a valid server address." = "Digite um endereço de servidor válido.";
+
+"Enter both a username and a password, or leave both blank." = "Digite usuário e senha, ou deixe ambos em branco.";
+
+"Fight alongside ~%ld other Spiral Knights!" = "Lute ao lado de ~%ld outros Spiral Knights!";
+
+"JIT enabled" = "JIT ativado";
+
+"JIT Setup" = "Configuração do JIT";
+
+"JIT was not enabled" = "O JIT não foi ativado";
+
+"JIT was not enabled: the game asked for its JIT memory and nothing answered.\nIn StikDebug, import skapsule-jit.js and assign it to SKapsule, then enable JIT again." = "O JIT não foi ativado: o jogo solicitou memória JIT e não obteve resposta.\nNo StikDebug, importe skapsule-jit.js, associe-o ao SKapsule e ative o JIT novamente.";
+
+"JVM exited (code %d)" = "A JVM encerrou (código %d)";
+
+"Launch the game once on Official first, so its files are downloaded, then connect to this server." = "Inicie o jogo uma vez no Official para baixar seus arquivos e, em seguida, conecte-se a este servidor.";
+
+"Launching Spiral Knights…" = "Iniciando Spiral Knights…";
+
+"Leave the key and URLs blank to use Official's." = "Deixe a chave e as URLs em branco para usar as do Official.";
+
+"Logout" = "Sair";
+
+"Max RAM" = "RAM máx.";
+
+"Name" = "Nome";
+
+"New password (blank keeps it)" = "Nova senha (em branco mantém a atual)";
+
+"No log files found yet. Launch the game first." = "Nenhum arquivo de log encontrado. Inicie o jogo primeiro.";
+
+"No Logs" = "Sem logs";
+
+"Not Now" = "Agora não";
+
+"Official" = "Official";
+
+"Open Folder" = "Abrir pasta";
+
+"Open Steam app" = "Abrir app Steam";
+
+"Operation completed successfully." = "Operação concluída com sucesso.";
+
+"Password (optional)" = "Senha (opcional)";
+
+"Players online" = "Jogadores online";
+
+"Port" = "Porta";
+
+"Preparing…" = "Preparando…";
+
+"Public key (modulus#exponent)" = "Chave pública (módulo#expoente)";
+
+"Remove Failed" = "Falha ao remover";
+
+"Remove Mods" = "Remover mods";
+
+"Removing Mods" = "Removendo mods";
+
+"Save" = "Salvar";
+
+"Scan this code with the Steam mobile app on another device and approve the sign-in, or open the Steam app on this one." = "Escaneie este código com o aplicativo Steam móvel em outro dispositivo e aprove o login, ou abra o app Steam neste.";
+
+"Send crash reports" = "Enviar relatórios de falha";
+
+"Server" = "Servidor";
+
+"Server: %@" = "Servidor: %@";
+
+"Servers" = "Servidores";
+
+"Setting up runtime…" = "Configurando ambiente de execução…";
+
+"Settings" = "Configurações";
+
+"Setup failed. Check your internet connection and relaunch." = "Falha na configuração. Verifique a conexão com a internet e reinicie.";
+
+"Share Logs" = "Compartilhar logs";
+
+"Sign in to Steam" = "Iniciar sessão no Steam";
+
+"Sign out" = "Sair";
+
+"Sign out of Steam? Your saved session will be cleared." = "Deseja sair do Steam? Sua sessão salva será limpa.";
+
+"SKapsule home directory is not set." = "O diretório inicial do SKapsule não está definido.";
+
+"Spiral Knights did not finish starting.\nShare Logs from the launcher sidebar to report it." = "Spiral Knights não concluiu a inicialização.\nCompartilhe os logs pela barra lateral do launcher para relatar o problema.";
+
+"Spiral Knights for iOS" = "Spiral Knights para iOS";
+
+"Spiral Knights needs JIT. Approve the request in StikDebug and the game continues automatically." = "Spiral Knights precisa de JIT. Aprove a solicitação no StikDebug e o jogo continuará automaticamente.";
+
+"Spiral Knights needs JIT. SKapsule is enabling it now (LocalDevVPN must be connected); the game continues automatically." = "Spiral Knights precisa de JIT. O SKapsule está ativando agora (o LocalDevVPN deve estar conectado); o jogo continuará automaticamente.";
+
+"Starting Java runtime…" = "Iniciando ambiente Java…";
+
+"Steam sign-in QR code" = "Código QR de login no Steam";
+
+"Support SKapsule on Buy Me a Coffee" = "Apoie o SKapsule no Buy Me a Coffee";
+
+"The game has an update. Select Official and launch once so it updates, then connect to this server." = "O jogo tem uma atualização. Selecione Official e inicie uma vez para atualizar, depois conecte-se a este servidor.";
+
+"The key must look like modulus#exponent, in hex." = "A chave deve seguir o formato módulo#expoente em hexadecimal.";
+
+"The last launch stopped when the runtime asked for its JIT memory and nothing answered.\n\nIn StikDebug, import skapsule-jit.js and assign it to this app, then enable JIT again. A debugger attached without that script is not enough." = "A última inicialização parou quando o ambiente solicitou memória JIT e nada respondeu.\n\nNo StikDebug, importe skapsule-jit.js, atribua-o a este aplicativo e ative o JIT novamente. Apenas anexar um depurador sem esse script não é suficiente.";
+
+"The Steam app did not open. Scan the code from another device that has the Steam app, or install Steam on this one." = "O app Steam não abriu. Escaneie o código em outro dispositivo com o aplicativo Steam ou instale o Steam neste.";
+
+"This is an approximation based on the players currently online through Steam, increased by 1.4x to account for standalone players as well.\n\nLive server: %ld on Steam, %ld estimated\nPreview server: %ld on Steam, %ld estimated" = "Esta é uma estimativa baseada nos jogadores online pelo Steam, multiplicada por 1,4 para incluir também jogadores independentes.\n\nServidor Live: %1$ld no Steam, %2$ld estimados\nServidor Preview: %3$ld no Steam, %4$ld estimados";
+
+"unknown error" = "erro desconhecido";
+
+"Up to Date" = "Atualizado";
+
+"Update Available" = "Atualização disponível";
+
+"Update available - v%@" = "Atualização disponível - v%@";
+
+"URLs must start with http:// or https://." = "As URLs devem começar com http:// ou https://.";
+
+"Username (optional, for quick login)" = "Nome de usuário (opcional, para login rápido)";
+
+"v%@ is out; you have v%s. Download the new IPA from the release page and install it the same way you installed this one." = "A versão v%1$@ foi lançada; você tem a v%2$s. Baixe o novo IPA na página de lançamentos e instale-o da mesma forma.";
+
+"View Release" = "Ver versão";
+
+"Waiting for JIT" = "Aguardando JIT";
+
+"Waiting for JIT…" = "Aguardando JIT…";
+
+"Web" = "Web";
+
+"You're on the latest version (v%s)." = "Você está na versão mais recente (v%s).";
+
+"You're on v%s, which is newer than the latest release (v%@)." = "Você está na v%1$s, mais recente que o lançamento oficial (v%2$@).";
+
+/* Layouts */
+"Layouts…" = "Layouts…";
+
+"Layouts" = "Layouts";
+
+"Default (built-in)" = "Default (built-in)";
+
+"＋ Save current layout as preset…" = "＋ Save current layout as preset…";
+
+"Export current layout to file…" = "Export current layout to file…";
+
+"Import layout from file…" = "Import layout from file…";
+
+"Apply \"%@\"?" = "Apply \"%@\"?";
+
+"This replaces your current arrangement. Save it as a preset first to keep it." = "This replaces your current arrangement. Save it as a preset first to keep it.";
+
+"Apply" = "Apply";
+
+"Applied \"%@\"" = "Applied \"%@\"";
+
+"Delete \"%@\"?" = "Delete \"%@\"?";
+
+"The preset is removed. The layout on screen is not changed." = "The preset is removed. The layout on screen is not changed.";
+
+"Deleted \"%@\"" = "Deleted \"%@\"";
+
+"Save current layout" = "Save current layout";
+
+"Preset name" = "Preset name";
+
+"Preset list is full (%ld). Delete one first." = "Preset list is full (%ld). Delete one first.";
+
+"Saved as \"%@\"" = "Saved as \"%@\"";
+
+"Layout exported" = "Layout exported";
+
+"Could not write the file" = "Could not write the file";
+
+"That layout was made by a newer version of SKapsule." = "That layout was made by a newer version of SKapsule.";
+
+"That file is too large to be a layout." = "That file is too large to be a layout.";
+
+"That file isn't a valid SKapsule controls layout." = "That file isn't a valid SKapsule controls layout.";
+
+"Could not read the file" = "Could not read the file";
+
+"Imported as \"%@\"." = "Imported as \"%@\".";
+
+"My layout" = "My layout";
+

@@ -1,0 +1,270 @@
+/* SKapsule user interface strings. The key is the English text. Translate the right-hand side only and keep
+   %@, %d, %ld, %s and %1$@ style placeholders exactly. See scripts/check-localizations.py. */
+
+"  Checking…" = "  正在检查…";
+
+"  Logout" = "  登出";
+
+" Launch" = " 启动";
+
+"- %@\n" = "- %@\n";
+
+"\n\nWarnings:\n" = "\n\n警告：\n";
+
+"A server with that name already exists." = "已存在同名服务器。";
+
+"Add Server" = "添加服务器";
+
+"Add server" = "添加服务器";
+
+"Add Server…" = "添加服务器…";
+
+"Address" = "地址";
+
+"Anonymous: device model, iOS version, app build and JVM crash logs." = "匿名：设备型号、iOS版本、应用版本和JVM崩溃日志。";
+
+"Apply Failed" = "应用失败";
+
+"Apply Mods" = "应用模组";
+
+"Applying Mods" = "正在应用模组";
+
+"Avoid screen edges" = "避开屏幕边缘";
+
+"Cancel" = "取消";
+
+"Check for Updates" = "检查更新";
+
+"Check the server's details." = "请检查服务器详情。";
+
+"Check your connection and try again. GitHub also limits how often a network can ask, so a busy network may need to wait a while." = "请检查网络连接后重试。GitHub限制网络请求频率，繁忙网络可能需要稍候。";
+
+"Choose a server" = "选择服务器";
+
+"Client URL (optional)" = "客户端URL（可选）";
+
+"Content URL (optional)" = "内容URL（可选）";
+
+"Could not locate Documents directory." = "找不到Documents目录。";
+
+"Couldn't Check for Updates" = "无法检查更新";
+
+"Couldn't enable JIT" = "无法启用JIT";
+
+"Couldn't point the game at this server: %@" = "无法将游戏指向此服务器：%@";
+
+"Couldn't save the login on this device." = "无法在此设备上保存登录信息。";
+
+"Delete" = "删除";
+
+"Development Build" = "开发版本";
+
+"Done" = "完成";
+
+"Download Failed" = "下载失败";
+
+"Download Modpack" = "下载模组包";
+
+"Downloading Mods" = "正在下载模组";
+
+"Edit Controls" = "编辑控制";
+
+"Edit Server" = "编辑服务器";
+
+"Edit server" = "编辑服务器";
+
+"Enable JIT" = "启用JIT";
+
+"Enter a name of up to 40 characters." = "请输入最多40个字符的名称。";
+
+"Enter a port from 1 to 65535." = "请输入1至65535之间的端口号。";
+
+"Enter a valid server address." = "请输入有效的服务器地址。";
+
+"Enter both a username and a password, or leave both blank." = "请输入用户名和密码，或同时留空。";
+
+"Fight alongside ~%ld other Spiral Knights!" = "与约%ld名Spiral Knights并肩作战！";
+
+"JIT enabled" = "已启用JIT";
+
+"JIT Setup" = "JIT设置";
+
+"JIT was not enabled" = "JIT未启用";
+
+"JIT was not enabled: the game asked for its JIT memory and nothing answered.\nIn StikDebug, import skapsule-jit.js and assign it to SKapsule, then enable JIT again." = "JIT未启用：游戏请求JIT内存但未收到响应。\n请在StikDebug中导入skapsule-jit.js并分配给SKapsule，然后重试启用JIT。";
+
+"JVM exited (code %d)" = "JVM已退出（代码 %d）";
+
+"Launch the game once on Official first, so its files are downloaded, then connect to this server." = "请先在Official服务器启动一次游戏以下载文件，然后再连接到此服务器。";
+
+"Launching Spiral Knights…" = "正在启动Spiral Knights…";
+
+"Leave the key and URLs blank to use Official's." = "密钥和URL留空将使用Official的配置。";
+
+"Logout" = "登出";
+
+"Max RAM" = "最大内存";
+
+"Name" = "名称";
+
+"New password (blank keeps it)" = "新密码（留空保留原密码）";
+
+"No log files found yet. Launch the game first." = "未找到日志文件。请先启动游戏。";
+
+"No Logs" = "无日志";
+
+"Not Now" = "以后再说";
+
+"Official" = "Official";
+
+"Open Folder" = "打开文件夹";
+
+"Open Steam app" = "打开Steam应用";
+
+"Operation completed successfully." = "操作成功完成。";
+
+"Password (optional)" = "密码（可选）";
+
+"Players online" = "在线玩家";
+
+"Port" = "端口";
+
+"Preparing…" = "正在准备…";
+
+"Public key (modulus#exponent)" = "公钥（模数#指数）";
+
+"Remove Failed" = "删除失败";
+
+"Remove Mods" = "移除模组";
+
+"Removing Mods" = "正在移除模组";
+
+"Save" = "保存";
+
+"Scan this code with the Steam mobile app on another device and approve the sign-in, or open the Steam app on this one." = "在另一台设备上使用Steam移动端扫描此二维码确认登录，或在此设备上打开Steam应用。";
+
+"Send crash reports" = "发送崩溃报告";
+
+"Server" = "服务器";
+
+"Server: %@" = "服务器：%@";
+
+"Servers" = "服务器";
+
+"Setting up runtime…" = "正在配置运行环境…";
+
+"Settings" = "设置";
+
+"Setup failed. Check your internet connection and relaunch." = "配置失败。请检查网络连接后重新启动。";
+
+"Share Logs" = "分享日志";
+
+"Sign in to Steam" = "登录Steam";
+
+"Sign out" = "退出登录";
+
+"Sign out of Steam? Your saved session will be cleared." = "退出Steam登录？已保存的会话将被清除。";
+
+"SKapsule home directory is not set." = "SKapsule主目录未设置。";
+
+"Spiral Knights did not finish starting.\nShare Logs from the launcher sidebar to report it." = "Spiral Knights未完成启动。\n请从启动器侧边栏分享日志以报告问题。";
+
+"Spiral Knights for iOS" = "Spiral Knights iOS版";
+
+"Spiral Knights needs JIT. Approve the request in StikDebug and the game continues automatically." = "Spiral Knights需要JIT。在StikDebug中批准请求后，游戏将自动继续。";
+
+"Spiral Knights needs JIT. SKapsule is enabling it now (LocalDevVPN must be connected); the game continues automatically." = "Spiral Knights需要JIT。SKapsule正在启用它（需连接LocalDevVPN）；游戏随后将自动继续。";
+
+"Starting Java runtime…" = "正在启动Java运行环境…";
+
+"Steam sign-in QR code" = "Steam登录二维码";
+
+"Support SKapsule on Buy Me a Coffee" = "在Buy Me a Coffee上支持SKapsule";
+
+"The game has an update. Select Official and launch once so it updates, then connect to this server." = "游戏有更新。请选择Official并启动一次完成更新，然后再连接到此服务器。";
+
+"The key must look like modulus#exponent, in hex." = "密钥必须为十六进制的模数#指数格式。";
+
+"The last launch stopped when the runtime asked for its JIT memory and nothing answered.\n\nIn StikDebug, import skapsule-jit.js and assign it to this app, then enable JIT again. A debugger attached without that script is not enough." = "上次启动在运行时请求JIT内存时由于无响应而停止。\n\n请在StikDebug中导入skapsule-jit.js并分配给此应用，然后重新启用JIT。未附带该脚本的调试器是不够的。";
+
+"The Steam app did not open. Scan the code from another device that has the Steam app, or install Steam on this one." = "未能打开Steam应用。请从其他装有Steam的设备扫描代码，或在此设备上安装Steam。";
+
+"This is an approximation based on the players currently online through Steam, increased by 1.4x to account for standalone players as well.\n\nLive server: %ld on Steam, %ld estimated\nPreview server: %ld on Steam, %ld estimated" = "这是基于Steam当前在线人数的估算值，乘以1.4以计入独立客户端玩家。\n\n正式服：Steam %1$ld人，估算 %2$ld人\n测试服：Steam %3$ld人，估算 %4$ld人";
+
+"unknown error" = "未知错误";
+
+"Up to Date" = "已是最新";
+
+"Update Available" = "有可用更新";
+
+"Update available - v%@" = "有可用更新 - v%@";
+
+"URLs must start with http:// or https://." = "URL必须以http://或https://开头。";
+
+"Username (optional, for quick login)" = "用户名（可选，用于快速登录）";
+
+"v%@ is out; you have v%s. Download the new IPA from the release page and install it the same way you installed this one." = "v%1$@已发布；当前为v%2$s。请从发布页下载新的IPA并按相同方式安装。";
+
+"View Release" = "查看版本";
+
+"Waiting for JIT" = "等待JIT";
+
+"Waiting for JIT…" = "等待JIT…";
+
+"Web" = "Web";
+
+"You're on the latest version (v%s)." = "已是最新版本 (v%s)。";
+
+"You're on v%s, which is newer than the latest release (v%@)." = "当前版本为v%1$s，新于最新正式发布版本 (v%2$@)。";
+
+/* Layouts */
+"Layouts…" = "Layouts…";
+
+"Layouts" = "Layouts";
+
+"Default (built-in)" = "Default (built-in)";
+
+"＋ Save current layout as preset…" = "＋ Save current layout as preset…";
+
+"Export current layout to file…" = "Export current layout to file…";
+
+"Import layout from file…" = "Import layout from file…";
+
+"Apply \"%@\"?" = "Apply \"%@\"?";
+
+"This replaces your current arrangement. Save it as a preset first to keep it." = "This replaces your current arrangement. Save it as a preset first to keep it.";
+
+"Apply" = "Apply";
+
+"Applied \"%@\"" = "Applied \"%@\"";
+
+"Delete \"%@\"?" = "Delete \"%@\"?";
+
+"The preset is removed. The layout on screen is not changed." = "The preset is removed. The layout on screen is not changed.";
+
+"Deleted \"%@\"" = "Deleted \"%@\"";
+
+"Save current layout" = "Save current layout";
+
+"Preset name" = "Preset name";
+
+"Preset list is full (%ld). Delete one first." = "Preset list is full (%ld). Delete one first.";
+
+"Saved as \"%@\"" = "Saved as \"%@\"";
+
+"Layout exported" = "Layout exported";
+
+"Could not write the file" = "Could not write the file";
+
+"That layout was made by a newer version of SKapsule." = "That layout was made by a newer version of SKapsule.";
+
+"That file is too large to be a layout." = "That file is too large to be a layout.";
+
+"That file isn't a valid SKapsule controls layout." = "That file isn't a valid SKapsule controls layout.";
+
+"Could not read the file" = "Could not read the file";
+
+"Imported as \"%@\"." = "Imported as \"%@\".";
+
+"My layout" = "My layout";
+

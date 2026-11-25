@@ -1,4 +1,5 @@
 #import "SKControlsEditorViewController.h"
+#import "SKLayoutLibrary.h"
 #import "SKTouchControlOverlay.h"
 #import "utils.h"
 
@@ -16,6 +17,8 @@
 @property (nonatomic, strong) SKTouchControlOverlay *overlay;
 @property (nonatomic, strong) UIView *backdrop;
 @property (nonatomic, strong) UIButton *doneButton;
+/// Presets and export/import (the same library the in-game editor opens).
+@property (nonatomic, strong) SKLayoutLibrary *layoutLibrary;
 @end
 
 @implementation SKControlsEditorViewController
@@ -37,8 +40,13 @@
     self.overlay = [[SKTouchControlOverlay alloc] initWithFrame:CGRectZero];
     [self.view addSubview:self.overlay];
 
+    // The handler is what reveals the panel's "Layouts…" button.
+    self.layoutLibrary = [[SKLayoutLibrary alloc] initWithPresenter:self overlay:self.overlay];
+    __weak typeof(self) weakSelf = self;
+    self.overlay.layoutLibraryHandler = ^{ [weakSelf.layoutLibrary show]; };
+
     self.doneButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    [self.doneButton setTitle:@"Done" forState:UIControlStateNormal];
+    [self.doneButton setTitle:NSLocalizedString(@"Done", nil) forState:UIControlStateNormal];
     [self.doneButton setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
     self.doneButton.titleLabel.font = [UIFont boldSystemFontOfSize:16];
     self.doneButton.backgroundColor = [UIColor colorWithRed:171.0 / 255.0

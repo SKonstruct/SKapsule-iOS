@@ -1,4 +1,5 @@
 #import "SKModManager.h"
+#import "SKModOrder.h"
 #import "SKZipUtils.h"
 #import <CommonCrypto/CommonDigest.h>
 #import <UIKit/UIKit.h>
@@ -71,6 +72,49 @@ static NSSet<NSString *> *SKModFilteredFiles(void) {
       files = [NSSet setWithArray:protectedFiles];
     });
     return files;
+}
+
+/**
+ * How many files a mod would write, which is what SKModOrder ranks by. A modpack is the sum of its
+ * inner mods (the top-level `.zip` entries, which is what the apply unpacks from it). Only entry
+ * names are read for a plain mod: the filter below rejects every entry, so nothing is inflated.
+ * A mod that cannot be read counts 0, so it sorts last and fails on its own when applied.
+ */
+static NSInteger SKModFilesChanged(NSString *modPath, NSSet<NSString *> *protectedFiles) {
+    NSMutableArray<NSString *> *names = [NSMutableArray array];
+    BOOL (^collect)(NSString *) = ^BOOL(NSString *name) {
+      [names addObject:name];
+      return NO;
+    };
+    BOOL (^never)(NSString *, NSData *) = ^BOOL(NSString *name, NSData *data) {
+      return YES;
+    };
+    if (![modPath hasSuffix:@".modpack"]) {
+        if (![SKZipUtils enumerateZip:modPath matching:collect usingBlock:never]) return 0;
+        return [SKModOrder filesWrittenInEntryNames:names protectedFiles:protectedFiles];
+    }
+
+    __block NSInteger total = 0;
+    BOOL ok = [SKZipUtils enumerateZip:modPath
+        matching:^BOOL(NSString *name) { return ![name containsString:@"/"] && [name hasSuffix:@".zip"]; }
+        usingBlock:^BOOL(NSString *name, NSData *inner) {
+          NSString *tmp = [NSTemporaryDirectory() stringByAppendingPathComponent:
+                                                      [NSString stringWithFormat:@"order-%@.zip", NSUUID.UUID.UUIDString]];
+          if ([inner writeToFile:tmp atomically:NO]) {
+              NSMutableArray<NSString *> *innerNames = [NSMutableArray array];
+              if ([SKZipUtils enumerateZip:tmp
+                                  matching:^BOOL(NSString *n) {
+                                    [innerNames addObject:n];
+                                    return NO;
+                                  }
+                                usingBlock:never]) {
+                  total += [SKModOrder filesWrittenInEntryNames:innerNames protectedFiles:protectedFiles];
+              }
+              [NSFileManager.defaultManager removeItemAtPath:tmp error:nil];
+          }
+          return YES;
+        }];
+    return ok ? total : 0;
 }
 
 /// `key = value` lines, as getdown writes getdown.txt and digest2.txt.
@@ -606,6 +650,16 @@ static NSString *SKDownloadVerified(NSURL *url, NSString *destPath, NSString *ex
       }
 
       NSSet<NSString *> *protectedFiles = SKModFilteredFiles();
+
+      // A later mod wins where two change the same file, so the order matters. It is worked out
+      // here, never chosen: the mods that change the most files go first and a small, targeted one
+      // beats a broad one (see SKModOrder). contentsOfDirectoryAtPath: has no defined order.
+      zipsOrModpacks = [[SKModOrder optimalOrderOfNames:zipsOrModpacks
+                                           filesChanged:^NSInteger(NSString *name) {
+                                             return SKModFilesChanged([modsPath stringByAppendingPathComponent:name],
+                                                                      protectedFiles);
+                                           }] mutableCopy];
+      NSLog(@"[SKModManager] Mod order: %@", [zipsOrModpacks componentsJoinedByString:@", "]);
 
       NSString *codeDir = [skPath stringByAppendingPathComponent:@"code"];
       NSString *classChangesDir = [codeDir stringByAppendingPathComponent:@"class-changes"];

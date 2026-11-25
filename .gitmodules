@@ -19,3 +19,6 @@
 [submodule "external/StikJIT"]
 	path = external/StikJIT
 	url = https://github.com/StikDebug/StikJIT.git
+[submodule "skgfx"]
+	path = external/skgfx
+	url = https://github.com/SKonstruct/skgfx.git

@@ -18,7 +18,8 @@
 /// Steam only knows Steam players; the count is scaled for standalone installs, as KnightLauncher does.
 static const float kPlayerEstimateMult = 1.4f;
 
-@interface LauncherViewController ()
+@interface LauncherViewController () <UITextViewDelegate>
+@property (nonatomic, strong) UITextView *creditView;
 @property (nonatomic, strong) UISegmentedControl *modeSegmentedControl;
 @property (nonatomic, strong) UIStackView *serverStack;
 @property (nonatomic, strong) UILabel *serverNameLabel;
@@ -87,6 +88,36 @@ static const float kPlayerEstimateMult = 1.4f;
     [btnOptions addTarget:self action:@selector(toggleSidebar) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:btnOptions];
 
+    // 1a. Credit: "Built with <heart> by SirDank", quiet, top-leading and level with the gear. Only the name is a link
+    // (a text view hands the tap on it to the delegate); the heart is drawn in the brand colour.
+    NSString *creditText = @"Built with \u2665\uFE0E by SirDank";
+    NSMutableAttributedString *credit = [[NSMutableAttributedString alloc]
+        initWithString:creditText
+            attributes:@{
+                NSFontAttributeName : [UIFont systemFontOfSize:12],
+                NSForegroundColorAttributeName : [UIColor colorWithWhite:0.5 alpha:1.0],
+            }];
+    NSRange heart = [creditText rangeOfString:@"\u2665\uFE0E"];
+    if (heart.location != NSNotFound) [credit addAttribute:NSForegroundColorAttributeName value:themeColor range:heart];
+    NSRange nameRange = [creditText rangeOfString:@"SirDank"];
+    if (nameRange.location != NSNotFound) {
+        [credit addAttribute:NSLinkAttributeName value:@"https://dankware.alwaysdata.net/" range:nameRange];
+    }
+    self.creditView = [[UITextView alloc] init];
+    self.creditView.attributedText = credit;
+    self.creditView.backgroundColor = UIColor.clearColor;
+    self.creditView.editable = NO;
+    self.creditView.scrollEnabled = NO;
+    self.creditView.textContainerInset = UIEdgeInsetsMake(10, 0, 10, 0);
+    self.creditView.textContainer.lineFragmentPadding = 0;
+    self.creditView.linkTextAttributes = @{
+        NSForegroundColorAttributeName : UIColor.whiteColor,
+        NSUnderlineStyleAttributeName : @(NSUnderlineStyleSingle),
+    };
+    self.creditView.delegate = self;
+    self.creditView.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:self.creditView];
+
     // 1b. Donate: Buy Me a Coffee, in its brand yellow with its glyph, left of the gear.
     UIButton *btnDonate = [UIButton buttonWithType:UIButtonTypeCustom];
     [btnDonate setImage:[[UIImage imageNamed:@"BuyMeACoffee"] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate]
@@ -96,7 +127,7 @@ static const float kPlayerEstimateMult = 1.4f;
     btnDonate.layer.cornerRadius = 22;
     btnDonate.imageEdgeInsets = UIEdgeInsetsMake(10, 10, 10, 10);
     btnDonate.imageView.contentMode = UIViewContentModeScaleAspectFit;
-    btnDonate.accessibilityLabel = @"Support SKapsule on Buy Me a Coffee";
+    btnDonate.accessibilityLabel = NSLocalizedString(@"Support SKapsule on Buy Me a Coffee", nil);
     btnDonate.translatesAutoresizingMaskIntoConstraints = NO;
     [btnDonate addTarget:self action:@selector(onDonate) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:btnDonate];
@@ -115,7 +146,7 @@ static const float kPlayerEstimateMult = 1.4f;
     titleLabel.text = [NSString stringWithFormat:@"SKapsule v%@", verStr];
 
     self.subtitleLabel = [[UILabel alloc] init];
-    self.subtitleLabel.text = @"Spiral Knights for iOS";
+    self.subtitleLabel.text = NSLocalizedString(@"Spiral Knights for iOS", nil);
     self.subtitleLabel.textColor = [UIColor colorWithWhite:0.6 alpha:1.0];
     self.subtitleLabel.font = [UIFont systemFontOfSize:14];
     self.subtitleLabel.textAlignment = NSTextAlignmentCenter;
@@ -133,7 +164,7 @@ static const float kPlayerEstimateMult = 1.4f;
     [self.view addSubview:self.updateButton];
 
     // 3. Segmented Control
-    self.modeSegmentedControl = [[UISegmentedControl alloc] initWithItems:@[@"Web", @"Steam"]];
+    self.modeSegmentedControl = [[UISegmentedControl alloc] initWithItems:@[NSLocalizedString(@"Web", nil), @"Steam"]];
     self.modeSegmentedControl.selectedSegmentIndex = 0;
     self.modeSegmentedControl.translatesAutoresizingMaskIntoConstraints = NO;
 
@@ -174,7 +205,7 @@ static const float kPlayerEstimateMult = 1.4f;
 
     // 4. Launch Button
     self.btnLaunch = [UIButton buttonWithType:UIButtonTypeCustom];
-    [self.btnLaunch setTitle:@" Launch" forState:UIControlStateNormal];
+    [self.btnLaunch setTitle:NSLocalizedString(@" Launch", nil) forState:UIControlStateNormal];
     self.btnLaunch.titleLabel.font = [UIFont boldSystemFontOfSize:18];
     [self.btnLaunch setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
     self.btnLaunch.backgroundColor = themeColor;
@@ -312,7 +343,7 @@ static const float kPlayerEstimateMult = 1.4f;
 
     // Sidebar Title
     UILabel *settingsTitle = [[UILabel alloc] init];
-    settingsTitle.text = @"Settings";
+    settingsTitle.text = NSLocalizedString(@"Settings", nil);
     settingsTitle.textColor = UIColor.whiteColor;
     settingsTitle.font = [UIFont boldSystemFontOfSize:20];
     [stackView addArrangedSubview:settingsTitle];
@@ -322,42 +353,42 @@ static const float kPlayerEstimateMult = 1.4f;
     [stackView addArrangedSubview:titleSpacer];
 
     // Sidebar Buttons Helper
-    UIButton *btnShare = [self createSidebarButtonWithTitle:@"Share Logs"
+    UIButton *btnShare = [self createSidebarButtonWithTitle:NSLocalizedString(@"Share Logs", nil)
                                                    iconName:@"square.and.arrow.up"
                                                      action:@selector(onShareLogs)];
     [stackView addArrangedSubview:btnShare];
 
-    UIButton *btnDownloadMods = [self createSidebarButtonWithTitle:@"Download Modpack"
+    UIButton *btnDownloadMods = [self createSidebarButtonWithTitle:NSLocalizedString(@"Download Modpack", nil)
                                                           iconName:@"icloud.and.arrow.down"
                                                             action:@selector(onDownloadMods)];
     [stackView addArrangedSubview:btnDownloadMods];
 
-    UIButton *btnApplyMods = [self createSidebarButtonWithTitle:@"Apply Mods"
+    UIButton *btnApplyMods = [self createSidebarButtonWithTitle:NSLocalizedString(@"Apply Mods", nil)
                                                        iconName:@"hammer"
                                                          action:@selector(onApplyMods)];
     [stackView addArrangedSubview:btnApplyMods];
 
-    UIButton *btnRemoveMods = [self createSidebarButtonWithTitle:@"Remove Mods"
+    UIButton *btnRemoveMods = [self createSidebarButtonWithTitle:NSLocalizedString(@"Remove Mods", nil)
                                                         iconName:@"trash"
                                                           action:@selector(onRemoveMods)];
     [stackView addArrangedSubview:btnRemoveMods];
 
-    UIButton *btnOpenFolder = [self createSidebarButtonWithTitle:@"Open Folder"
+    UIButton *btnOpenFolder = [self createSidebarButtonWithTitle:NSLocalizedString(@"Open Folder", nil)
                                                         iconName:@"folder"
                                                           action:@selector(onOpenFolder)];
     [stackView addArrangedSubview:btnOpenFolder];
 
-    UIButton *btnEditControls = [self createSidebarButtonWithTitle:@"Edit Controls"
+    UIButton *btnEditControls = [self createSidebarButtonWithTitle:NSLocalizedString(@"Edit Controls", nil)
                                                           iconName:@"gamecontroller"
                                                             action:@selector(onEditControls)];
     [stackView addArrangedSubview:btnEditControls];
 
-    UIButton *btnJITSetup = [self createSidebarButtonWithTitle:@"JIT Setup"
+    UIButton *btnJITSetup = [self createSidebarButtonWithTitle:NSLocalizedString(@"JIT Setup", nil)
                                                       iconName:@"bolt.badge.automatic"
                                                         action:@selector(onJITSetup:)];
     [stackView addArrangedSubview:btnJITSetup];
 
-    UIButton *btnCheckUpdates = [self createSidebarButtonWithTitle:@"Check for Updates"
+    UIButton *btnCheckUpdates = [self createSidebarButtonWithTitle:NSLocalizedString(@"Check for Updates", nil)
                                                           iconName:@"arrow.triangle.2.circlepath"
                                                             action:@selector(onCheckForUpdates)];
     [stackView addArrangedSubview:btnCheckUpdates];
@@ -379,7 +410,7 @@ static const float kPlayerEstimateMult = 1.4f;
 
     // Logout button
     self.btnLogout = [UIButton buttonWithType:UIButtonTypeSystem];
-    [self.btnLogout setTitle:@"  Logout" forState:UIControlStateNormal];
+    [self.btnLogout setTitle:NSLocalizedString(@"  Logout", nil) forState:UIControlStateNormal];
     [self.btnLogout setTitleColor:[UIColor colorWithRed:1.0 green:0.3 blue:0.3 alpha:1.0]
                          forState:UIControlStateNormal];
     self.btnLogout.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeft;
@@ -404,7 +435,7 @@ static const float kPlayerEstimateMult = 1.4f;
     avoidRow.translatesAutoresizingMaskIntoConstraints = NO;
 
     UILabel *avoidLabel = [[UILabel alloc] init];
-    avoidLabel.text = @"Avoid screen edges";
+    avoidLabel.text = NSLocalizedString(@"Avoid screen edges", nil);
     avoidLabel.textColor = UIColor.whiteColor;
     avoidLabel.font = [UIFont systemFontOfSize:14];
     avoidLabel.translatesAutoresizingMaskIntoConstraints = NO;
@@ -431,7 +462,7 @@ static const float kPlayerEstimateMult = 1.4f;
     ramRow.translatesAutoresizingMaskIntoConstraints = NO;
 
     UILabel *ramLabel = [[UILabel alloc] init];
-    ramLabel.text = @"Max RAM";
+    ramLabel.text = NSLocalizedString(@"Max RAM", nil);
     ramLabel.textColor = UIColor.whiteColor;
     ramLabel.font = [UIFont systemFontOfSize:14];
     ramLabel.translatesAutoresizingMaskIntoConstraints = NO;
@@ -478,7 +509,7 @@ static const float kPlayerEstimateMult = 1.4f;
     crashRow.translatesAutoresizingMaskIntoConstraints = NO;
 
     UILabel *crashLabel = [[UILabel alloc] init];
-    crashLabel.text = @"Send crash reports";
+    crashLabel.text = NSLocalizedString(@"Send crash reports", nil);
     crashLabel.textColor = UIColor.whiteColor;
     crashLabel.font = [UIFont systemFontOfSize:14];
     crashLabel.translatesAutoresizingMaskIntoConstraints = NO;
@@ -497,7 +528,7 @@ static const float kPlayerEstimateMult = 1.4f;
     [stackView addArrangedSubview:crashRow];
 
     UILabel *crashNote = [[UILabel alloc] init];
-    crashNote.text = @"Anonymous: device model, iOS version, app build and JVM crash logs.";
+    crashNote.text = NSLocalizedString(@"Anonymous: device model, iOS version, app build and JVM crash logs.", nil);
     crashNote.textColor = [UIColor colorWithWhite:0.67 alpha:1.0];
     crashNote.font = [UIFont systemFontOfSize:12];
     crashNote.numberOfLines = 0;
@@ -513,6 +544,10 @@ static const float kPlayerEstimateMult = 1.4f;
         [btnOptions.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:16],
         [btnOptions.trailingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.trailingAnchor constant:-16],
         [btnOptions.widthAnchor constraintEqualToConstant:44], [btnOptions.heightAnchor constraintEqualToConstant:44],
+        // Credit: top-leading, level with the gear.
+        [self.creditView.leadingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.leadingAnchor constant:20],
+        [self.creditView.centerYAnchor constraintEqualToAnchor:btnOptions.centerYAnchor],
+        [self.creditView.widthAnchor constraintLessThanOrEqualToConstant:220],
         [btnDonate.centerYAnchor constraintEqualToAnchor:btnOptions.centerYAnchor],
         [btnDonate.trailingAnchor constraintEqualToAnchor:btnOptions.leadingAnchor constant:-12],
         [btnDonate.widthAnchor constraintEqualToConstant:44], [btnDonate.heightAnchor constraintEqualToConstant:44],
@@ -745,7 +780,7 @@ static const float kPlayerEstimateMult = 1.4f;
     UIColor *amber = [UIColor colorWithRed:0.95 green:0.62 blue:0.20 alpha:1.0];
     UIColor *color = enabled ? green : amber;
 
-    [self.jitStatusButton setTitle:(enabled ? @"JIT enabled" : @"Enable JIT") forState:UIControlStateNormal];
+    [self.jitStatusButton setTitle:(enabled ? NSLocalizedString(@"JIT enabled", nil) : NSLocalizedString(@"Enable JIT", nil)) forState:UIControlStateNormal];
     [self.jitStatusButton setTitleColor:color forState:UIControlStateNormal];
     self.jitStatusButton.tintColor = color;
     self.jitStatusButton.layer.borderColor = [color colorWithAlphaComponent:0.6].CGColor;
@@ -768,10 +803,10 @@ static const float kPlayerEstimateMult = 1.4f;
         return;
     }
     [SKBuiltinJIT requestJITWithFailure:^(NSString *message) {
-      UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Couldn't enable JIT"
+      UIAlertController *alert = [UIAlertController alertControllerWithTitle:NSLocalizedString(@"Couldn't enable JIT", nil)
                                                                      message:message
                                                               preferredStyle:UIAlertControllerStyleAlert];
-      [alert addAction:[UIAlertAction actionWithTitle:@"JIT Setup"
+      [alert addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"JIT Setup", nil)
                                                 style:UIAlertActionStyleDefault
                                               handler:^(UIAlertAction *action) {
                                                 [self onJITSetup:self.jitStatusButton];
@@ -861,7 +896,7 @@ static const float kPlayerEstimateMult = 1.4f;
 - (void)onShareLogs {
     const char *homeEnv = getenv("SKAPSULE_HOME");
     if (!homeEnv) {
-        [self showAlertWithTitle:@"No Logs" message:@"SKapsule home directory is not set."];
+        [self showAlertWithTitle:NSLocalizedString(@"No Logs", nil) message:NSLocalizedString(@"SKapsule home directory is not set.", nil)];
         return;
     }
     NSString *home = [NSString stringWithUTF8String:homeEnv];
@@ -899,7 +934,7 @@ static const float kPlayerEstimateMult = 1.4f;
         }
         [self presentViewController:activityVC animated:YES completion:nil];
     } else {
-        [self showAlertWithTitle:@"No Logs" message:@"No log files found yet. Launch the game first."];
+        [self showAlertWithTitle:NSLocalizedString(@"No Logs", nil) message:NSLocalizedString(@"No log files found yet. Launch the game first.", nil)];
     }
 }
 
@@ -917,11 +952,11 @@ static const float kPlayerEstimateMult = 1.4f;
     if (warned) return;
     if (!SKPreviousRunDiedOnJITTrap()) return;
     warned = YES;
-    [self showAlertWithTitle:@"JIT was not enabled"
-                     message:@"The last launch stopped when the runtime asked for its JIT "
+    [self showAlertWithTitle:NSLocalizedString(@"JIT was not enabled", nil)
+                     message:NSLocalizedString(@"The last launch stopped when the runtime asked for its JIT "
                              @"memory and nothing answered.\n\nIn StikDebug, import "
                              @"skapsule-jit.js and assign it to this app, then enable JIT "
-                             @"again. A debugger attached without that script is not enough."];
+                             @"again. A debugger attached without that script is not enough.", nil)];
 }
 
 #pragma mark - News
@@ -1109,7 +1144,7 @@ static int SKCompareVersions(NSString *a, NSString *b) {
     self.checkingForUpdates = YES;
     UIButton *button = self.checkUpdatesButton;
     NSString *idleTitle = [button titleForState:UIControlStateNormal];
-    [button setTitle:@"  Checking…" forState:UIControlStateNormal];
+    [button setTitle:NSLocalizedString(@"  Checking…", nil) forState:UIControlStateNormal];
     button.enabled = NO;
     [self checkForUpdateForced:YES
                     completion:^(NSDictionary *result) {
@@ -1119,17 +1154,17 @@ static int SKCompareVersions(NSString *a, NSString *b) {
                       NSString *remote = result[@"version"];
                       NSString *url = result[@"url"];
                       if (![remote isKindOfClass:NSString.class] || ![url isKindOfClass:NSString.class]) {
-                          [self showAlertWithTitle:@"Couldn't Check for Updates"
-                                           message:@"Check your connection and try again. GitHub also limits "
+                          [self showAlertWithTitle:NSLocalizedString(@"Couldn't Check for Updates", nil)
+                                           message:NSLocalizedString(@"Check your connection and try again. GitHub also limits "
                                                    @"how often a network can ask, so a busy network may need "
-                                                   @"to wait a while."];
+                                                   @"to wait a while.", nil)];
                           return;
                       }
                       int cmp = SKCompareVersions(@CONFIG_VERSION, remote);
                       if (cmp > 0) {
-                          [self showAlertWithTitle:@"Development Build"
-                                           message:[NSString stringWithFormat:@"You're on v%s, which is newer than "
-                                                                              @"the latest release (v%@).",
+                          [self showAlertWithTitle:NSLocalizedString(@"Development Build", nil)
+                                           message:[NSString stringWithFormat:NSLocalizedString(@"You're on v%s, which is newer than "
+                                                                              @"the latest release (v%@).", nil),
                                                                               CONFIG_VERSION, remote]];
                           return;
                       }
@@ -1137,25 +1172,25 @@ static int SKCompareVersions(NSString *a, NSString *b) {
                           // A stale answer may have painted the title as a development build.
                           self.titleLabel.text = [NSString stringWithFormat:@"SKapsule v%s", CONFIG_VERSION];
                           self.titleLabel.textColor = UIColor.whiteColor;
-                          [self showAlertWithTitle:@"Up to Date"
-                                           message:[NSString stringWithFormat:@"You're on the latest version (v%s).",
+                          [self showAlertWithTitle:NSLocalizedString(@"Up to Date", nil)
+                                           message:[NSString stringWithFormat:NSLocalizedString(@"You're on the latest version (v%s).", nil),
                                                                               CONFIG_VERSION]];
                           return;
                       }
                       UIAlertController *alert = [UIAlertController
-                          alertControllerWithTitle:@"Update Available"
-                                           message:[NSString stringWithFormat:@"v%@ is out; you have v%s. Download "
+                          alertControllerWithTitle:NSLocalizedString(@"Update Available", nil)
+                                           message:[NSString stringWithFormat:NSLocalizedString(@"v%@ is out; you have v%s. Download "
                                                                               @"the new IPA from the release page "
                                                                               @"and install it the same way you "
-                                                                              @"installed this one.",
+                                                                              @"installed this one.", nil),
                                                                               remote, CONFIG_VERSION]
                                     preferredStyle:UIAlertControllerStyleAlert];
-                      [alert addAction:[UIAlertAction actionWithTitle:@"View Release"
+                      [alert addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"View Release", nil)
                                                                 style:UIAlertActionStyleDefault
                                                               handler:^(UIAlertAction *action) {
                                                                 [self openURLWithSafariFallback:url];
                                                               }]];
-                      [alert addAction:[UIAlertAction actionWithTitle:@"Not Now"
+                      [alert addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"Not Now", nil)
                                                                 style:UIAlertActionStyleCancel
                                                               handler:nil]];
                       [self presentViewController:alert animated:YES completion:nil];
@@ -1181,13 +1216,22 @@ static int SKCompareVersions(NSString *a, NSString *b) {
     }
 
     self.updateURL = url;
-    [self.updateButton setTitle:[NSString stringWithFormat:@"Update available - v%@", remote]
+    [self.updateButton setTitle:[NSString stringWithFormat:NSLocalizedString(@"Update available - v%@", nil), remote]
                        forState:UIControlStateNormal];
     self.updateButton.hidden = NO;
 }
 
 - (void)onUpdateTapped {
     if (self.updateURL) [self openURLWithSafariFallback:self.updateURL];
+}
+
+/// The credit's link: open it ourselves (in Safari), never inside the text view.
+- (BOOL)textView:(UITextView *)textView
+    shouldInteractWithURL:(NSURL *)URL
+                  inRange:(NSRange)characterRange
+              interaction:(UITextItemInteraction)interaction {
+    if (textView == self.creditView) [self openURLWithSafariFallback:URL.absoluteString];
+    return NO;
 }
 
 - (void)openURLWithSafariFallback:(NSString *)urlString {
@@ -1222,7 +1266,7 @@ static int SKCompareVersions(NSString *a, NSString *b) {
 - (void)onOpenFolder {
     NSString *docsDir = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
     if (!docsDir) {
-        [self showAlertWithTitle:@"Open Folder" message:@"Could not locate Documents directory."];
+        [self showAlertWithTitle:NSLocalizedString(@"Open Folder", nil) message:NSLocalizedString(@"Could not locate Documents directory.", nil)];
         return;
     }
     NSURL *docsURL = [NSURL fileURLWithPath:docsDir];
@@ -1247,11 +1291,11 @@ static int SKCompareVersions(NSString *a, NSString *b) {
 
 - (void)onLogout {
     UIAlertController *alert =
-        [UIAlertController alertControllerWithTitle:@"Logout"
-                                            message:@"Sign out of Steam? Your saved session will be "
-                                                    @"cleared."
+        [UIAlertController alertControllerWithTitle:NSLocalizedString(@"Logout", nil)
+                                            message:NSLocalizedString(@"Sign out of Steam? Your saved session will be "
+                                                    @"cleared.", nil)
                                      preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Sign out"
+    [alert addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"Sign out", nil)
                                               style:UIAlertActionStyleDestructive
                                             handler:^(UIAlertAction *action) {
                                               NSString *cred = [SKInstaller credFilePath];
@@ -1260,7 +1304,7 @@ static int SKCompareVersions(NSString *a, NSString *b) {
                                               }
                                               [self updateLogoutButtonVisibility];
                                             }]];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"Cancel", nil) style:UIAlertActionStyleCancel handler:nil]];
     [self presentViewController:alert animated:YES completion:nil];
 }
 
@@ -1320,20 +1364,20 @@ static int SKCompareVersions(NSString *a, NSString *b) {
         [self setButtonsEnabled:YES];
         BOOL notInstalled = !ok && jar && error.code == 1;
         if (updatePending) {
-            [self showAlertWithTitle:@"Servers"
-                             message:@"The game has an update. Select Official and launch once so it updates, "
-                                     @"then connect to this server."];
+            [self showAlertWithTitle:NSLocalizedString(@"Servers", nil)
+                             message:NSLocalizedString(@"The game has an update. Select Official and launch once so it updates, "
+                                     @"then connect to this server.", nil)];
         } else if (ok || (notInstalled && !server)) {
             // Not installed yet and heading for Official: the first launch downloads Official's files.
             proceed();
         } else if (notInstalled) {
-            [self showAlertWithTitle:@"Servers"
-                             message:@"Launch the game once on Official first, so its files are downloaded, "
-                                     @"then connect to this server."];
+            [self showAlertWithTitle:NSLocalizedString(@"Servers", nil)
+                             message:NSLocalizedString(@"Launch the game once on Official first, so its files are downloaded, "
+                                     @"then connect to this server.", nil)];
         } else {
-            [self showAlertWithTitle:@"Servers"
-                             message:[NSString stringWithFormat:@"Couldn't point the game at this server: %@",
-                                                                error.localizedDescription ?: @"unknown error"]];
+            [self showAlertWithTitle:NSLocalizedString(@"Servers", nil)
+                             message:[NSString stringWithFormat:NSLocalizedString(@"Couldn't point the game at this server: %@", nil),
+                                                                error.localizedDescription ?: NSLocalizedString(@"unknown error", nil)]];
         }
       });
     });
@@ -1354,7 +1398,7 @@ static int SKCompareVersions(NSString *a, NSString *b) {
     pick.translatesAutoresizingMaskIntoConstraints = NO;
     pick.isAccessibilityElement = YES;
     pick.accessibilityTraits = UIAccessibilityTraitButton;
-    pick.accessibilityHint = @"Choose a server";
+    pick.accessibilityHint = NSLocalizedString(@"Choose a server", nil);
     // A dropdown: the menu opens from the control itself (rebuilt on every open, so it is never stale).
     pick.showsMenuAsPrimaryAction = YES;
     pick.menu = [UIMenu menuWithChildren:@[ [UIDeferredMenuElement elementWithUncachedProvider:^(void (^completion)(NSArray<UIMenuElement *> *)) {
@@ -1371,7 +1415,7 @@ static int SKCompareVersions(NSString *a, NSString *b) {
     icon.tintColor = dim;
     icon.contentMode = UIViewContentModeScaleAspectFit;
     UILabel *caption = [[UILabel alloc] init];
-    caption.text = @"Server";
+    caption.text = NSLocalizedString(@"Server", nil);
     caption.font = [UIFont systemFontOfSize:11];
     caption.textColor = dim;
     self.serverNameLabel = [[UILabel alloc] init];
@@ -1434,21 +1478,21 @@ static int SKCompareVersions(NSString *a, NSString *b) {
 - (nullable NSString *)playerCountText {
     NSInteger total = (NSInteger)roundf(self.liveSteamPlayers * kPlayerEstimateMult) +
                       (NSInteger)roundf(self.previewSteamPlayers * kPlayerEstimateMult);
-    return total > 0 ? [NSString stringWithFormat:@"Fight alongside ~%ld other Spiral Knights!", (long)total] : nil;
+    return total > 0 ? [NSString stringWithFormat:NSLocalizedString(@"Fight alongside ~%ld other Spiral Knights!", nil), (long)total] : nil;
 }
 
 /// Shows which server Play connects to. Steam sign-in belongs to Official, so the Web/Steam switch is
 /// hidden for a private server and Play uses Web (onLaunchPressed); the saved choice is left alone.
 - (void)showSelectedServer {
     NSDictionary *server = SKServers.selectedServer;
-    NSString *name = server[SKServerNameKey] ?: @"Official";
+    NSString *name = server[SKServerNameKey] ?: NSLocalizedString(@"Official", nil);
     self.serverNameLabel.text = name;
-    self.serverPick.accessibilityLabel = [NSString stringWithFormat:@"Server: %@", name];
+    self.serverPick.accessibilityLabel = [NSString stringWithFormat:NSLocalizedString(@"Server: %@", nil), name];
     [self.serverActionButton setImage:[UIImage systemImageNamed:server ? @"pencil" : @"plus"] forState:UIControlStateNormal];
-    self.serverActionButton.accessibilityLabel = server ? @"Edit server" : @"Add server";
+    self.serverActionButton.accessibilityLabel = server ? NSLocalizedString(@"Edit server", nil) : NSLocalizedString(@"Add server", nil);
     self.modeSegmentedControl.hidden = server != nil;
     // The player count is Official's.
-    self.subtitleLabel.text = (server ? nil : [self playerCountText]) ?: @"Spiral Knights for iOS";
+    self.subtitleLabel.text = (server ? nil : [self playerCountText]) ?: NSLocalizedString(@"Spiral Knights for iOS", nil);
 }
 
 /// The pencil edits the selected private server; the plus (Official selected) adds one.
@@ -1461,7 +1505,7 @@ static int SKCompareVersions(NSString *a, NSString *b) {
 - (NSArray<UIMenuElement *> *)serverMenuItems {
     NSDictionary *selected = SKServers.selectedServer;
     __weak typeof(self) weakSelf = self;
-    UIAction *official = [UIAction actionWithTitle:@"Official"
+    UIAction *official = [UIAction actionWithTitle:NSLocalizedString(@"Official", nil)
                                              image:[UIImage systemImageNamed:@"globe"]
                                         identifier:nil
                                            handler:^(UIAction *action) {
@@ -1481,7 +1525,7 @@ static int SKCompareVersions(NSString *a, NSString *b) {
         row.state = [server[SKServerIdKey] isEqualToString:selected[SKServerIdKey]] ? UIMenuElementStateOn : UIMenuElementStateOff;
         [rows addObject:row];
     }
-    UIAction *add = [UIAction actionWithTitle:@"Add Server…"
+    UIAction *add = [UIAction actionWithTitle:NSLocalizedString(@"Add Server…", nil)
                                         image:[UIImage systemImageNamed:@"plus"]
                                    identifier:nil
                                       handler:^(UIAction *action) {
@@ -1497,15 +1541,15 @@ static int SKCompareVersions(NSString *a, NSString *b) {
 - (void)presentServerForm:(NSDictionary *)existing draft:(NSDictionary *)draft {
     NSDictionary *shown = draft ?: existing;
     UIAlertController *alert = [UIAlertController
-        alertControllerWithTitle:existing ? @"Edit Server" : @"Add Server"
-                         message:@"Leave the key and URLs blank to use Official's."
+        alertControllerWithTitle:existing ? NSLocalizedString(@"Edit Server", nil) : NSLocalizedString(@"Add Server", nil)
+                         message:NSLocalizedString(@"Leave the key and URLs blank to use Official's.", nil)
                   preferredStyle:UIAlertControllerStyleAlert];
     NSArray *fields = @[
-        @[@"Name", SKServerNameKey], @[@"Address", SKServerHostKey], @[@"Port", SKServerPortKey],
-        @[@"Public key (modulus#exponent)", SKServerPublicKeyKey], @[@"Client URL (optional)", SKServerClientURLKey],
-        @[@"Content URL (optional)", SKServerContentURLKey],
-        @[@"Username (optional, for quick login)", @"loginUser"],
-        @[@"Password (optional)", @"loginPass"],
+        @[NSLocalizedString(@"Name", nil), SKServerNameKey], @[NSLocalizedString(@"Address", nil), SKServerHostKey], @[NSLocalizedString(@"Port", nil), SKServerPortKey],
+        @[NSLocalizedString(@"Public key (modulus#exponent)", nil), SKServerPublicKeyKey], @[NSLocalizedString(@"Client URL (optional)", nil), SKServerClientURLKey],
+        @[NSLocalizedString(@"Content URL (optional)", nil), SKServerContentURLKey],
+        @[NSLocalizedString(@"Username (optional, for quick login)", nil), @"loginUser"],
+        @[NSLocalizedString(@"Password (optional)", nil), @"loginPass"],
     ];
     NSDictionary *savedLogin = existing ? [SKCredentials loginForServerId:existing[SKServerIdKey]] : nil;
     for (NSArray *field in fields) {
@@ -1517,7 +1561,7 @@ static int SKCompareVersions(NSString *a, NSString *b) {
           if ([field[1] isEqualToString:@"loginPass"]) {
               value = nil;
               tf.secureTextEntry = YES;
-              if (savedLogin) tf.placeholder = @"New password (blank keeps it)";
+              if (savedLogin) tf.placeholder = NSLocalizedString(@"New password (blank keeps it)", nil);
           }
           tf.text = [value isKindOfClass:NSNumber.class] ? [value stringValue] : value;
           tf.autocorrectionType = UITextAutocorrectionTypeNo;
@@ -1525,9 +1569,9 @@ static int SKCompareVersions(NSString *a, NSString *b) {
           tf.keyboardType = [field[1] isEqualToString:SKServerPortKey] ? UIKeyboardTypeNumberPad : UIKeyboardTypeDefault;
         }];
     }
-    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"Cancel", nil) style:UIAlertActionStyleCancel handler:nil]];
     if (existing) {
-        [alert addAction:[UIAlertAction actionWithTitle:@"Delete"
+        [alert addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"Delete", nil)
                                                   style:UIAlertActionStyleDestructive
                                                 handler:^(UIAlertAction *action) {
                                                   [SKServers deleteServerWithId:existing[SKServerIdKey]];
@@ -1536,7 +1580,7 @@ static int SKCompareVersions(NSString *a, NSString *b) {
                                                 }]];
     }
     __weak UIAlertController *weakAlert = alert;
-    [alert addAction:[UIAlertAction actionWithTitle:@"Save"
+    [alert addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"Save", nil)
                                               style:UIAlertActionStyleDefault
                                             handler:^(UIAlertAction *action) {
                                               NSArray<UITextField *> *tf = weakAlert.textFields;
@@ -1569,7 +1613,7 @@ static int SKCompareVersions(NSString *a, NSString *b) {
                                               [SKServers saveServer:candidate];
                                               if (loginUser.length) {
                                                   if (![SKCredentials saveUsername:loginUser password:loginPass forServerId:candidate[SKServerIdKey]]) {
-                                                      [self showAlertWithTitle:@"Servers" message:@"Couldn't save the login on this device."];
+                                                      [self showAlertWithTitle:NSLocalizedString(@"Servers", nil) message:NSLocalizedString(@"Couldn't save the login on this device.", nil)];
                                                   }
                                               } else {
                                                   [SKCredentials deleteLoginForServerId:candidate[SKServerIdKey]];
@@ -1582,17 +1626,17 @@ static int SKCompareVersions(NSString *a, NSString *b) {
 }
 
 - (void)presentServerProblem:(SKServerProblem)problem retry:(void (^)(void))retry {
-    NSString *text = @"Check the server's details.";
+    NSString *text = NSLocalizedString(@"Check the server's details.", nil);
     switch (problem) {
-        case SKServerProblemName: text = @"Enter a name of up to 40 characters."; break;
-        case SKServerProblemDuplicate: text = @"A server with that name already exists."; break;
-        case SKServerProblemHost: text = @"Enter a valid server address."; break;
-        case SKServerProblemPort: text = @"Enter a port from 1 to 65535."; break;
-        case SKServerProblemKey: text = @"The key must look like modulus#exponent, in hex."; break;
-        case SKServerProblemURL: text = @"URLs must start with http:// or https://."; break;
-        case SKServerProblemNone: text = @"Enter both a username and a password, or leave both blank."; break;
+        case SKServerProblemName: text = NSLocalizedString(@"Enter a name of up to 40 characters.", nil); break;
+        case SKServerProblemDuplicate: text = NSLocalizedString(@"A server with that name already exists.", nil); break;
+        case SKServerProblemHost: text = NSLocalizedString(@"Enter a valid server address.", nil); break;
+        case SKServerProblemPort: text = NSLocalizedString(@"Enter a port from 1 to 65535.", nil); break;
+        case SKServerProblemKey: text = NSLocalizedString(@"The key must look like modulus#exponent, in hex.", nil); break;
+        case SKServerProblemURL: text = NSLocalizedString(@"URLs must start with http:// or https://.", nil); break;
+        case SKServerProblemNone: text = NSLocalizedString(@"Enter both a username and a password, or leave both blank.", nil); break;
     }
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Servers"
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:NSLocalizedString(@"Servers", nil)
                                                                    message:text
                                                             preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"OK"
@@ -1624,7 +1668,7 @@ static int SKCompareVersions(NSString *a, NSString *b) {
     }
 
     [self.spinner startAnimating];
-    self.setupStatus.text = @"Setting up runtime…";
+    self.setupStatus.text = NSLocalizedString(@"Setting up runtime…", nil);
 
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
       BOOL ok = [SKInstaller installWithProgress:^(NSString *status) {
@@ -1638,7 +1682,7 @@ static int SKCompareVersions(NSString *a, NSString *b) {
             self.setupStatus.text = @"";
             [self setButtonsEnabled:YES];
         } else {
-            self.setupStatus.text = @"Setup failed. Check your internet connection and relaunch.";
+            self.setupStatus.text = NSLocalizedString(@"Setup failed. Check your internet connection and relaunch.", nil);
             SKReportFailure(@"runtime_install_failed", @"SKInstaller reported failure", nil);
         }
       });
@@ -1646,72 +1690,19 @@ static int SKCompareVersions(NSString *a, NSString *b) {
 }
 
 - (void)onPlayWeb {
-    [self launchGameWithMode:SKLoginModeWeb steamUser:@"" steamPass:@""];
+    [self launchGameWithMode:SKLoginModeWeb];
 }
 
 - (void)onPlaySteam {
-    // Check for stored creds first; if present, skip the login prompt
-    NSString *credFile = [SKInstaller credFilePath];
-    if ([NSFileManager.defaultManager fileExistsAtPath:credFile]) {
-        [self launchGameWithMode:SKLoginModeSteam steamUser:@"" steamPass:@""];
-        return;
-    }
-    [self promptSteamLogin];
+    [self launchGameWithMode:SKLoginModeSteam];
 }
 
-- (void)promptSteamLogin {
-    UIAlertController *alert =
-        [UIAlertController alertControllerWithTitle:@"Steam Login"
-                                            message:@"Enter your Steam credentials. Your password goes straight to "
-                                                    @"the game's Steam login and is not saved. A login token is "
-                                                    @"stored encrypted on this device so you stay signed in."
-                                     preferredStyle:UIAlertControllerStyleAlert];
-
-    // textContentType is what puts a password manager in the QuickType bar. The pair has to
-    // be username + password on adjacent fields for AutoFill to offer a credential rather
-    // than a plain "Passwords" shortcut.
-    [alert addTextFieldWithConfigurationHandler:^(UITextField *tf) {
-      tf.placeholder = @"Steam username";
-      tf.autocapitalizationType = UITextAutocapitalizationTypeNone;
-      tf.autocorrectionType = UITextAutocorrectionTypeNo;
-      tf.spellCheckingType = UITextSpellCheckingTypeNo;
-      tf.keyboardType = UIKeyboardTypeASCIICapable;
-      tf.textContentType = UITextContentTypeUsername;
-    }];
-    [alert addTextFieldWithConfigurationHandler:^(UITextField *tf) {
-      tf.placeholder = @"Steam password";
-      tf.secureTextEntry = YES;
-      tf.autocapitalizationType = UITextAutocapitalizationTypeNone;
-      tf.autocorrectionType = UITextAutocorrectionTypeNo;
-      tf.spellCheckingType = UITextSpellCheckingTypeNo;
-      tf.textContentType = UITextContentTypePassword;
-    }];
-
-    [alert
-        addAction:[UIAlertAction
-                      actionWithTitle:@"Login"
-                                style:UIAlertActionStyleDefault
-                              handler:^(UIAlertAction *action) {
-                                NSString *user = alert.textFields[0].text ?: @"";
-                                NSString *pass = alert.textFields[1].text ?: @"";
-                                alert.textFields[1].text = @"";
-                                [self
-                                    launchGameWithMode:SKLoginModeSteam
-                                             steamUser:[user
-                                                           stringByTrimmingCharactersInSet:NSCharacterSet
-                                                                                               .whitespaceCharacterSet]
-                                             steamPass:pass];
-                              }]];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
-
-    [self presentViewController:alert animated:YES completion:nil];
-}
-
-- (void)launchGameWithMode:(SKLoginMode)mode steamUser:(NSString *)user steamPass:(NSString *)pass {
+- (void)launchGameWithMode:(SKLoginMode)mode {
     GameViewController *gameVC = [[GameViewController alloc] init];
     gameVC.loginMode = mode;
-    gameVC.steamUser = user;
-    gameVC.steamPass = pass;
+    // No stored sign-in: the QR code is shown in portrait, before the screen turns landscape.
+    gameVC.signInInPortrait =
+      mode == SKLoginModeSteam && ![NSFileManager.defaultManager fileExistsAtPath:[SKInstaller credFilePath]];
     // A private server's saved login, if it has one; the game withholds it unless it is set up for that server.
     NSDictionary *server = SKServers.selectedServer;
     if (mode == SKLoginModeWeb && server) {
@@ -1799,13 +1790,13 @@ static int SKCompareVersions(NSString *a, NSString *b) {
     if (SKServers.selectedServer) return;
     NSInteger live = (NSInteger)roundf(self.liveSteamPlayers * 1.4f);
     NSInteger preview = (NSInteger)roundf(self.previewSteamPlayers * 1.4f);
-    [self showAlertWithTitle:@"Players online"
+    [self showAlertWithTitle:NSLocalizedString(@"Players online", nil)
                      message:[NSString stringWithFormat:
-                                         @"This is an approximation based on the players "
+                                         NSLocalizedString(@"This is an approximation based on the players "
                                          @"currently online through Steam, increased by 1.4x "
                                          @"to account for standalone players as well.\n\n"
                                          @"Live server: %ld on Steam, %ld estimated\n"
-                                         @"Preview server: %ld on Steam, %ld estimated",
+                                         @"Preview server: %ld on Steam, %ld estimated", nil),
                                          (long)self.liveSteamPlayers, (long)live,
                                          (long)self.previewSteamPlayers, (long)preview]];
 }
@@ -1813,7 +1804,7 @@ static int SKCompareVersions(NSString *a, NSString *b) {
 
 - (UIAlertController *)createProgressAlertWithTitle:(NSString *)title {
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:title
-                                                                   message:@"Preparing…"
+                                                                   message:NSLocalizedString(@"Preparing…", nil)
                                                             preferredStyle:UIAlertControllerStyleAlert];
 
     UIProgressView *progressView = [[UIProgressView alloc] initWithProgressViewStyle:UIProgressViewStyleDefault];
@@ -1844,7 +1835,7 @@ static int SKCompareVersions(NSString *a, NSString *b) {
 }
 
 - (void)onDownloadMods {
-    UIAlertController *alert = [self createProgressAlertWithTitle:@"Downloading Mods"];
+    UIAlertController *alert = [self createProgressAlertWithTitle:NSLocalizedString(@"Downloading Mods", nil)];
     [self presentViewController:alert animated:YES completion:nil];
 
     [[SKModManager sharedManager]
@@ -1858,9 +1849,9 @@ static int SKCompareVersions(NSString *a, NSString *b) {
             [alert dismissViewControllerAnimated:YES
                                       completion:^{
                                         if (success) {
-                                            [self showAlertWithTitle:@"Download Modpack" message:summary];
+                                            [self showAlertWithTitle:NSLocalizedString(@"Download Modpack", nil) message:summary];
                                         } else {
-                                            [self showAlertWithTitle:@"Download Failed"
+                                            [self showAlertWithTitle:NSLocalizedString(@"Download Failed", nil)
                                                              message:error.localizedDescription];
                                         }
                                       }];
@@ -1869,7 +1860,7 @@ static int SKCompareVersions(NSString *a, NSString *b) {
 }
 
 - (void)onApplyMods {
-    UIAlertController *alert = [self createProgressAlertWithTitle:@"Applying Mods"];
+    UIAlertController *alert = [self createProgressAlertWithTitle:NSLocalizedString(@"Applying Mods", nil)];
     [self presentViewController:alert animated:YES completion:nil];
 
     [[SKModManager sharedManager]
@@ -1885,12 +1876,12 @@ static int SKCompareVersions(NSString *a, NSString *b) {
                                         if (success) {
                                             NSMutableString *msg = [NSMutableString stringWithString:summary];
                                             if (warnings.count > 0) {
-                                                [msg appendString:@"\n\nWarnings:\n"];
+                                                [msg appendString:NSLocalizedString(@"\n\nWarnings:\n", nil)];
                                                 for (NSString *warn in warnings) {
-                                                    [msg appendFormat:@"- %@\n", warn];
+                                                    [msg appendFormat:NSLocalizedString(@"- %@\n", nil), warn];
                                                 }
                                             }
-                                            [self showAlertWithTitle:@"Operation completed successfully."
+                                            [self showAlertWithTitle:NSLocalizedString(@"Operation completed successfully.", nil)
                                                              message:[msg stringByTrimmingCharactersInSet:
                                                                               [NSCharacterSet
                                                                                   whitespaceAndNewlineCharacterSet]]];
@@ -1898,7 +1889,7 @@ static int SKCompareVersions(NSString *a, NSString *b) {
                                             if (!(error.code == 8 && [error.domain isEqualToString:@"SKModManagerDomain"]))
                                                 SKReportFailure(@"mods_apply_failed",
                                                                 error.localizedDescription, nil);
-                                            [self showAlertWithTitle:@"Apply Failed"
+                                            [self showAlertWithTitle:NSLocalizedString(@"Apply Failed", nil)
                                                              message:error.localizedDescription];
                                         }
                                       }];
@@ -1907,7 +1898,7 @@ static int SKCompareVersions(NSString *a, NSString *b) {
 }
 
 - (void)onRemoveMods {
-    UIAlertController *alert = [self createProgressAlertWithTitle:@"Removing Mods"];
+    UIAlertController *alert = [self createProgressAlertWithTitle:NSLocalizedString(@"Removing Mods", nil)];
     [self presentViewController:alert animated:YES completion:nil];
 
     [[SKModManager sharedManager]
@@ -1922,9 +1913,9 @@ static int SKCompareVersions(NSString *a, NSString *b) {
                 dismissViewControllerAnimated:YES
                                    completion:^{
                                      if (success) {
-                                         [self showAlertWithTitle:@"Operation completed successfully." message:summary];
+                                         [self showAlertWithTitle:NSLocalizedString(@"Operation completed successfully.", nil) message:summary];
                                      } else {
-                                         [self showAlertWithTitle:@"Remove Failed" message:error.localizedDescription];
+                                         [self showAlertWithTitle:NSLocalizedString(@"Remove Failed", nil) message:error.localizedDescription];
                                      }
                                    }];
           });

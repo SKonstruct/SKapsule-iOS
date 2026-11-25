@@ -4,6 +4,53 @@ Notable changes per release. Versions are the git tags the IPAs are built from
 (`vX.Y.Z` → `SKapsule.ipa` on that release). Before releasing, rename **Unreleased** to the new
 version: the Release workflow publishes that section as the release notes.
 
+## 1.1.0
+
+### Added
+
+- **Languages.** The app has string files for Arabic, German, Spanish, Estonian, French, Italian, Japanese, Polish,
+  Brazilian Portuguese, Russian and Simplified and Traditional Chinese; pick one in iOS Settings > SKapsule > Language
+  (text not translated yet shows in English). The interface text now goes through `NSLocalizedString`.
+- **A credit.** "Built with ♥ by SirDank" in the top-left corner of the main screen, quiet and grey with a
+  pink heart; the name opens the author's site.
+- **FPS counter.** A small "FPS 55" in the top-left corner, on by default. **Show FPS counter** in the
+  settings panel (tap ⚙ in game) turns it off.
+- **Sharpening.** A slider in the same panel sharpens the picture on its way to the screen, which is what
+  you want when **Resolution** is below 100%: the game is drawn smaller and stretched, and sharpening
+  brings the edges back. 0% (the default) leaves the picture as it was.
+- **Sharp HUD (experimental).** Below 100% resolution the HUD is drawn small and stretched too, so its text
+  is soft. With this on, the scene stays at your resolution and the HUD is drawn at the screen's full
+  resolution, so its text is crisp. The HUD is then smaller, so raise the game's own UI scale. Off by default.
+- **Layouts: presets, export and import.** **Layouts…** in the Edit Controls panel keeps named presets of your
+  control layout (plus the built-in default), and exports or imports one as a `.json` file through the Files
+  picker. A layout exported here imports on SKapsule for Android, and the other way round. Only the arrangement
+  travels: where each control sits, its size and whether it shows, plus opacity and **Show Buttons**. Resolution
+  and **Show Controls** stay yours, and a file can never change what a control does. Importing saves a new
+  preset and asks before applying it.
+
+### Fixed
+
+- **Mods apply in a fixed order.** They used to apply in whatever order iOS listed the files, so which mod won a
+  clash could differ between devices. The mods that change the most files now go first and equal ones by name, so a
+  small, targeted mod wins over a broad one (the same rule as SKradle and SKapsule for Android). There is nothing to
+  sort by hand.
+
+### Changed
+
+- **Steam sign-in is by QR code or the Steam app, with no username or password.** The first Steam launch
+  shows a QR code in portrait, before the game starts and the screen turns landscape: scan it with the Steam mobile app and approve, or tap **Open Steam app**. SKapsule
+  no longer asks for your Steam password or a Steam Guard code, and keeps only the sign-in token it
+  already stored. If you were signed in you stay signed in. **Cancel** carries on without Steam.
+- **The default memory limit for the game is now 1024 MB** (it was 768 MB). It applies if you never changed
+  the setting, and it is only a ceiling: the game still starts small and takes what it needs.
+- **The game now runs with two more of KnightLauncher's recommended settings.** Its own requests to run
+  garbage collection are ignored, which avoids some freezes, and textures it no longer uses are released
+  sooner.
+- **Built-in JIT is updated to StikJIT 2.0.** It checks more carefully for a broken connection before
+  trying, and no longer leaves handles open when it fails.
+- The graphics and audio libraries are updated to their latest upstream versions (rendering fixes and
+  new OpenGL features, and many OpenAL Soft changes).
+
 ## 1.0.4
 
 ### Fixed

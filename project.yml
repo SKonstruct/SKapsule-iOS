@@ -49,9 +49,15 @@ targets:
           - 'Info.plist'
           - 'JITHelper'
           - 'Tests'
+      # The graphics pass, shared with the Android app: the external/skgfx submodule (SKonstruct/skgfx).
+      - path: external/skgfx/mobile
+        includes:
+          - 'skgfx.c'
+          - 'skgfx.h'
     settings:
       CODE_SIGN_IDENTITY: 'Apple Development'
       ENABLE_USER_SCRIPT_SANDBOXING: NO
+      HEADER_SEARCH_PATHS: '$(inherited) $(SRCROOT)/external/skgfx/mobile'
       INFOPLIST_FILE: 'Natives/Info.plist'
       OTHER_CFLAGS: '-DGLES_SILENCE_DEPRECATION=1'
       # On-device pairing (Natives/RPPairing), built by scripts/build-rppairing-ios.sh.

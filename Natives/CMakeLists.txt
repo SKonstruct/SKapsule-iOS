@@ -20,6 +20,7 @@ endif()
 
 include_directories(
   "."
+  "../external/skgfx/mobile"
 )
 
 # rpath for loading dylibs from Frameworks/ and JRE lib/
@@ -37,12 +38,15 @@ add_executable(SKapsule
   LauncherViewController.m
   SKZipUtils.m
   SKModManager.m
+  SKModOrder.m
   SKServers.m
   SKCredentials.m
   GameViewController.m
   SKTouchControls.m
   SKTouchControlOverlay.m
   SKControlsEditorViewController.m
+  SKLayoutLibrary.m
+  SKLayoutShare.m
   SKKeyboardBridge.m
   JavaLauncher.m
   glfw_ios.m
@@ -54,6 +58,7 @@ add_executable(SKapsule
   SKJITSetupViewController.m
   SKReporter.m
   utils.m
+  ../external/skgfx/mobile/skgfx.c
   Assets.xcassets
 )
 
@@ -84,6 +89,11 @@ if(SK_ASAN)
   endif()
 endif()
 
+# The simulator build (scripts/sim/build.sh) passes its own slice.
+if(NOT SK_RPPAIRING_LIB)
+  set(SK_RPPAIRING_LIB "${CMAKE_CURRENT_LIST_DIR}/../out/rppairing/libskrppairing.a")
+endif()
+
 target_link_libraries(SKapsule
   "-framework CoreFoundation"
   "-framework CoreGraphics"
@@ -98,7 +108,7 @@ target_link_libraries(SKapsule
   "-framework BackgroundTasks"
   "-framework UserNotifications"
   # On-device pairing (Natives/RPPairing), built by scripts/build-rppairing-ios.sh.
-  "${CMAKE_CURRENT_LIST_DIR}/../out/rppairing/libskrppairing.a"
+  "${SK_RPPAIRING_LIB}"
   "-ldl"
   "-lz"
 )

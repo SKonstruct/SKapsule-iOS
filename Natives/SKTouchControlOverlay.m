@@ -288,6 +288,8 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
 
 @end
 
+#import "SKGfxSettings.h"
+
 #pragma mark - Overlay
 
 @implementation SKTouchControlOverlay {
@@ -300,6 +302,13 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
     UISlider *_opacitySlider;
     UISlider *_resolutionSlider;
     UIButton *_resetButton;
+    UIButton *_layoutsButton;
+    UIStackView *_panelStack;
+    UISwitch *_fpsSwitch;
+    UISlider *_sharpenSlider;
+    UILabel *_sharpenLabel;
+    UISwitch *_hudSwitch;
+    UILabel *_gfxHint;
     UIView *_nodeSection;
     UILabel *_nodeTitle;
     UISwitch *_visibleSwitch;
@@ -355,9 +364,11 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
     // The panel's height comes from its stack's constraints; sizeToFit would return the
     // frame unchanged because the panel itself is autoresizing-sized.
     CGFloat panelWidth = MIN(320.0f, width - 40.0f);
-    CGFloat panelHeight = [_panel systemLayoutSizeFittingSize:CGSizeMake(panelWidth, 0)
-                                withHorizontalFittingPriority:UILayoutPriorityRequired
-                                      verticalFittingPriority:UILayoutPriorityFittingSizeLevel].height;
+    CGFloat contentHeight = [_panelStack systemLayoutSizeFittingSize:CGSizeMake(panelWidth - 32.0f, 0)
+                                       withHorizontalFittingPriority:UILayoutPriorityRequired
+                                             verticalFittingPriority:UILayoutPriorityFittingSizeLevel].height + 32.0f;
+    // Taller than the screen: the panel scrolls.
+    CGFloat panelHeight = MIN(contentHeight, height - 24.0f);
     _panel.frame = CGRectMake((width - panelWidth) * 0.5f, (height - panelHeight) * 0.5f,
                               panelWidth, panelHeight);
 }
@@ -535,6 +546,50 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
                           action:@selector(onResolutionCommitted)
                 forControlEvents:UIControlEventTouchUpInside | UIControlEventTouchUpOutside];
 
+    [_resolutionSlider addTarget:self action:@selector(onResolutionMoved) forControlEvents:UIControlEventValueChanged];
+
+    // Graphics (skgfx.c). Stored apart from the touch layout, so Reset Layout leaves them alone.
+    _fpsSwitch = [UISwitch new];
+    _fpsSwitch.onTintColor = SKThemeColor();
+    _fpsSwitch.on = SKGfxShowFps();
+    [_fpsSwitch addTarget:self action:@selector(onFpsChanged) forControlEvents:UIControlEventValueChanged];
+
+    _sharpenLabel = [self panelLabel:@""];
+    _sharpenSlider = [UISlider new];
+    _sharpenSlider.minimumTrackTintColor = SKThemeColor();
+    _sharpenSlider.minimumValue = 0;
+    _sharpenSlider.maximumValue = 100;
+    _sharpenSlider.value = SKGfxSharpenPercent();
+    [_sharpenSlider addTarget:self action:@selector(onSharpenMoved) forControlEvents:UIControlEventValueChanged];
+    // Applied on release, like the resolution: the drawable may be rebuilt.
+    [_sharpenSlider addTarget:self
+                       action:@selector(onSharpenCommitted)
+             forControlEvents:UIControlEventTouchUpInside | UIControlEventTouchUpOutside];
+    UIButton *sharpenReset = [UIButton buttonWithType:UIButtonTypeSystem];
+    [sharpenReset setTitle:@"Reset" forState:UIControlStateNormal];
+    [sharpenReset addTarget:self action:@selector(onSharpenReset) forControlEvents:UIControlEventTouchUpInside];
+    UIStackView *sharpenRow = [[UIStackView alloc] initWithArrangedSubviews:@[_sharpenSlider, sharpenReset]];
+    sharpenRow.axis = UILayoutConstraintAxisHorizontal;
+    sharpenRow.spacing = 12;
+
+    _hudSwitch = [UISwitch new];
+    _hudSwitch.onTintColor = SKThemeColor();
+    _hudSwitch.on = SKGfxSharpHud();
+    [_hudSwitch addTarget:self action:@selector(onHudChanged) forControlEvents:UIControlEventValueChanged];
+
+    _gfxHint = [self panelLabel:@""];
+    _gfxHint.font = [UIFont systemFontOfSize:12];
+    _gfxHint.textColor = [UIColor colorWithWhite:1 alpha:0.7];
+    _gfxHint.numberOfLines = 0;
+    [self refreshGfxPanel];
+
+    // Layout library: presets, export, import. The host provides it (it presents the file
+    // pickers), so the button stays hidden until a host sets one.
+    _layoutsButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [_layoutsButton setTitle:NSLocalizedString(@"Layouts…", nil) forState:UIControlStateNormal];
+    [_layoutsButton addTarget:self action:@selector(onLayoutsTapped) forControlEvents:UIControlEventTouchUpInside];
+    _layoutsButton.hidden = (self.layoutLibraryHandler == nil);
+
     _resetButton = [UIButton buttonWithType:UIButtonTypeSystem];
     [_resetButton setTitle:@"Reset Layout" forState:UIControlStateNormal];
     [_resetButton addTarget:self action:@selector(onResetTapped) forControlEvents:UIControlEventTouchUpInside];
@@ -565,18 +620,36 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
         [self rowWithLabel:@"Show Buttons" control:_actionBarSwitch],
         [self rowWithLabel:@"Opacity" control:_opacitySlider],
         [self rowWithLabel:@"Resolution" control:_resolutionSlider],
+        [self rowWithLabel:@"Show FPS counter" control:_fpsSwitch],
+        _sharpenLabel,
+        sharpenRow,
+        [self rowWithLabel:@"Sharp HUD (experimental)" control:_hudSwitch],
+        _gfxHint,
+        _layoutsButton,
         _resetButton,
         _nodeSection,
     ]];
     stack.axis = UILayoutConstraintAxisVertical;
     stack.spacing = 10;
     stack.translatesAutoresizingMaskIntoConstraints = NO;
-    [_panel addSubview:stack];
+    _panelStack = stack;
+    // The panel scrolls: the graphics rows make it taller than a landscape phone.
+    UIScrollView *scroll = [UIScrollView new];
+    scroll.translatesAutoresizingMaskIntoConstraints = NO;
+    scroll.alwaysBounceVertical = NO;
+    scroll.delaysContentTouches = NO;  // sliders in here must respond at once
+    [_panel addSubview:scroll];
+    [scroll addSubview:stack];
     [NSLayoutConstraint activateConstraints:@[
-        [stack.leadingAnchor constraintEqualToAnchor:_panel.leadingAnchor constant:16],
-        [stack.trailingAnchor constraintEqualToAnchor:_panel.trailingAnchor constant:-16],
-        [stack.topAnchor constraintEqualToAnchor:_panel.topAnchor constant:16],
-        [stack.bottomAnchor constraintEqualToAnchor:_panel.bottomAnchor constant:-16],
+        [scroll.leadingAnchor constraintEqualToAnchor:_panel.leadingAnchor],
+        [scroll.trailingAnchor constraintEqualToAnchor:_panel.trailingAnchor],
+        [scroll.topAnchor constraintEqualToAnchor:_panel.topAnchor],
+        [scroll.bottomAnchor constraintEqualToAnchor:_panel.bottomAnchor],
+        [stack.leadingAnchor constraintEqualToAnchor:scroll.contentLayoutGuide.leadingAnchor constant:16],
+        [stack.trailingAnchor constraintEqualToAnchor:scroll.contentLayoutGuide.trailingAnchor constant:-16],
+        [stack.topAnchor constraintEqualToAnchor:scroll.contentLayoutGuide.topAnchor constant:16],
+        [stack.bottomAnchor constraintEqualToAnchor:scroll.contentLayoutGuide.bottomAnchor constant:-16],
+        [stack.widthAnchor constraintEqualToAnchor:scroll.frameLayoutGuide.widthAnchor constant:-32],
     ]];
     [self addSubview:_panel];
 }
@@ -600,6 +673,58 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
     _layout.renderScale = MIN(MAX(_resolutionSlider.value, SKMinRenderScale), SKMaxRenderScale);
     [_layout save];
     [self.delegate touchOverlay:self didChangeRenderScale:_layout.renderScale];
+}
+
+#pragma mark Graphics
+
+/// Sharp HUD needs a scene smaller than the window, so it is greyed out at 100% resolution, with the
+/// hint saying what to change. The hint also says what the offscreen features have in common.
+- (void)refreshGfxPanel {
+    int percent = (int)lround(_sharpenSlider.value);
+    _sharpenLabel.text = percent > 0 ? [NSString stringWithFormat:@"Sharpening: %d%%", percent] : @"Sharpening: off";
+    float scale = _resolutionSlider ? _resolutionSlider.value : _layout.renderScale;
+    BOOL applies = SKGfxSharpHudApplies(scale);
+    _hudSwitch.enabled = applies;
+    _hudSwitch.alpha = applies ? 1.0f : 0.4f;
+    _gfxHint.text = [@"Sharpening and Sharp HUD draw the game off-screen first.\n"
+        stringByAppendingString:applies
+            ? @"Sharp HUD draws the HUD at full resolution, so it gets smaller: raise the game's UI scale to compensate."
+            : @"Sharp HUD needs Resolution below 100%."];
+}
+
+- (void)gfxChanged {
+    if ([self.delegate respondsToSelector:@selector(touchOverlayDidChangeGfx:)])
+        [self.delegate touchOverlayDidChangeGfx:self];
+}
+
+- (void)onFpsChanged {
+    SKGfxSetShowFps(_fpsSwitch.on);
+    if ([self.delegate respondsToSelector:@selector(touchOverlay:didChangeFpsVisible:)])
+        [self.delegate touchOverlay:self didChangeFpsVisible:_fpsSwitch.on];
+}
+
+- (void)onSharpenMoved {
+    [self refreshGfxPanel];
+}
+
+- (void)onSharpenCommitted {
+    SKGfxSetSharpenPercent((int)lround(_sharpenSlider.value));
+    [self gfxChanged];
+}
+
+- (void)onSharpenReset {
+    _sharpenSlider.value = 0;
+    [self refreshGfxPanel];
+    [self onSharpenCommitted];
+}
+
+- (void)onHudChanged {
+    SKGfxSetSharpHud(_hudSwitch.on);
+    [self gfxChanged];
+}
+
+- (void)onResolutionMoved {
+    [self refreshGfxPanel];
 }
 
 - (void)onVisibleChanged {
@@ -651,10 +776,31 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
     _actionBarSwitch.on = _layout.actionBarVisible;
     _opacitySlider.value = _layout.globalOpacity;
     _resolutionSlider.value = _layout.renderScale;
+    [self refreshGfxPanel];
     [self selectControl:nil];
     [self applyAppearance];
     [self setNeedsLayout];
     [self.delegate touchOverlay:self didChangeRenderScale:_layout.renderScale];
+}
+
+- (void)setLayoutLibraryHandler:(void (^)(void))handler {
+    _layoutLibraryHandler = [handler copy];
+    _layoutsButton.hidden = (_layoutLibraryHandler == nil);
+}
+
+- (void)onLayoutsTapped {
+    if (self.layoutLibraryHandler) self.layoutLibraryHandler();
+}
+
+- (void)applySharedLayout:(SKSharedLayout *)shared {
+    [_layout applySharedLayout:shared];  // mutates the nodes the control views hold
+    [_layout save];
+
+    _actionBarSwitch.on = _layout.actionBarVisible;
+    _opacitySlider.value = _layout.globalOpacity;
+    [self selectControl:nil];
+    [self applyAppearance];
+    [self setNeedsLayout];
 }
 
 @end

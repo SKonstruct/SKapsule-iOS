@@ -14,6 +14,7 @@ extern EAGLContext *gEAGLContext;
 extern CAEAGLLayer *gEAGLLayer;
 extern GLuint gRenderbuffer;
 extern GLuint gFramebuffer;
+#include "skgfx.h"
 extern GLuint gDepthRenderbuffer;
 
 // Input is produced on UIKit/GameController threads and drained on SK's main
@@ -170,6 +171,47 @@ void sk_gl_set_drawable_size(int width, int height) {
     atomic_store(&gDrawableHeight, height);
 }
 
+// The graphics pass (skgfx.c). What the game was last told its window size is, packed w<<32|h, 0 until
+// it first asks; the native drawable size as the view controller last said it (it changes a moment
+// after the settings do).
+static _Atomic uint64_t gToldSize;
+static atomic_int gNativeWidth;
+static atomic_int gNativeHeight;
+
+static void believed_size(int *w, int *h) {
+    int dw = atomic_load(&gDrawableWidth);
+    int dh = atomic_load(&gDrawableHeight);
+    if (skgfx_wanted() && atomic_load(&gNativeWidth) > 0 && atomic_load(&gNativeHeight) > 0) {
+        dw = atomic_load(&gNativeWidth);
+        dh = atomic_load(&gNativeHeight);
+    }
+    skgfx_believed_size(dw, dh, w, h);
+}
+
+// The game only learns its size when it asks (nativeGetSurfaceSize) or is told. A later change, from the
+// resolution slider or the graphics settings, is told as a framebuffer-size event.
+static void push_size_if_changed(void) {
+    uint64_t old = atomic_load(&gToldSize);
+    if (old == 0) return;
+    int w, h;
+    believed_size(&w, &h);
+    uint64_t now = ((uint64_t)(uint32_t)w << 32) | (uint32_t)h;
+    if (now != old && atomic_compare_exchange_strong(&gToldSize, &old, now)) {
+        input_push(EV_FRAMEBUFFER_SIZE, w, h, 0);
+    }
+}
+
+void sk_gl_set_gfx_config(int enabled, float scale, float sharpen, int hud, int nativeWidth, int nativeHeight) {
+    atomic_store(&gNativeWidth, nativeWidth);
+    atomic_store(&gNativeHeight, nativeHeight);
+    skgfx_set_config(enabled, scale, sharpen, hud);
+    push_size_if_changed();
+}
+
+uint64_t sk_gfx_frame_count(void) {
+    return skgfx_frames();
+}
+
 static jintArray nativeGetSurfaceSize(JNIEnv *env, jclass clazz) {
     jintArray result = (*env)->NewIntArray(env, 2);
     if (result != NULL) {
@@ -177,8 +219,11 @@ static jintArray nativeGetSurfaceSize(JNIEnv *env, jclass clazz) {
         int width = atomic_load(&gDrawableWidth);
         int height = atomic_load(&gDrawableHeight);
         if (width > 0 && height > 0) {
-            dims[0] = (jint)width;
-            dims[1] = (jint)height;
+            int believedW, believedH;
+            believed_size(&believedW, &believedH);
+            atomic_store(&gToldSize, ((uint64_t)(uint32_t)believedW << 32) | (uint32_t)believedH);
+            dims[0] = (jint)believedW;
+            dims[1] = (jint)believedH;
         } else {
             // Nothing has built a drawable yet. Use the layer's own scale rather than the
             // screen's, so the render-scale divisor is still honoured.
@@ -208,13 +253,28 @@ static void gl4es_bring_up_once(void) {
         if (init_gl4es) {
             init_gl4es();
             NSLog(@"[glfw] gl4es initialized!");
+            // The graphics pass hooks into gl4es now, and starts drawing offscreen before the first
+            // frame if the settings ask for it.
+            skgfx_init(gl4es);
+            int drawableW = atomic_load(&gDrawableWidth);
+            int drawableH = atomic_load(&gDrawableHeight);
+            if (drawableW > 0 && drawableH > 0) skgfx_after_swap(gFramebuffer, drawableW, drawableH);
         } else {
             NSLog(@"[glfw] dlsym initialize_gl4es failed: %s", dlerror());
         }
     });
 }
 
+// Set once the game's render thread first takes gEAGLContext. Until then the main thread may still
+// rebuild the renderbuffer (the portrait sign-in phase ends with a rotation before that).
+static atomic_int gContextTaken;
+
+int sk_gl_context_taken(void) {
+    return atomic_load(&gContextTaken);
+}
+
 static void nativeMakeContextCurrent(JNIEnv *env, jclass clazz, jlong window) {
+    atomic_store(&gContextTaken, 1);
     [EAGLContext setCurrentContext:gEAGLContext];
 
     // Dynamically call native GLES glBindFramebuffer to bind the custom FBO on the render thread context.
@@ -242,6 +302,7 @@ static BOOL gRenderReadyFired = NO;
 // never fires onRenderReady and the boot overlay stays up forever.
 void sk_gl_reset_render_ready(void) {
     gRenderReadyFired = NO;
+    atomic_store(&gContextTaken, 0);
 }
 
 // Rebuilding the drawable is GL work, and this context belongs to SK's render thread --
@@ -276,7 +337,7 @@ static void apply_pending_resize(void) {
     // let it rebuild GL objects. Only ever pushed for a deliberate resolution change.
     if (width > 0 && height > 0) {
         sk_gl_set_drawable_size((int)width, (int)height);
-        sk_input_push_framebuffer_size((int)width, (int)height);
+        push_size_if_changed();
     }
 }
 
@@ -317,12 +378,20 @@ static void wait_until_active(void) {
 static void nativeSwapBuffers(JNIEnv *env, jclass clazz, jlong window) {
     wait_until_active();
     [EAGLContext setCurrentContext:gEAGLContext];
+    // The graphics pass composes the offscreen scene onto the window's framebuffer first.
+    int drawableW = atomic_load(&gDrawableWidth);
+    int drawableH = atomic_load(&gDrawableHeight);
+    if (drawableW > 0 && drawableH > 0) skgfx_present(gFramebuffer, drawableW, drawableH);
     glBindRenderbuffer(GL_RENDERBUFFER, gRenderbuffer);
     [gEAGLContext presentRenderbuffer:GL_RENDERBUFFER];
 
     // After the present, so the frame just shown was rendered at the old size.
     if (atomic_exchange_explicit(&gResizePending, 0, memory_order_acquire))
         apply_pending_resize();
+    drawableW = atomic_load(&gDrawableWidth);
+    drawableH = atomic_load(&gDrawableHeight);
+    if (drawableW > 0 && drawableH > 0) skgfx_after_swap(gFramebuffer, drawableW, drawableH);
+    push_size_if_changed();
 
     if (!gRenderReadyFired) {
         gRenderReadyFired = YES;

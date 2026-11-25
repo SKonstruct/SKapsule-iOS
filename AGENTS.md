@@ -49,6 +49,7 @@ Natives/               iOS app (Objective-C) + CMake build
   JavaLauncher.*       JVM bootstrap (dlopen libjli, JLI_Launch)
   SKTouchControls.*    touch-control node model + persisted layout
   SKTouchControlOverlay.*   touch-control overlay, edit mode, settings panel
+  SKLayoutShare.*      layout export/import format + presets (Foundation only; same file as Android's)
   SKControlsEditorViewController.*  controls editor opened from the launcher sidebar
   SKMouseButtons.h     per-button mouse/trackpad press tracking (header-only)
   SKKeyboardBridge.*   offscreen UIKeyInput -> GLFW char/key events
@@ -56,33 +57,38 @@ Natives/               iOS app (Objective-C) + CMake build
   SKInstaller.*        runtime extraction + installation check
   SKZipUtils.*         zip read/write (central directory), git blob SHA
   SKModManager.*       modpack download, apply and remove
+  SKModOrder.*         automatic apply order for mods (Foundation only; same rule as Android's ModsOrder.kt)
   SKServers.*          custom servers: saved list, validation, config.jar connection edit (Foundation only, host-tested)
   SKNewsFeed.*         home-screen news card feed (KnightLauncher's Flamingo service)
   SKReporter.*         Sentry failure/crash reports, log scrubbing
   glfw_ios.m           GLFW natives for the JVM: input queue, buffer swap, gamepad
-  NativeBridge.*       JVM ↔ UI bridge (boot status, Steam Guard prompts)
+  NativeBridge.*       JVM ↔ UI bridge (boot status, Steam QR sign-in show/hide/cancel)
   utils.*              JIT detection, entitlements, file helpers
   SKBuiltinJIT.*       JIT method choice, pairing file, starts the JIT helper extension
   SKJITAdvice.h        built-in JIT failure advice (header-only, tested by `make test`)
+  SKGfxSettings.h      its settings and decisions (header-only, tested by `make test`)
   SKJITPairing.*       on-device pairing (iOS 27+): Bonjour advert, background task, PIN
   SKJITSetupViewController.*  the JIT Setup bottom sheet (ways in, steps, pairing, LocalDevVPN, enable)
   SKRPPairing.h        C interface of Natives/RPPairing/ (Rust, libskrppairing.a)
   JITHelper/           Swift app extension linking StikJIT (attaches the JIT debugger)
   awt_xawt/            cacio AWT stubs
   Info.plist           iOS app metadata
-  Assets.xcassets/     app icon, Buy Me a Coffee image
+  Assets.xcassets/     app icon (AppIcon `icon-1024.png` is byte-identical to SKonstruct/brand `icon/icon-1024.png`), Buy Me a Coffee image
 external/bootstrap/    Java bootstrap module (shared with Android)
   SkBootstrap.java     runs HeadlessGetdown → launches ProjectXApp
   HeadlessGetdown.java headless getdown driver
-  NativeBridgePrompt.java   frenchpress credential prompt
+  NativeBridgePrompt.java   frenchpress Steam QR sign-in prompt
   GLFW.java            GLFW shim routing to native implementations
 scripts/               build-*-ios.sh per native component + stage-app-assets.sh; patches/ for StikJIT
+  sim/                 iOS Simulator build and run loop (build-libs.sh, build.sh, run.sh)
 assets/                bundled JRE zip, fonts, JIT script, iOS-only shadow classes
 external/gl4es/        submodule — GL → GLES translation
 external/openal-soft/  submodule — audio
 external/lwjgl3/       submodule — LWJGL iOS build
 external/caciocavallo17/  submodule — headless AWT
 external/frenchpress/  submodule — Steam login
+external/skgfx/        submodule — graphics present pass (mobile/skgfx.c, skgfx.h: FPS counter feed, sharpening, Sharp HUD; MIT;
+                       single source SKonstruct/skgfx, shared with SKapsule; compiled via CMake and project.yml)
 external/StikJIT/      submodule — built-in JIT framework (MPL-2.0); built from a patched copy (scripts/patches)
 entitlements.*.xml     signing entitlements (sideload / TrollStore)
 out/                   native build outputs (generated, gitignored)
@@ -97,6 +103,7 @@ out/artifacts/         packaged IPA output (generated, gitignored)
 - **Native app (CMake):** `make native` (requires Xcode CLI tools + iOS SDK)
 - **Host-side tests:** `make test` builds `Natives/Tests/` for the Mac and runs it (zip parsing, git blob SHA, mouse buttons, JIT advice, custom servers). Add a case there when touching `SKZipUtils`, `SKMouseButtons` or `SKServers`. The **Test** workflow runs it on every push and pull request.
 - **Full package:** `make package` (produces `.ipa` in `out/artifacts/`)
+- **iOS Simulator:** `make sim-run` builds `build/sim/SKapsule.app` (own `build/sim`, `out/sim`; device targets untouched), installs it and runs to the game's first frame; see ENGINEERING.md ▸ Simulator. The simulator-only code is behind `TARGET_OS_SIMULATOR` (`utils.m`); keep it out of the device path.
 - **TrollStore:** `make package TROLLSTORE_JIT_ENT=1` (produces `.tipa`)
 - **Release:** `make all RELEASE=1`
 - **Xcode IDE Build:** The user builds and tests on-device via Xcode. **CRITICAL**: The Xcode build uses `make xcode-payload` as a post-build step. Any new stub dylibs or source files must be available through this pathway. Both the CMake and Xcode pipelines must be kept functional.

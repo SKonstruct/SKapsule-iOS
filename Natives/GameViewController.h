@@ -9,8 +9,9 @@ typedef NS_ENUM(NSInteger, SKLoginMode) {
 
 @interface GameViewController : UIViewController
 @property (nonatomic, assign) SKLoginMode loginMode;
-@property (nonatomic, copy) NSString *steamUser;
-@property (nonatomic, copy) NSString *steamPass;
+/// A Steam launch with no stored sign-in: the screen starts in portrait for the QR code and turns
+/// landscape when the sign-in ends, before the game starts.
+@property (nonatomic, assign) BOOL signInInPortrait;
 /// Optional quick login for Web mode, and the server (the game's server_host) it belongs to.
 @property (nonatomic, copy) NSString *webUser;
 @property (nonatomic, copy) NSString *webPass;

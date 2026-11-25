@@ -237,3 +237,56 @@ static NSString *SKLabelForNode(NSString *nodeId, NSString *persisted) {
 }
 
 @end
+
+@implementation SKTouchLayout (Sharing)
+
++ (NSSet<NSString *> *)knownNodeIds {
+    NSMutableSet *ids = [NSMutableSet set];
+    for (SKControlNode *node in [self defaultLayout].nodes) [ids addObject:node.nodeId];
+    return ids;
+}
+
+- (SKSharedLayout *)sharedLayoutNamed:(NSString *)name {
+    SKSharedLayout *shared = [SKSharedLayout new];
+    shared.name = [SKSharedLayout cleanName:name];
+    shared.globalOpacity = self.globalOpacity;
+    shared.actionBarVisible = self.actionBarVisible;
+    NSMutableArray<SKSharedNode *> *nodes = [NSMutableArray arrayWithCapacity:self.nodes.count];
+    for (SKControlNode *node in self.nodes) {
+        SKSharedNode *out = [SKSharedNode new];
+        out.nodeId = node.nodeId;
+        out.xPercent = node.xPercent;
+        out.yPercent = node.yPercent;
+        out.scale = node.scale;
+        out.visible = node.visible;
+        [nodes addObject:out];
+    }
+    shared.nodes = nodes;
+    return shared;
+}
+
+- (void)applySharedLayout:(SKSharedLayout *)shared {
+    SKTouchLayout *defaults = [SKTouchLayout defaultLayout];
+    self.globalOpacity = shared ? shared.globalOpacity : defaults.globalOpacity;
+    self.actionBarVisible = shared ? shared.actionBarVisible : defaults.actionBarVisible;
+    for (SKControlNode *node in self.nodes) {
+        SKSharedNode *state = [shared nodeForId:node.nodeId];
+        SKControlNode *fresh = nil;
+        for (SKControlNode *candidate in defaults.nodes) {
+            if ([candidate.nodeId isEqualToString:node.nodeId]) fresh = candidate;
+        }
+        if (state) {
+            node.xPercent = state.xPercent;
+            node.yPercent = state.yPercent;
+            node.scale = state.scale;
+            node.visible = state.visible;
+        } else if (fresh) {
+            node.xPercent = fresh.xPercent;
+            node.yPercent = fresh.yPercent;
+            node.scale = fresh.scale;
+            node.visible = fresh.visible;
+        }
+    }
+}
+
+@end

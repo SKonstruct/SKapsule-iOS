@@ -165,11 +165,14 @@ help:
 	echo '    make deploy           Install to device'
 	echo '    make check            Dump variables'
 	echo '    make format           Auto-format source files'
+	echo '    make sim-build        Build for the iOS Simulator (scripts/sim/)'
+	echo '    make sim-run          sim-build, then install, launch and capture in the simulator'
 	echo ''
 	echo 'Variables:'
 	echo '    RELEASE=1             Release build'
 	echo '    TROLLSTORE_JIT_ENT=1  TrollStore entitlements'
 	echo '    DEVICE_ID=...         Target device UDID'
+	echo '    SIM_ARGS=...          Options for scripts/sim/run.sh (--fresh, --launcher-only, --wait N)'
 	echo '    VERBOSE=1             Print commands'
 
 check:
@@ -329,12 +332,32 @@ test:
 	xcrun clang -fobjc-arc -Wall -framework Foundation -I$(SOURCEDIR)/Natives \
 		$(SOURCEDIR)/Natives/Tests/SKMouseButtonsTests.m -o $(WORKINGDIR)/sk-mouse-tests
 	$(WORKINGDIR)/sk-mouse-tests
+	python3 $(SOURCEDIR)/scripts/check-localizations.py
 	xcrun clang -fobjc-arc -Wall -framework Foundation -I$(SOURCEDIR)/Natives \
 		$(SOURCEDIR)/Natives/Tests/SKJITAdviceTests.m -o $(WORKINGDIR)/sk-jit-advice-tests
 	$(WORKINGDIR)/sk-jit-advice-tests
+	xcrun clang -fobjc-arc -Wall -framework Foundation -I$(SOURCEDIR)/Natives \
+		$(SOURCEDIR)/Natives/Tests/SKGfxSettingsTests.m -o $(WORKINGDIR)/sk-gfx-tests
+	$(WORKINGDIR)/sk-gfx-tests
 	xcrun clang -fobjc-arc -Wall -framework Foundation -lz -I$(SOURCEDIR)/Natives \
 		$(SOURCEDIR)/Natives/Tests/SKServersTests.m $(SOURCEDIR)/Natives/SKServers.m $(SOURCEDIR)/Natives/SKZipUtils.m -o $(WORKINGDIR)/sk-server-tests
 	$(WORKINGDIR)/sk-server-tests
+	xcrun clang -fobjc-arc -Wall -framework Foundation -I$(SOURCEDIR)/Natives \
+		$(SOURCEDIR)/Natives/Tests/SKLayoutShareTests.m $(SOURCEDIR)/Natives/SKLayoutShare.m -o $(WORKINGDIR)/sk-layout-tests
+	$(WORKINGDIR)/sk-layout-tests
+	xcrun clang -fobjc-arc -Wall -framework Foundation -I$(SOURCEDIR)/Natives \
+		$(SOURCEDIR)/Natives/Tests/SKModOrderTests.m $(SOURCEDIR)/Natives/SKModOrder.m -o $(WORKINGDIR)/sk-mod-order-tests
+	$(WORKINGDIR)/sk-mod-order-tests
 	echo '[SKapsule v$(VERSION)] test - end'
 
-.PHONY: all clean check native test payload package deploy help format
+# iOS Simulator (scripts/sim/): its own build/sim and out/sim, so none of the device targets above are involved.
+sim-libs:
+	$(SOURCEDIR)/scripts/sim/build-libs.sh
+
+sim-build:
+	$(SOURCEDIR)/scripts/sim/build.sh
+
+sim-run: sim-build
+	$(SOURCEDIR)/scripts/sim/run.sh $(SIM_ARGS)
+
+.PHONY: all clean check native test payload package deploy help format sim-libs sim-build sim-run

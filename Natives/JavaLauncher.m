@@ -44,15 +44,12 @@ static void init_loadSKEnv(void) {
 }
 
 static void skUnsetSteamEnv(void) {
-    unsetenv("FRENCHPRESS_STEAM_USER");
-    unsetenv("FRENCHPRESS_STEAM_PASS");
     unsetenv("SK_WEB_USER");
     unsetenv("SK_WEB_PASS");
     unsetenv("SK_LOGIN_HOST");
 }
 
-int launchJVM(NSString *steamUser, NSString *steamPass, NSString *webUser, NSString *webPass, NSString *loginHost,
-              BOOL isSteam, int width, int height) {
+int launchJVM(NSString *webUser, NSString *webPass, NSString *loginHost, BOOL isSteam, int width, int height) {
     NSLog(@"[JavaLauncher] Beginning JVM launch");
 
     init_loadSKEnv();
@@ -157,13 +154,6 @@ int launchJVM(NSString *steamUser, NSString *steamPass, NSString *webUser, NSStr
         margv[++margc] = strdup([NSString stringWithFormat:@"-Dfrenchpress.jar=%@", frenchpressJar].UTF8String);
         margv[++margc] = "-Dfrenchpress.credentialPrompt=com.skarm.launcher.bootstrap.NativeBridgePrompt";
 
-        if (steamUser.length > 0) {
-            setenv("FRENCHPRESS_STEAM_USER", steamUser.UTF8String, 1);
-        }
-        if (steamPass.length > 0) {
-            setenv("FRENCHPRESS_STEAM_PASS", steamPass.UTF8String, 1);
-        }
-
         NSString *credFile = [NSString stringWithFormat:@"%s/home/.local/share/frenchpress/steam.creds", home];
         setenv("FRENCHPRESS_CRED_FILE", credFile.UTF8String, 1);
         // Ensure cred directory exists
@@ -225,6 +215,9 @@ int launchJVM(NSString *steamUser, NSString *steamPass, NSString *webUser, NSStr
     //     code cache and metaspace are still reclaimed.
     //  2. SK's live set is small (~200MB in Haven), which is what Serial suits.
     margv[++margc] = "-XX:+UseSerialGC";
+    // KnightLauncher's recommended settings pair G1 with this one. Here it matters more than
+    // there: an explicit System.gc() under SerialGC is a full stop-the-world collection.
+    margv[++margc] = "-XX:+DisableExplicitGC";
     // Also from KnightLauncher. SK holds textures/models behind soft references and
     // the default (1000 ms per MB of free heap) retains them far too long for a phone.
     margv[++margc] = "-XX:SoftRefLRUPolicyMSPerMB=10";
@@ -350,26 +343,30 @@ JNIEXPORT void JNICALL Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeSteam
     // so frenchpress doesn't crash.
 }
 
-JNIEXPORT jstring JNICALL Java_com_skarm_launcher_bootstrap_SkBootstrap_nativePromptDeviceCode(JNIEnv *env,
-                                                                                               jclass clazz,
-                                                                                               jboolean prev_wrong) {
-    NSString *code = [SKNativeBridge promptForDeviceCode:(BOOL)prev_wrong];
-    return (*env)->NewStringUTF(env, code.UTF8String ?: "");
+static NSString *skJString(JNIEnv *env, jstring s) {
+    if (s == NULL)
+        return @"";
+    const char *c = (*env)->GetStringUTFChars(env, s, NULL);
+    if (c == NULL)
+        return @"";
+    NSString *ns = [NSString stringWithUTF8String:c] ?: @"";
+    (*env)->ReleaseStringUTFChars(env, s, c);
+    return ns;
 }
 
-JNIEXPORT jstring JNICALL Java_com_skarm_launcher_bootstrap_SkBootstrap_nativePromptEmailCode(JNIEnv *env, jclass clazz,
-                                                                                              jstring email_str,
-                                                                                              jboolean prev_wrong) {
-    NSString *email = @"";
-    if (email_str != NULL) {
-        const char *email_c = (*env)->GetStringUTFChars(env, email_str, NULL);
-        if (email_c != NULL) {
-            email = [NSString stringWithUTF8String:email_c];
-            (*env)->ReleaseStringUTFChars(env, email_str, email_c);
-        }
-    }
-    NSString *code = [SKNativeBridge promptForEmailCode:email prevWrong:(BOOL)prev_wrong];
-    return (*env)->NewStringUTF(env, code.UTF8String ?: "");
+JNIEXPORT void JNICALL Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeShowSignIn(JNIEnv *env, jclass clazz,
+                                                                                      jstring challenge_url,
+                                                                                      jstring qr_modules) {
+    [SKNativeBridge onShowSignIn:skJString(env, challenge_url) modules:skJString(env, qr_modules)];
+}
+
+JNIEXPORT void JNICALL Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeHideSignIn(JNIEnv *env, jclass clazz) {
+    [SKNativeBridge onHideSignIn];
+}
+
+JNIEXPORT jboolean JNICALL Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeSignInCancelled(JNIEnv *env,
+                                                                                                jclass clazz) {
+    return [SKNativeBridge signInCancelled] ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT void JNICALL Java_com_skarm_launcher_bootstrap_SkBootstrap_registerGlfwNatives(JNIEnv *env, jclass clazz,
@@ -446,10 +443,11 @@ static void register_sk_natives(void) {
              (void *)&Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeLaunchStatus},
             {"nativeSteamKeepAlive", "(Z)V",
              (void *)&Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeSteamKeepAlive},
-            {"nativePromptDeviceCode", "(Z)Ljava/lang/String;",
-             (void *)&Java_com_skarm_launcher_bootstrap_SkBootstrap_nativePromptDeviceCode},
-            {"nativePromptEmailCode", "(Ljava/lang/String;Z)Ljava/lang/String;",
-             (void *)&Java_com_skarm_launcher_bootstrap_SkBootstrap_nativePromptEmailCode},
+            {"nativeShowSignIn", "(Ljava/lang/String;Ljava/lang/String;)V",
+             (void *)&Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeShowSignIn},
+            {"nativeHideSignIn", "()V", (void *)&Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeHideSignIn},
+            {"nativeSignInCancelled", "()Z",
+             (void *)&Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeSignInCancelled},
             {"registerGlfwNatives", "(Ljava/lang/Class;)V",
              (void *)&Java_com_skarm_launcher_bootstrap_SkBootstrap_registerGlfwNatives},
         };

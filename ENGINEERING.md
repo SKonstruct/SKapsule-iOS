@@ -10,7 +10,7 @@ Resolved sagas are condensed to their conclusions. Full detail is in git history
 ## Current State
 
 The app boots the bundled JRE 25, runs the real Spiral Knights desktop client through
-gl4es, plays audio and logs in (Web or Steam, including Steam Guard). The runtime is the
+gl4es, plays audio and logs in (Web, or Steam by QR code). The runtime is the
 AngelAuraMC JDK-25 **JIT** build, so on-device runs need JIT: built-in (StikJIT) or the
 StikDebug app, both running `skapsule-jit.js` passed inline.
 
@@ -105,6 +105,13 @@ and the natives (`libjava`, `libjimage`, `libzip`, …) live in `jre25/lib`, `co
   `raw.githubusercontent.com` over HTTPS) before being moved into place. The listing's
   `main` branch is trusted, not pinned. A sync only deletes files an earlier sync wrote
   (`mod_sync_files`); the user's own mods are never removed.
+- **Apply order is automatic, never chosen** (`Natives/SKModOrder.{h,m}`, Foundation only). A later mod
+  wins a clash, and `contentsOfDirectoryAtPath:` has no defined order, so apply sorts: the mods that write
+  the most files first, equal ones by name (ignoring case, then exact), so a small, targeted mod wins over a
+  broad one. A mod's weight is the files it writes: no directories, `mod.json`/`mod.png`, protected files or
+  paths that leave the root; a modpack is the sum of its top-level inner `.zip` mods; an unreadable mod is 0.
+  This is SKradle's "optimal" order (`core::mods::list`) and Android's `ModsOrder.kt`: keep the three in
+  step. `SKModOrderTests.m` and Android's `ModsOrderTest.kt` run the same cases.
 - **Apply fails closed:** if a jar cannot be rebuilt or swapped, the code jars stay as the
   restored originals and the user gets the error. Apply and remove run under a background
   task (about 30 s of grace if the app is backgrounded).
@@ -182,6 +189,11 @@ path passes the script inline too (`script-data`, base64url).
   to report progress or iOS ends it.
 - **Method is Automatic by default** (StikDebug app if installed, else built-in), never switched
   after a failure.
+- **StikJIT is pinned at upstream 2.0 (`a9ccad9`)**, which has its own `_remotepairing._tcp` port discovery
+  (`automaticallyDiscoverRSDPort`, on only when the port is the default 49152). Ours (`RSDPortResolver.swift`) still
+  passes the port it found, so upstream's never runs; keep it unless upstream's proves better on a device. Its
+  script rule is unchanged: on a TXM device our inline script runs, without one it attaches only. The patch applied
+  cleanly and the framework and helper build; none of it has run on a device.
 - None of the patch, port lookup, advice or on-device pairing has run on a device yet.
 
 **The JIT badge has one blind spot.** `isJITEnabled` on a TXM device checks `CS_DEBUGGED`
@@ -200,6 +212,49 @@ without the following `[JIT26] mapping at RW=…, RX=…`) and says so in an ale
 trap. A second executable reservation later in a session would hit the same dead trap;
 that is why the code cache must stay large enough (`-XX:ReservedCodeCacheSize`) that HotSpot
 never needs one.
+
+### Graphics pass — `external/skgfx/mobile/skgfx.c`
+
+The FPS counter, sharpening (CAS) and Sharp HUD, ported from KnightLauncherPlus's `skgfx`. **`skgfx.c` and
+`skgfx.h` come from the `external/skgfx` submodule (single source: SKonstruct/skgfx, MIT), shared with SKapsule
+(Android):** change them in that repo and bump the pointer here. `Natives/CMakeLists.txt` and `project.yml` (then
+`xcodegen generate`) point at `external/skgfx/mobile`. The decisions and
+settings are in `SKGfxSettings.h` (Android: `GfxSettings.kt`), tested by `make test`.
+
+- **Redirect:** gl4es maps the game's framebuffer 0 to `glstate->fbo.mainfbo_fbo`. The gl4es fork exports
+  `gl4es_skgfx_set_main_framebuffer()` and a hook table (`gl4es_skgfx_hooks`: ortho, draw, viewport,
+  scissor, blendfunc), all NULL unless set. The game draws into our scene target; `skgfx_present(gFramebuffer, …)`
+  puts it on the window (CAS when asked) just before `presentRenderbuffer`. These patches are ours only: do not
+  offer them upstream. **A device's `out/gl4es` must be rebuilt (`scripts/build-gl4es-ios.sh`) to carry them:**
+  with the old library the pass logs "no graphics hooks" and stays off. The dylib exports only `gl4es_`-prefixed
+  entry points, so the module looks those up first.
+- **Offscreen path** is on when sharpening > 0 or (Sharp HUD and scale < 1); otherwise the layer is
+  `contentsScale`-scaled as before. On it the layer stays native-sized and the pass scales.
+- **What the game believes its size is** (`skgfx_believed_size`; `SKGfxGameSize`, which also scales touches): the
+  scene size, or with Sharp HUD the full drawable (the game lays out and rasterises text at full size; its viewport
+  and scissor are scaled down for the scene). Changes reach the game as a framebuffer-size event
+  (`push_size_if_changed` in `glfw_ios.m`), so they apply live.
+- **GL discipline:** anything gl4es tracks changes through its own entry points; everything else is saved and
+  restored exactly. `apply_pending_resize` rebinds framebuffers behind gl4es's back, so `skgfx_after_swap`
+  re-asserts the game's framebuffer every frame. No GL text: the counter is a `UIView`. Fails open.
+- **Sharp HUD start** is the first full-window `glOrtho` after 20 depth-tested draws (as KLP). Not supported: MSAA on
+  the layer, a game screenshot taken while the HUD is drawn.
+- **Verified** (iOS 27.0 simulator, login screen): counter shows and hides; sharpening engages with the scene at
+  60% inside the native drawable; Sharp HUD starts after 25 draws with a crisp, smaller HUD over a soft scene;
+  leaving and re-entering the app keeps all of it. **Sim-only / not measured:** real-device fps and GPU time
+  (`SKGFX_TIME=1` in the environment logs the pass's GPU ms every 120 frames; the simulator's ~4 fps says nothing),
+  thermals, in-world Sharp HUD (needs a login), a device run at all. The simulator's login scene shows opaque
+  black shards with or without this pass (same with the pre-merge gl4es), so that is the simulator, not a regression.
+
+### JVM flags — `Natives/JavaLauncher.m`
+
+Checked against KnightLauncher's "Load recommended settings" (G1, `-XX:+DisableExplicitGC`, 2048 MB on
+a desktop). We keep **SerialGC**, not G1: G1 crashed this JRE entering Haven (SIGSEGV in
+`G1CodeRootSetHashTable::bulk_remove`, only reachable under G1). `-XX:+DisableExplicitGC` and
+`-XX:SoftRefLRUPolicyMSPerMB=10` match KnightLauncher; the first matters more here, because an explicit
+`System.gc()` under SerialGC is a full stop-the-world collection. The heap cap defaults to **1024 MB**
+(`SK_RAM_DEFAULT_MB`), with `-Xms128M`: it is a ceiling, not a commitment. Android's JVM picks G1 by
+ergonomics (`gc.log` says `Using G1`), so there the same recommendation holds with no flag.
 
 ### gl4es
 
@@ -254,6 +309,50 @@ The file lands at `home/.userPrefs/.java/.userPrefs/projectx/prefs.xml` (the JDK
 `FileSystemPreferences` appends `.java/.userPrefs` itself). Every component is a dotfile,
 which is why `home/` **looks** empty in Files.app; it is visible over USB in Finder.
 
+### Simulator
+
+`make sim-run` builds, installs and runs the app in the iOS Simulator with no device, signing
+profile or JIT helper (`scripts/sim/`, after Wintur's `docs/SIM-LOOP.md`). It uses its own `build/sim`
+and `out/sim`; no device target is involved.
+
+- **`build-libs.sh`** rebuilds gl4es, openal-soft and the pairing library against the
+  iphonesimulator SDK with the device scripts themselves (`SDKPATH`, `OUT_DIR`, `RP_TARGET`
+  overrides) into `out/sim`.
+- **`build.sh`** compiles the app with CMake for the simulator, stages the JRE from the assets zip into
+  `out/sim/jre25` with the same layout and trimming as `METHOD_STAGE_JRE` (**keep the two in step**),
+  and stages the device build's jars. The JRE and the LWJGL natives are the device builds with only
+  their Mach-O platform retagged (`vtool -set-build-version iossim`): the arm64 code is the same and
+  dyld in a simulator refuses an iOS-platform image. Everything is signed ad hoc, with no entitlements;
+  there is no `SKJITHelper.appex` and no StikJIT. It puts `Natives/config.h` back afterwards (CMake
+  writes it into the source tree, where Xcode also reads it).
+- **`run.sh`** boots `SK_SIM_DEVICE` (default iPhone 18 Pro Max), installs over the existing app (the
+  downloaded game survives; `--fresh` forgets it), launches, taps Launch with idb (`idb_companion`
+  required) and waits for `[NativeBridge] renderReady`. `build/sim/runs/<time>/` gets the screenshots
+  (`launcher.png`, `game.png`), `latestlog.txt`, `vmlog-*.log`, any `hs_err`/crash report and a summary.
+  Exit 0 means: launcher UI up, game rendered, no crash.
+
+**Verified** (iPhone 18 Pro Max, iOS 27.0, from a fresh install): the launcher UI, the JIT JRE booting,
+getdown downloading the game, and the logon window rendering through gl4es. The VM creates its mirror-mapped
+code cache in-process (`[JIT26] mapping at RW=…, RX=…`) and the code cache fills (3 to 8 MB in use), so
+HotSpot compiles: the macOS kernel grants executable memory with no debugger and no `brk #0x69`.
+
+**Sim-only** (what passes only because of an accommodation; `TARGET_OS_SIMULATOR` in `utils.m`, compiled
+out of the device build):
+
+- `DeviceGetJITFlags()` is 0, so `DeviceHasTXM()` (which libjvm `dlsym`s) says no TXM and no mirrored
+  mapping; `isJITEnabled()` is YES, so the pill is green and a launch never waits for a debugger.
+- The JRE and LWJGL natives are retagged device builds, not rebuilt. GL ES is Apple's simulator
+  implementation, not the device GPU (`default FBO binding: 1`).
+- `os_proc_available_memory` is 0 in the `[mem]` lines.
+- The log shows `MacContextUpdate install failed` (`NoSuchMethodError` on `GLFW.getLibrary`) from the
+  game's Mac-only path; not compared with a device log.
+
+The simulator is a testbed for boot, UI, input and layout. It is **not** one for what depends on the
+device: the StikJIT attach, `SKJITHelper.appex`, pairing and LocalDevVPN, the SIGTRAP guard and the
+`brk #0x69` path (TXM), jetsam and memory pressure, thermal throttling, Metal/gl4es performance, or Game
+Mode. Call a result "sim-only" when it rests on a simulator accommodation. The repo's `.claude/skills/`
+carry the simulator-driving skills (`skapsule-simulator` says how they apply here).
+
 ### Footguns
 
 - **The `[Pre-Init] Commit:` line goes stale.** `Natives/config.h` is generated by
@@ -305,6 +404,17 @@ usually belongs in the other.
   Every appearance change re-asserts `sk_gamepad_set_virtual_active(controlsEnabled)`, or a
   latched `Strafe` toggle has no reset path. Right stick presses axis 5 and holds the last
   aim direction 200 ms on release. **Deadzone applies to physical sticks only.**
+- `Natives/SKLayoutShare.{h,m}` (Foundation only): the layout **export/import format** and the preset
+  store, a port of Android's `touch/TouchLayoutShare.kt` + `TouchLayoutPresets.kt`. An export from either
+  app must import on the other, so the two must accept and refuse the same files. The file is
+  `{format:"skapsule-controls", version:1 (an integer), name, globalOpacity, actionBarVisible, nodes:[{id,
+  xPercent, yPercent, scale, visible}]}`. Only the arrangement is shared (not `renderScale` or
+  `controlsEnabled`), and a file is untrusted: size capped at 64 KB, at most 64 nodes, finite numbers clamped
+  to the editor's own ranges, a repeated known id refused, unknown ids ignored, and any structural error
+  refuses the whole file. `-[SKTouchLayout applySharedLayout:]` lays the values over the app's own nodes by id,
+  so a file can move controls but never change what they send. `Natives/Tests/SKLayoutShareTests.m`
+  (`make test`) and Android's `TouchLayoutShareTest.kt` parse the same two fixtures, one written by each app
+  (`Natives/Tests/fixtures/`, copied to Android's `src/test/resources/`); keep them identical.
 - `Natives/SKKeyboardBridge.{h,m}`: offscreen `UIKeyInput` first responder.
 - **Touch routing differs by necessity.** iOS relies on UIKit hit testing: each control is
   a real subview with its own `UITouch`, and the overlay's `hitTest:` returns nil in the
@@ -342,8 +452,25 @@ usually belongs in the other.
 - **AWT / Java2D.** `awt_stubs.c` replaces `libawt_headless.dylib`; its exported symbol set
   had to be exact: over-stubbing shadowed real rendering-loop registration, under-stubbing
   produced `UnsatisfiedLinkError` on platform-backend `initIDs`.
-- **Steam login.** A self-deadlock in `showSteamGuardPromptWithTitle:` (nested
-  `dispatch_async(main_queue)` behind a main-queue semaphore wait) was fixed.
+- **Steam login.** No username or password reaches the app: frenchpress starts a QR sign-in and the
+  user approves it in the Steam mobile app; only the resulting refresh token is stored. The JVM talks
+  to the UI through three `SkBootstrap` natives (`JavaLauncher.m`, `NativeBridge.m`). The sign-in runs
+  first, in `SkBootstrap.signInToSteam`, before the updater and the game: it uses a loader of its own,
+  stores the token and disconnects, and the game's frenchpress then signs in from the token. It is
+  skipped when a token file exists, and a cancel sets `frenchpress.signInDeclined` so the game does not
+  ask again. That sign-in is shown in portrait: `GameViewController` reports portrait while
+  `signInInPortrait` is set (Steam, no token file), and the hide handler, which SkBootstrap fires once
+  more when the phase is over, turns the screen landscape. The JVM is always given landscape
+  dimensions, and the drawable is resized after the turn (rebuilt on the main thread while the render
+  thread has not yet taken the context, else by the render thread). The natives:
+  `nativeShowSignIn(url, modules)` and `nativeHideSignIn()` never block (the QR is drawn by
+  `GameViewController` from the module grid, updated in place when Steam rotates the challenge), and
+  `nativeSignInCancelled()` is polled by the JVM, so a Cancel needs no parked thread. A sign-in with no
+  handler registered reports itself cancelled rather than waiting. A background task is held while the
+  QR is up, because the Steam app takes the foreground; it lasts seconds, so frenchpress restarts the
+  challenge if the connection dies. **Open Steam app** opens the challenge URL as a universal link
+  (`UniversalLinksOnly`), which fails visibly instead of opening a web page. Untested on a device: that
+  the Steam app accepts the link, and that a sign-in survives the app switch.
 - **Input bridge.** Touch, on-screen controls, gamepad and keyboard/mouse all feed two shared
   native structures, a 4-int-record event ring buffer and a GLFW standard-layout gamepad
   mailbox, so SK never knows which producer it is hearing. Wire protocol is in
@@ -358,6 +485,7 @@ make native                      # CMake build of the native app (builds the Rus
 make test                        # host-side tests (zip parsing, mouse buttons)
 ./scripts/build-gl4es-ios.sh     # -> out/gl4es/libgl4es.dylib
 make package                     # -> .ipa in out/artifacts/
+make sim-run                     # build + run in the iOS Simulator (scripts/sim/; SIM_ARGS=--fresh|--launcher-only)
 ```
 
 Deploy to device via Xcode; the post-build phase re-runs `make xcode-payload`. Adding a
