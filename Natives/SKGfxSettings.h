@@ -14,6 +14,15 @@ static inline void SKGfxSetShowFps(BOOL on) {
     [NSUserDefaults.standardUserDefaults setBool:on forKey:@"gfx_show_fps"];
 }
 
+/// The game's mouse cursor drawn on screen (off by default): a touch screen has no pointer to see.
+static inline BOOL SKShowMouseCursor(void) {
+    return [NSUserDefaults.standardUserDefaults boolForKey:@"show_mouse_cursor"];
+}
+
+static inline void SKSetShowMouseCursor(BOOL on) {
+    [NSUserDefaults.standardUserDefaults setBool:on forKey:@"show_mouse_cursor"];
+}
+
 static inline int SKGfxSharpenPercent(void) {
     NSInteger value = [NSUserDefaults.standardUserDefaults integerForKey:@"gfx_sharpen_percent"];
     return value < 0 ? 0 : (value > 100 ? 100 : (int)value);

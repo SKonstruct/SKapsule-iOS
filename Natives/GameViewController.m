@@ -278,6 +278,10 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
 @property (nonatomic, assign) BOOL gfxOffscreen;          // the offscreen pass is on (see SKGfxSettings.h)
 @property (nonatomic, strong) UIView *fpsPill;
 @property (nonatomic, strong) UILabel *fpsLabel;
+/// The mouse cursor drawn over the game (a setting, off by default) and where the game last saw it.
+@property (nonatomic, strong) UIImageView *cursorView;
+@property (nonatomic, assign) CGPoint cursorPoint;
+@property (nonatomic, assign) BOOL cursorSeen;
 @property (nonatomic, strong) NSTimer *fpsTimer;
 @property (nonatomic, assign) uint64_t fpsLastFrames;
 @property (nonatomic, assign) NSTimeInterval fpsLastTime;
@@ -361,8 +365,6 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
     self.layoutLibrary = [[SKLayoutLibrary alloc] initWithPresenter:self overlay:self.touchControls];
     __weak typeof(self) weakLibraryOwner = self;
     self.touchControls.layoutLibraryHandler = ^{ [weakLibraryOwner.layoutLibrary show]; };
-    // The tab strip's Close does what the gear's second tap does, so the gear icon follows.
-    self.touchControls.closeRequestHandler = ^{ [weakLibraryOwner onToggleEditLayout]; };
 
     self.keyboardBridge = [[SKKeyboardBridge alloc] initWithFrame:CGRectZero];
     [self.view addSubview:self.keyboardBridge];
@@ -632,6 +634,9 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
 }
 
 - (void)pushCursorAtPoint:(CGPoint)point {
+    self.cursorPoint = point;
+    self.cursorSeen = YES;
+    [self placeCursorView];
     CGFloat scale = [self pointToPixelScale];
     sk_input_push_cursor((int)lround(point.x * scale), (int)lround(point.y * scale));
 }
@@ -1380,6 +1385,34 @@ static const CGFloat kChromeButtonGap = 8.0f;
 
 - (void)touchOverlay:(SKTouchControlOverlay *)overlay didChangeFpsVisible:(BOOL)visible {
     [self setFpsVisible:visible];
+}
+
+- (void)touchOverlay:(SKTouchControlOverlay *)overlay didChangeCursorVisible:(BOOL)visible {
+    [self placeCursorView];
+}
+
+#pragma mark Mouse cursor
+
+/// An arrow whose tip sits on the point the game sees as the cursor. Hidden until the setting is on and the game
+/// has had a pointer position; it never takes touches.
+- (void)placeCursorView {
+    if (!self.cursorView) {
+        UIImage *arrow = [UIImage systemImageNamed:@"cursorarrow"
+                                 withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:26 weight:UIImageSymbolWeightRegular]];
+        self.cursorView = [[UIImageView alloc] initWithImage:[arrow imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate]];
+        self.cursorView.tintColor = UIColor.whiteColor;
+        self.cursorView.layer.shadowColor = UIColor.blackColor.CGColor;
+        self.cursorView.layer.shadowOpacity = 0.8;
+        self.cursorView.layer.shadowRadius = 1.5;
+        self.cursorView.layer.shadowOffset = CGSizeZero;
+        self.cursorView.userInteractionEnabled = NO;
+        self.cursorView.isAccessibilityElement = NO;
+        [self.view addSubview:self.cursorView];
+    }
+    self.cursorView.hidden = !(SKShowMouseCursor() && self.cursorSeen);
+    CGPoint tip = [self.surfaceView convertPoint:self.cursorPoint toView:self.view];
+    self.cursorView.frame = CGRectMake(tip.x - 3, tip.y - 2, self.cursorView.bounds.size.width, self.cursorView.bounds.size.height);
+    [self.view bringSubviewToFront:self.cursorView];
 }
 
 #pragma mark FPS counter

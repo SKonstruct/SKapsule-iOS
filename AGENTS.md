@@ -58,6 +58,7 @@ Natives/               iOS app (Objective-C) + CMake build
   SKInstaller.*        runtime extraction + installation check
   SKZipUtils.*         zip read/write (central directory), git blob SHA
   SKModManager.*       modpack download, apply and remove
+  SKModSync.h          when mods apply by themselves (header-only, tested by `make test`; same rule as Android's ModsSync.kt)
   SKModOrder.*         automatic apply order for mods (Foundation only; same rule as Android's ModsOrder.kt)
   SKServers.*          custom servers: saved list, validation, config.jar connection edit (Foundation only, host-tested)
   SKNewsFeed.*         home-screen news card feed (KnightLauncher's Flamingo service)

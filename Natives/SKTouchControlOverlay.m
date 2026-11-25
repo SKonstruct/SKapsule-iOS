@@ -349,10 +349,10 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
     UIButton *_layoutsButton;
     UIStackView *_panelStack;
     UISwitch *_fpsSwitch;
+    UISwitch *_cursorSwitch;
     UISlider *_sharpenSlider;
     UILabel *_sharpenLabel;
     UISwitch *_hudSwitch;
-    UILabel *_gfxHint;
     UIView *_nodeSection;
     UILabel *_nodeTitle;
     UISwitch *_visibleSwitch;
@@ -426,7 +426,7 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
     }
 
     // The tab strip sits at the top centre; everything else keeps clear of it.
-    CGFloat tabsWidth = MIN(_tabs.numberOfSegments >= 3 ? 300.0f : 210.0f, width - 180.0f);
+    CGFloat tabsWidth = MIN(210.0f, width - 180.0f);
     _tabs.frame = CGRectMake((width - tabsWidth) * 0.5f, 10, tabsWidth, 32);
     CGFloat top = CGRectGetMaxY(_tabs.frame) + 10;
 
@@ -547,25 +547,7 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
     [self setNeedsLayout];
 }
 
-- (void)setCloseTabHidden:(BOOL)closeTabHidden {
-    _closeTabHidden = closeTabHidden;
-    BOOL hasClose = _tabs.numberOfSegments >= 3;
-    if (closeTabHidden && hasClose) {
-        [_tabs removeSegmentAtIndex:2 animated:NO];
-    } else if (!closeTabHidden && !hasClose) {
-        [_tabs insertSegmentWithTitle:NSLocalizedString(@"Close", nil) atIndex:2 animated:NO];
-    }
-    _tabs.selectedSegmentIndex = _page;
-    [self setNeedsLayout];
-}
-
 - (void)onTabChanged {
-    if (_tabs.selectedSegmentIndex == 2) {
-        _tabs.selectedSegmentIndex = _page;  // Close is a button, not a page
-        if (self.closeRequestHandler) self.closeRequestHandler();
-        else if (self.editing) [self toggleEditMode];
-        return;
-    }
     [self showPage:_tabs.selectedSegmentIndex];
 }
 
@@ -686,6 +668,11 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
     _fpsSwitch.on = SKGfxShowFps();
     [_fpsSwitch addTarget:self action:@selector(onFpsChanged) forControlEvents:UIControlEventValueChanged];
 
+    _cursorSwitch = [UISwitch new];
+    _cursorSwitch.onTintColor = SKThemeColor();
+    _cursorSwitch.on = SKShowMouseCursor();
+    [_cursorSwitch addTarget:self action:@selector(onCursorChanged) forControlEvents:UIControlEventValueChanged];
+
     _sharpenLabel = [self panelLabel:@""];
     _sharpenSlider = [UISlider new];
     _sharpenSlider.minimumTrackTintColor = SKThemeColor();
@@ -709,10 +696,6 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
     _hudSwitch.on = SKGfxSharpHud();
     [_hudSwitch addTarget:self action:@selector(onHudChanged) forControlEvents:UIControlEventValueChanged];
 
-    _gfxHint = [self panelLabel:@""];
-    _gfxHint.font = [UIFont systemFontOfSize:12];
-    _gfxHint.textColor = [UIColor colorWithWhite:1 alpha:0.7];
-    _gfxHint.numberOfLines = 0;
     [self refreshGfxPanel];
 
     // Layout library: presets, export, import. The host provides it (it presents the file
@@ -764,14 +747,10 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
     _floatRightSwitch = [UISwitch new];
     _floatRightSwitch.onTintColor = SKThemeColor();
     [_floatRightSwitch addTarget:self action:@selector(onFloatChanged:) forControlEvents:UIControlEventValueChanged];
-    UILabel *floatHint = [self panelLabel:NSLocalizedString(@"A floating stick appears where your thumb lands and follows it.", nil)];
-    floatHint.font = [UIFont systemFontOfSize:12];
-    floatHint.textColor = [UIColor colorWithWhite:1 alpha:0.7];
-    floatHint.numberOfLines = 0;
     [self syncFloatSwitches];
 
     _tabs = [[UISegmentedControl alloc] initWithItems:@[
-        NSLocalizedString(@"Edit", nil), NSLocalizedString(@"Settings", nil), NSLocalizedString(@"Close", nil)]];
+        NSLocalizedString(@"Edit", nil), NSLocalizedString(@"Settings", nil)]];
     _tabs.selectedSegmentIndex = 0;
     _tabs.selectedSegmentTintColor = SKThemeColor();
     [_tabs setTitleTextAttributes:@{NSForegroundColorAttributeName : UIColor.whiteColor} forState:UIControlStateNormal];
@@ -787,13 +766,12 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
         [self rowWithLabel:@"Opacity" control:_opacitySlider],
         [self rowWithLabel:@"Resolution" control:_resolutionSlider],
         [self rowWithLabel:@"Show FPS counter" control:_fpsSwitch],
+        [self rowWithLabel:NSLocalizedString(@"Show mouse cursor", nil) control:_cursorSwitch],
         _sharpenLabel,
         sharpenRow,
         [self rowWithLabel:@"Sharp HUD (experimental)" control:_hudSwitch],
-        _gfxHint,
         [self rowWithLabel:NSLocalizedString(@"Floating left stick", nil) control:_floatLeftSwitch],
         [self rowWithLabel:NSLocalizedString(@"Floating right stick", nil) control:_floatRightSwitch],
-        floatHint,
         _layoutsButton,
         _resetButton,
     ]];
@@ -871,10 +849,6 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
     BOOL applies = SKGfxSharpHudApplies(scale);
     _hudSwitch.enabled = applies;
     _hudSwitch.alpha = applies ? 1.0f : 0.4f;
-    _gfxHint.text = [@"Sharpening and Sharp HUD draw the game off-screen first.\n"
-        stringByAppendingString:applies
-            ? @"Sharp HUD draws the HUD at full resolution, so it gets smaller: raise the game's UI scale to compensate."
-            : @"Sharp HUD needs Resolution below 100%."];
 }
 
 - (void)gfxChanged {
@@ -886,6 +860,12 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
     SKGfxSetShowFps(_fpsSwitch.on);
     if ([self.delegate respondsToSelector:@selector(touchOverlay:didChangeFpsVisible:)])
         [self.delegate touchOverlay:self didChangeFpsVisible:_fpsSwitch.on];
+}
+
+- (void)onCursorChanged {
+    SKSetShowMouseCursor(_cursorSwitch.on);
+    if ([self.delegate respondsToSelector:@selector(touchOverlay:didChangeCursorVisible:)])
+        [self.delegate touchOverlay:self didChangeCursorVisible:_cursorSwitch.on];
 }
 
 - (void)onSharpenMoved {

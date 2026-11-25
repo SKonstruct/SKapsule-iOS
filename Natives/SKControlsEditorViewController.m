@@ -38,8 +38,6 @@
     // No delegate: its one method reports a render-scale change to the live GL surface,
     // and there isn't one. The scale is still persisted by the overlay itself.
     self.overlay = [[SKTouchControlOverlay alloc] initWithFrame:CGRectZero];
-    // The Done button below leaves the editor, so the tab strip needs no Close.
-    self.overlay.closeTabHidden = YES;
     [self.view addSubview:self.overlay];
 
     // The handler is what reveals the panel's "Layouts…" button.

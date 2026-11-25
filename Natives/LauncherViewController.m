@@ -59,16 +59,19 @@ static const float kPlayerEstimateMult = 1.4f;
 // Sidebar & Dimming Overlay
 @property (nonatomic, strong) UIView *dimmingView;
 @property (nonatomic, strong) UIButton *downloadModsButton;
+@property (nonatomic, assign) BOOL modSyncRunning;
+/// The mods folder state a sync failed on, so it is reported once, not again on every return to the launcher.
+@property (nonatomic, copy) NSString *modSyncFailedKey;
 @property (nonatomic, strong) UIView *sidebarView;
 @property (nonatomic, strong) NSLayoutConstraint *sidebarTrailingConstraint;
 @property (nonatomic, strong) UIButton *btnLogout;
 @property (nonatomic, strong) UIView *logoutDivider;
 @property (nonatomic, strong) UISwitch *avoidEdgesSwitch;
 @property (nonatomic, strong) UISwitch *fpsSwitch;
+@property (nonatomic, strong) UISwitch *cursorSwitch;
 @property (nonatomic, strong) UILabel *sharpenLabel;
 @property (nonatomic, strong) UISlider *sharpenSlider;
 @property (nonatomic, strong) UISwitch *sharpHudSwitch;
-@property (nonatomic, strong) UILabel *gfxHintLabel;
 @property (nonatomic, strong) UISwitch *crashReportSwitch;
 @property (nonatomic, strong) UIButton *ramMinusButton;
 @property (nonatomic, strong) UIButton *ramPlusButton;
@@ -339,6 +342,8 @@ static const float kPlayerEstimateMult = 1.4f;
     // Scrollable Stack for Sidebar
     UIScrollView *scrollView = [[UIScrollView alloc] init];
     scrollView.translatesAutoresizingMaskIntoConstraints = NO;
+    // Runs to the screen's bottom edge: no safe-area inset or padding under the last row.
+    scrollView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
     [self.sidebarView addSubview:scrollView];
 
     UIStackView *stackView = [[UIStackView alloc] init];
@@ -380,15 +385,11 @@ static const float kPlayerEstimateMult = 1.4f;
         }];
     }
 
-    UIButton *btnApplyMods = [self createSidebarButtonWithTitle:NSLocalizedString(@"Apply Mods", nil)
-                                                       iconName:@"hammer"
-                                                         action:@selector(onApplyMods)];
-    [stackView addArrangedSubview:btnApplyMods];
-
-    UIButton *btnRemoveMods = [self createSidebarButtonWithTitle:NSLocalizedString(@"Remove Mods", nil)
-                                                        iconName:@"trash"
-                                                          action:@selector(onRemoveMods)];
-    [stackView addArrangedSubview:btnRemoveMods];
+    // No Apply button: the mods are applied by themselves when the folder changes (syncModsIfNeeded).
+    UIButton *btnResetGame = [self createSidebarButtonWithTitle:NSLocalizedString(@"Reset Game Files", nil)
+                                                       iconName:@"trash"
+                                                         action:@selector(onResetGameFiles)];
+    [stackView addArrangedSubview:btnResetGame];
 
     UIButton *btnOpenFolder = [self createSidebarButtonWithTitle:NSLocalizedString(@"Open Folder", nil)
                                                         iconName:@"folder"
@@ -528,6 +529,12 @@ static const float kPlayerEstimateMult = 1.4f;
                                                        switchView:self.fpsSwitch
                                                         tintColor:themeColor]];
 
+    self.cursorSwitch = [[UISwitch alloc] init];
+    [self.cursorSwitch addTarget:self action:@selector(onCursorChanged:) forControlEvents:UIControlEventValueChanged];
+    [stackView addArrangedSubview:[self sidebarSwitchRowWithTitle:NSLocalizedString(@"Show mouse cursor", nil)
+                                                       switchView:self.cursorSwitch
+                                                        tintColor:themeColor]];
+
     self.sharpenLabel = [[UILabel alloc] init];
     self.sharpenLabel.textColor = UIColor.whiteColor;
     self.sharpenLabel.font = [UIFont systemFontOfSize:14];
@@ -550,11 +557,6 @@ static const float kPlayerEstimateMult = 1.4f;
                                                        switchView:self.sharpHudSwitch
                                                         tintColor:themeColor]];
 
-    self.gfxHintLabel = [[UILabel alloc] init];
-    self.gfxHintLabel.textColor = [UIColor colorWithWhite:0.67 alpha:1.0];
-    self.gfxHintLabel.font = [UIFont systemFontOfSize:12];
-    self.gfxHintLabel.numberOfLines = 0;
-    [stackView addArrangedSubview:self.gfxHintLabel];
     [self refreshGraphicsSettings];
 
     // Crash reporting row
@@ -580,13 +582,6 @@ static const float kPlayerEstimateMult = 1.4f;
     [crashRow addSubview:self.crashReportSwitch];
     [stackView addArrangedSubview:crashRow];
 
-    UILabel *crashNote = [[UILabel alloc] init];
-    crashNote.text = NSLocalizedString(@"Anonymous: device model, iOS version, app build and JVM crash logs.", nil);
-    crashNote.textColor = [UIColor colorWithWhite:0.67 alpha:1.0];
-    crashNote.font = [UIFont systemFontOfSize:12];
-    crashNote.numberOfLines = 0;
-    crashNote.translatesAutoresizingMaskIntoConstraints = NO;
-    [stackView addArrangedSubview:crashNote];
 
     // Layout Constraints
     self.sidebarTrailingConstraint = [self.sidebarView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor
@@ -693,7 +688,7 @@ static const float kPlayerEstimateMult = 1.4f;
         [scrollView.leadingAnchor constraintEqualToAnchor:self.sidebarView.leadingAnchor constant:16],
         [scrollView.trailingAnchor constraintEqualToAnchor:self.sidebarView.trailingAnchor constant:-16],
         [scrollView.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:16],
-        [scrollView.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor constant:-16],
+        [scrollView.bottomAnchor constraintEqualToAnchor:self.sidebarView.bottomAnchor],
 
         // Stack view constraints inside scroll view
         [stackView.leadingAnchor constraintEqualToAnchor:scrollView.leadingAnchor],
@@ -765,6 +760,11 @@ static const float kPlayerEstimateMult = 1.4f;
                                            selector:@selector(refreshJITStatus)
                                                name:UIApplicationDidBecomeActiveNotification
                                              object:nil];
+    // Files app edits the mods folder while we are in the background.
+    [NSNotificationCenter.defaultCenter addObserver:self
+                                           selector:@selector(syncModsIfNeeded)
+                                               name:UIApplicationDidBecomeActiveNotification
+                                             object:nil];
     [self refreshJITStatus];
 }
 
@@ -794,6 +794,7 @@ static const float kPlayerEstimateMult = 1.4f;
     // In viewDidAppear, not viewWillAppear: the window scene is nil until the view
     // is actually in a window, and the scene is what performs the rotation.
     [self enforcePortraitOrientation];
+    [self syncModsIfNeeded];
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -973,6 +974,7 @@ static const float kPlayerEstimateMult = 1.4f;
 /// The in-game panel changes the same settings, so they are read again whenever the launcher appears.
 - (void)refreshGraphicsSettings {
     self.fpsSwitch.on = SKGfxShowFps();
+    self.cursorSwitch.on = SKShowMouseCursor();
     int sharpen = SKGfxSharpenPercent();
     self.sharpenSlider.value = sharpen;
     [self updateSharpenLabel:sharpen];
@@ -981,10 +983,6 @@ static const float kPlayerEstimateMult = 1.4f;
     BOOL applies = SKGfxSharpHudApplies((float)[SKTouchLayout loadLayout].renderScale);
     self.sharpHudSwitch.enabled = applies;
     self.sharpHudSwitch.alpha = applies ? 1.0 : 0.4;
-    self.gfxHintLabel.text = [NSString
-        stringWithFormat:@"%@\n%@", NSLocalizedString(@"Sharpening and Sharp HUD draw the game off-screen first.", nil),
-                         applies ? NSLocalizedString(@"Sharp HUD draws the HUD at full resolution, so it gets smaller: raise the game's UI scale to compensate.", nil)
-                                 : NSLocalizedString(@"Sharp HUD needs Resolution below 100%.", nil)];
 }
 
 - (void)updateSharpenLabel:(int)percent {
@@ -994,6 +992,10 @@ static const float kPlayerEstimateMult = 1.4f;
 
 - (void)onFpsChanged:(UISwitch *)sender {
     SKGfxSetShowFps(sender.on);
+}
+
+- (void)onCursorChanged:(UISwitch *)sender {
+    SKSetShowMouseCursor(sender.on);
 }
 
 - (void)onSharpenSliding:(UISlider *)sender {
@@ -1981,7 +1983,16 @@ static int SKCompareVersions(NSString *a, NSString *b) {
                                       completion:^{
                                         if (success) {
                                             [self refreshModpackButton];
-                                            [self showAlertWithTitle:NSLocalizedString(@"Download Modpack", nil) message:summary];
+                                            UIAlertController *done = [UIAlertController
+                                                alertControllerWithTitle:NSLocalizedString(@"Download Modpack", nil)
+                                                                 message:summary
+                                                          preferredStyle:UIAlertControllerStyleAlert];
+                                            [done addAction:[UIAlertAction actionWithTitle:@"OK"
+                                                                                     style:UIAlertActionStyleDefault
+                                                                                   handler:^(UIAlertAction *a) {
+                                                                                     [self syncModsIfNeeded];
+                                                                                   }]];
+                                            [self presentViewController:done animated:YES completion:nil];
                                         } else {
                                             [self showAlertWithTitle:NSLocalizedString(@"Download Failed", nil)
                                                              message:error.localizedDescription];
@@ -1991,46 +2002,65 @@ static int SKCompareVersions(NSString *a, NSString *b) {
         }];
 }
 
-- (void)onApplyMods {
-    UIAlertController *alert = [self createProgressAlertWithTitle:NSLocalizedString(@"Applying Mods", nil)];
+/// Applies or restores the mods by itself when the mods folder or the game changed (SKModSync.h). Quiet when it
+/// works, a progress alert while it runs; warnings and failures say so.
+- (void)syncModsIfNeeded {
+    if (self.modSyncRunning || self.presentedViewController || !self.view.window) return;
+    SKModManager *manager = SKModManager.sharedManager;
+    SKModSyncAction action = manager.pendingSyncAction;
+    NSString *key = manager.syncKey;
+    if (action == SKModSyncNone || [key isEqualToString:self.modSyncFailedKey]) return;
+
+    self.modSyncRunning = YES;
+    [self setButtonsEnabled:NO];
+    BOOL apply = (action == SKModSyncApply);
+    UIAlertController *alert = [self createProgressAlertWithTitle:apply ? NSLocalizedString(@"Applying Mods", nil)
+                                                                        : NSLocalizedString(@"Resetting Game Files", nil)];
     [self presentViewController:alert animated:YES completion:nil];
 
-    [[SKModManager sharedManager]
-        applyModsWithProgress:^(float progress, NSString *status) {
-          dispatch_async(dispatch_get_main_queue(), ^{
-            [self updateProgressAlert:alert progress:progress message:status];
-          });
-        }
-        completion:^(BOOL success, NSString *summary, NSArray *warnings, NSError *error) {
-          dispatch_async(dispatch_get_main_queue(), ^{
-            [alert dismissViewControllerAnimated:YES
-                                      completion:^{
-                                        if (success) {
-                                            NSMutableString *msg = [NSMutableString stringWithString:summary];
-                                            if (warnings.count > 0) {
-                                                [msg appendString:NSLocalizedString(@"\n\nWarnings:\n", nil)];
-                                                for (NSString *warn in warnings) {
-                                                    [msg appendFormat:NSLocalizedString(@"- %@\n", nil), warn];
-                                                }
-                                            }
-                                            [self showAlertWithTitle:NSLocalizedString(@"Operation completed successfully.", nil)
-                                                             message:[msg stringByTrimmingCharactersInSet:
-                                                                              [NSCharacterSet
-                                                                                  whitespaceAndNewlineCharacterSet]]];
-                                        } else {
-                                            if (!(error.code == 8 && [error.domain isEqualToString:@"SKModManagerDomain"]))
-                                                SKReportFailure(@"mods_apply_failed",
-                                                                error.localizedDescription, nil);
-                                            [self showAlertWithTitle:NSLocalizedString(@"Apply Failed", nil)
-                                                             message:error.localizedDescription];
+    void (^progress)(float, NSString *) = ^(float value, NSString *status) {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        [self updateProgressAlert:alert progress:value message:status];
+      });
+    };
+    void (^finish)(BOOL, NSArray<NSString *> *, NSError *) = ^(BOOL success, NSArray<NSString *> *warnings, NSError *error) {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        [alert dismissViewControllerAnimated:YES
+                                  completion:^{
+                                    self.modSyncRunning = NO;
+                                    [self setButtonsEnabled:YES];
+                                    if (success) {
+                                        if (warnings.count > 0) {
+                                            [self showAlertWithTitle:NSLocalizedString(@"Mods applied with warnings", nil)
+                                                             message:[warnings componentsJoinedByString:@"\n"]];
                                         }
-                                      }];
-          });
-        }];
+                                        return;
+                                    }
+                                    self.modSyncFailedKey = key;
+                                    if (!(error.code == 8 && [error.domain isEqualToString:@"SKModManagerDomain"]))
+                                        SKReportFailure(apply ? @"mods_apply_failed" : @"mods_reset_failed",
+                                                        error.localizedDescription, nil);
+                                    [self showAlertWithTitle:apply ? NSLocalizedString(@"Apply Failed", nil)
+                                                                   : NSLocalizedString(@"Reset Failed", nil)
+                                                     message:error.localizedDescription];
+                                  }];
+      });
+    };
+    if (apply) {
+        [manager applyModsWithProgress:progress
+                            completion:^(BOOL ok, NSString *summary, NSArray *warnings, NSError *error) {
+                              finish(ok, warnings, error);
+                            }];
+    } else {
+        [manager removeModsWithProgress:progress
+                             completion:^(BOOL ok, NSString *summary, NSError *error) {
+                               finish(ok, nil, error);
+                             }];
+    }
 }
 
-- (void)onRemoveMods {
-    UIAlertController *alert = [self createProgressAlertWithTitle:NSLocalizedString(@"Removing Mods", nil)];
+- (void)onResetGameFiles {
+    UIAlertController *alert = [self createProgressAlertWithTitle:NSLocalizedString(@"Resetting Game Files", nil)];
     [self presentViewController:alert animated:YES completion:nil];
 
     [[SKModManager sharedManager]
@@ -2047,7 +2077,7 @@ static int SKCompareVersions(NSString *a, NSString *b) {
                                      if (success) {
                                          [self showAlertWithTitle:NSLocalizedString(@"Operation completed successfully.", nil) message:summary];
                                      } else {
-                                         [self showAlertWithTitle:NSLocalizedString(@"Remove Failed", nil) message:error.localizedDescription];
+                                         [self showAlertWithTitle:NSLocalizedString(@"Reset Failed", nil) message:error.localizedDescription];
                                      }
                                    }];
           });

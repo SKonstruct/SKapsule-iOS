@@ -2,6 +2,7 @@
 
 #import <Foundation/Foundation.h>
 #import "SKModPack.h"
+#import "SKModSync.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -38,8 +39,14 @@ NS_ASSUME_NONNULL_BEGIN
                                         NSArray<NSString *> *_Nullable warnings,
                                         NSError *_Nullable error))completionBlock;
 
+/// What the launcher should do by itself now (SKModSync.h): apply after the mods folder changed, restore after every
+/// mod was removed, else nothing. Cheap, reads only file attributes; main thread.
+- (SKModSyncAction)pendingSyncAction;
+/// The fingerprint that decision rests on. The launcher remembers a failed one, so it reports once, not on every return.
+- (NSString *)syncKey;
+
 /**
- Restores the original game files by removing all applied mod overrides.
+ Restores the original game files by removing all applied mod overrides ("Reset Game Files").
  */
 - (void)removeModsWithProgress:(void (^)(float progress, NSString *status))progressBlock
                     completion:

@@ -21,11 +21,9 @@
 
 "Address" = "Aadress";
 
-"Anonymous: device model, iOS version, app build and JVM crash logs." = "Anonüümne: seadme mudel, iOS-i versioon, rakenduse järk ja JVM-i krahhilogid.";
 
 "Apply Failed" = "Rakendamine nurjus";
 
-"Apply Mods" = "Rakenda modid";
 
 "Applying Mods" = "Modide rakendamine";
 
@@ -133,11 +131,8 @@
 
 "Public key (modulus#exponent)" = "Avalik võti (moodul#eksponent)";
 
-"Remove Failed" = "Eemaldamine nurjus";
 
-"Remove Mods" = "Eemalda modid";
 
-"Removing Mods" = "Modide eemaldamine";
 
 "Save" = "Salvesta";
 
@@ -282,20 +277,24 @@
 
 "Sharp HUD (experimental)" = "Terav HUD (eksperimentaalne)";
 
-"Sharpening and Sharp HUD draw the game off-screen first." = "Teravustamine ja terav HUD renderdavad mängu esmalt ekraaniväliselt.";
 
-"Sharp HUD draws the HUD at full resolution, so it gets smaller: raise the game's UI scale to compensate." = "Terav HUD joonistatakse täiseraldusvõimega (muutub väiksemaks): kompenseerimiseks suurenda mängu liidese skaalat.";
 
-"Sharp HUD needs Resolution below 100%." = "Terav HUD vajab eraldusvõimet alla 100%.";
 
 /* Touch editor pages */
 "Edit" = "Muuda";
 
-"Close" = "Sulge";
 
 "Floating left stick" = "Ujuv vasak kang";
 
 "Floating right stick" = "Ujuv parem kang";
 
-"A floating stick appears where your thumb lands and follows it." = "Ujuv kang ilmub kohta, kuhu pöial maandub, ja järgib seda.";
+/* Mods applied by themselves, and the mouse cursor */
+"Reset Game Files" = "Reset Game Files";
 
+"Resetting Game Files" = "Resetting Game Files";
+
+"Reset Failed" = "Reset Failed";
+
+"Mods applied with warnings" = "Mods applied with warnings";
+
+"Show mouse cursor" = "Show mouse cursor";

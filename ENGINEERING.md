@@ -112,6 +112,13 @@ and the natives (`libjava`, `libjimage`, `libzip`, …) live in `jre25/lib`, `co
   paths that leave the root; a modpack is the sum of its top-level inner `.zip` mods; an unreadable mod is 0.
   This is SKradle's "optimal" order (`core::mods::list`) and Android's `ModsOrder.kt`: keep the three in
   step. `SKModOrderTests.m` and Android's `ModsOrderTest.kt` run the same cases.
+- **Mods apply by themselves** (`Natives/SKModSync.h` decides, `SKModManager pendingSyncAction`, run by the launcher on
+  appearing, on becoming active and after a download; same rule and cases as Android's `ModsSync.kt`). Two
+  fingerprints are saved after each apply or reset: the mods folder (name, size, time) and the SHA-1 of the
+  game's `digest2.txt` (changes when the game updates and puts its jars back). Either differing means apply;
+  no mods left but some applied means restore once. The code jars are deliberately not fingerprinted: a private-server
+  choice rewrites `config.jar` after each apply. Reset Game Files saves the current fingerprints, so the folder stays
+  unapplied until it changes. A failed state is reported once per fingerprint.
 - **Apply fails closed:** if a jar cannot be rebuilt or swapped, the code jars stay as the
   restored originals and the user gets the error. Apply and remove run under a background
   task (about 30 s of grace if the app is backgrounded).
@@ -416,8 +423,7 @@ usually belongs in the other.
   so a file can move controls but never change what they send. `Natives/Tests/SKLayoutShareTests.m`
   (`make test`) and Android's `TouchLayoutShareTest.kt` parse the same two fixtures, one written by each app
   (`Natives/Tests/fixtures/`, copied to Android's `src/test/resources/`); keep them identical.
-- **Editor pages and floating sticks.** The overlay's tab strip (Edit | Settings | Close; Close is hidden in the
-  standalone editor, which has Done) switches `_page`: Edit shows the selected control's own dialog, docked by
+- **Editor pages and floating sticks.** The overlay's tab strip (Edit | Settings; the gear closes the editor, the standalone editor has Done) switches `_page`: Edit shows the selected control's own dialog, docked by
   `SKDockPlacement.h` (never over that control or the tab strip/Done, least cover of other controls; same rule and
   cases as Android's `DialogDock.kt`), Settings the full panel with controls shown untouchable. A floating stick
   (`SKControlNode.floating`) is claimed in `hitTest:` only when the touch would otherwise reach the game (buttons

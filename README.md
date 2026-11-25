@@ -138,8 +138,8 @@ and Sharp HUD draw the game off-screen first; Sharp HUD needs Resolution below 1
 the screen's full resolution, so the HUD comes out smaller.
 
 **Mods.** **Download Modpack** in the sidebar fetches the [Spiral Knights Modpack](https://github.com/SirDank/Spiral-Knights-Modpack); you can also put
-your own mods in the `mods` folder (**Open Folder**). **Apply Mods** installs them and
-**Remove Mods** restores the game's original files. A few config files that often clash with
+your own mods in the `mods` folder (**Open Folder**). mods apply by themselves when the folder changes (or after a game update), and
+**Reset Game Files** restores the game's original files. A few config files that often clash with
 game updates are never replaced, the same ones [KnightLauncher](https://github.com/lucasluqui/KnightLauncher) skips. Downloading the modpack
 never deletes mods you added yourself. Mods apply in an automatic order, with the broadest mod first (the one that
 changes the most files), so a small, targeted mod wins over a big one; there is nothing to sort by hand. The button

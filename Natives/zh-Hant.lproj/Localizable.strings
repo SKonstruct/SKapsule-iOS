@@ -21,11 +21,9 @@
 
 "Address" = "位址";
 
-"Anonymous: device model, iOS version, app build and JVM crash logs." = "匿名：裝置型號、iOS版本、應用程式組建與JVM崩潰記錄。";
 
 "Apply Failed" = "套用失敗";
 
-"Apply Mods" = "套用模組";
 
 "Applying Mods" = "正在套用模組";
 
@@ -133,11 +131,8 @@
 
 "Public key (modulus#exponent)" = "公開金鑰（模數#指數）";
 
-"Remove Failed" = "移除失敗";
 
-"Remove Mods" = "移除模組";
 
-"Removing Mods" = "正在移除模組";
 
 "Save" = "儲存";
 
@@ -282,20 +277,24 @@
 
 "Sharp HUD (experimental)" = "清晰HUD（實驗性）";
 
-"Sharpening and Sharp HUD draw the game off-screen first." = "銳化與清晰HUD會先在離屏緩衝區繪製遊戲畫面。";
 
-"Sharp HUD draws the HUD at full resolution, so it gets smaller: raise the game's UI scale to compensate." = "清晰HUD以完整解析度繪製HUD（介面會變小）：請調大遊戲內UI縮放比例以補償。";
 
-"Sharp HUD needs Resolution below 100%." = "清晰HUD需要解析度低於100%。";
 
 /* Touch editor pages */
 "Edit" = "編輯";
 
-"Close" = "關閉";
 
 "Floating left stick" = "浮動左搖桿";
 
 "Floating right stick" = "浮動右搖桿";
 
-"A floating stick appears where your thumb lands and follows it." = "浮動搖桿會出現在拇指按下的位置並跟隨移動。";
+/* Mods applied by themselves, and the mouse cursor */
+"Reset Game Files" = "Reset Game Files";
 
+"Resetting Game Files" = "Resetting Game Files";
+
+"Reset Failed" = "Reset Failed";
+
+"Mods applied with warnings" = "Mods applied with warnings";
+
+"Show mouse cursor" = "Show mouse cursor";

@@ -12,6 +12,8 @@
 - (void)touchOverlayDidChangeGfx:(SKTouchControlOverlay *)overlay;
 /// The FPS counter was switched on or off.
 - (void)touchOverlay:(SKTouchControlOverlay *)overlay didChangeFpsVisible:(BOOL)visible;
+/// The mouse cursor was switched on or off (read it back from SKGfxSettings.h).
+- (void)touchOverlay:(SKTouchControlOverlay *)overlay didChangeCursorVisible:(BOOL)visible;
 /// Appearance changed (opacity, Show Controls, Show Buttons). The host uses it to keep the
 /// chrome buttons in step; without it they only catch up on the next layout pass.
 - (void)touchOverlayDidChangeAppearance:(SKTouchControlOverlay *)overlay;
@@ -23,11 +25,6 @@
 @property (nonatomic, weak) id<SKTouchControlOverlayDelegate> delegate;
 
 - (void)toggleEditMode;
-
-/// The editor's tab strip (Edit | Settings | Close). Close asks the host to leave edit mode; a host
-/// that has its own Done button (the standalone editor) hides the tab instead.
-@property (nonatomic, copy) void (^closeRequestHandler)(void);
-@property (nonatomic, assign) BOOL closeTabHidden;
 
 /// Set by the host (the standalone editor and the game) to open the layout library (presets,
 /// export, import); setting it is what reveals the panel's "Layouts…" button.

@@ -21,11 +21,9 @@
 
 "Address" = "Адрес";
 
-"Anonymous: device model, iOS version, app build and JVM crash logs." = "Анонимно: модель устройства, версия iOS, сборка приложения и журналы сбоев JVM.";
 
 "Apply Failed" = "Сбой применения";
 
-"Apply Mods" = "Применить моды";
 
 "Applying Mods" = "Применение модов";
 
@@ -133,11 +131,8 @@
 
 "Public key (modulus#exponent)" = "Открытый ключ (модуль#экспонента)";
 
-"Remove Failed" = "Сбой удаления";
 
-"Remove Mods" = "Удалить моды";
 
-"Removing Mods" = "Удаление модов";
 
 "Save" = "Сохранить";
 
@@ -282,20 +277,24 @@
 
 "Sharp HUD (experimental)" = "Четкий интерфейс (эксперим.)";
 
-"Sharpening and Sharp HUD draw the game off-screen first." = "Резкость и четкий интерфейс сначала отрисовывают игру вне экрана.";
 
-"Sharp HUD draws the HUD at full resolution, so it gets smaller: raise the game's UI scale to compensate." = "Четкий интерфейс отрисовывается в полном разрешении (становится мельче): увеличьте масштаб интерфейса в игре для компенсации.";
 
-"Sharp HUD needs Resolution below 100%." = "Для четкого интерфейса требуется разрешение ниже 100%.";
 
 /* Touch editor pages */
 "Edit" = "Изменить";
 
-"Close" = "Закрыть";
 
 "Floating left stick" = "Плавающий левый стик";
 
 "Floating right stick" = "Плавающий правый стик";
 
-"A floating stick appears where your thumb lands and follows it." = "Плавающий стик появляется в месте касания большого пальца и следует за ним.";
+/* Mods applied by themselves, and the mouse cursor */
+"Reset Game Files" = "Reset Game Files";
 
+"Resetting Game Files" = "Resetting Game Files";
+
+"Reset Failed" = "Reset Failed";
+
+"Mods applied with warnings" = "Mods applied with warnings";
+
+"Show mouse cursor" = "Show mouse cursor";

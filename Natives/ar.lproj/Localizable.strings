@@ -21,11 +21,9 @@
 
 "Address" = "العنوان";
 
-"Anonymous: device model, iOS version, app build and JVM crash logs." = "مجهول: طراز الجهاز وإصدار iOS وبنية التطبيق وسجلات تعطل JVM.";
 
 "Apply Failed" = "فشل التطبيق";
 
-"Apply Mods" = "تطبيق التعديلات";
 
 "Applying Mods" = "جارٍ تطبيق التعديلات";
 
@@ -133,11 +131,8 @@
 
 "Public key (modulus#exponent)" = "المفتاح العام (المقياس#الأس)";
 
-"Remove Failed" = "فشل الحذف";
 
-"Remove Mods" = "إزالة التعديلات";
 
-"Removing Mods" = "جارٍ إزالة التعديلات";
 
 "Save" = "حفظ";
 
@@ -282,20 +277,24 @@
 
 "Sharp HUD (experimental)" = "واجهة مستخدم واضحة (تجريبي)";
 
-"Sharpening and Sharp HUD draw the game off-screen first." = "تقوم الحدة والواجهة الواضحة برسم اللعبة خارج الشاشة أولاً.";
 
-"Sharp HUD draws the HUD at full resolution, so it gets smaller: raise the game's UI scale to compensate." = "ترسم الواجهة الواضحة بدقة كاملة (تصبح أصغر): ارفع مقياس واجهة اللعبة للتعويض.";
 
-"Sharp HUD needs Resolution below 100%." = "تتطلب الواجهة الواضحة دقة أقل من 100%.";
 
 /* Touch editor pages */
 "Edit" = "تعديل";
 
-"Close" = "إغلاق";
 
 "Floating left stick" = "عصا يسرى عائمة";
 
 "Floating right stick" = "عصا يمنى عائمة";
 
-"A floating stick appears where your thumb lands and follows it." = "تظهر العصا العائمة حيث يلامس إبهامك الشاشة وتتبعه.";
+/* Mods applied by themselves, and the mouse cursor */
+"Reset Game Files" = "Reset Game Files";
 
+"Resetting Game Files" = "Resetting Game Files";
+
+"Reset Failed" = "Reset Failed";
+
+"Mods applied with warnings" = "Mods applied with warnings";
+
+"Show mouse cursor" = "Show mouse cursor";

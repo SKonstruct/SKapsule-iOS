@@ -21,11 +21,9 @@
 
 "Address" = "Dirección";
 
-"Anonymous: device model, iOS version, app build and JVM crash logs." = "Anónimo: modelo de dispositivo, versión de iOS, compilación y registros de bloqueo de JVM.";
 
 "Apply Failed" = "Error al aplicar";
 
-"Apply Mods" = "Aplicar mods";
 
 "Applying Mods" = "Aplicando mods";
 
@@ -133,11 +131,8 @@
 
 "Public key (modulus#exponent)" = "Clave pública (módulo#exponente)";
 
-"Remove Failed" = "Error al eliminar";
 
-"Remove Mods" = "Eliminar mods";
 
-"Removing Mods" = "Eliminando mods";
 
 "Save" = "Guardar";
 
@@ -282,20 +277,24 @@
 
 "Sharp HUD (experimental)" = "HUD nítido (experimental)";
 
-"Sharpening and Sharp HUD draw the game off-screen first." = "La nitidez y el HUD nítido renderizan el juego fuera de pantalla primero.";
 
-"Sharp HUD draws the HUD at full resolution, so it gets smaller: raise the game's UI scale to compensate." = "El HUD nítido se dibuja a resolución completa (se hace más pequeño): aumenta la escala de interfaz del juego para compensar.";
 
-"Sharp HUD needs Resolution below 100%." = "El HUD nítido requiere una resolución inferior al 100%.";
 
 /* Touch editor pages */
 "Edit" = "Editar";
 
-"Close" = "Cerrar";
 
 "Floating left stick" = "Stick izquierdo flotante";
 
 "Floating right stick" = "Stick derecho flotante";
 
-"A floating stick appears where your thumb lands and follows it." = "Un stick flotante aparece donde apoyas el pulgar y lo sigue.";
+/* Mods applied by themselves, and the mouse cursor */
+"Reset Game Files" = "Reset Game Files";
 
+"Resetting Game Files" = "Resetting Game Files";
+
+"Reset Failed" = "Reset Failed";
+
+"Mods applied with warnings" = "Mods applied with warnings";
+
+"Show mouse cursor" = "Show mouse cursor";

@@ -21,11 +21,9 @@
 
 "Address" = "Address";
 
-"Anonymous: device model, iOS version, app build and JVM crash logs." = "Anonymous: device model, iOS version, app build and JVM crash logs.";
 
 "Apply Failed" = "Apply Failed";
 
-"Apply Mods" = "Apply Mods";
 
 "Applying Mods" = "Applying Mods";
 
@@ -133,11 +131,8 @@
 
 "Public key (modulus#exponent)" = "Public key (modulus#exponent)";
 
-"Remove Failed" = "Remove Failed";
 
-"Remove Mods" = "Remove Mods";
 
-"Removing Mods" = "Removing Mods";
 
 "Save" = "Save";
 
@@ -282,20 +277,24 @@
 
 "Sharp HUD (experimental)" = "Sharp HUD (experimental)";
 
-"Sharpening and Sharp HUD draw the game off-screen first." = "Sharpening and Sharp HUD draw the game off-screen first.";
 
-"Sharp HUD draws the HUD at full resolution, so it gets smaller: raise the game's UI scale to compensate." = "Sharp HUD draws the HUD at full resolution, so it gets smaller: raise the game's UI scale to compensate.";
 
-"Sharp HUD needs Resolution below 100%." = "Sharp HUD needs Resolution below 100%.";
 
 /* Touch editor pages */
 "Edit" = "Edit";
 
-"Close" = "Close";
 
 "Floating left stick" = "Floating left stick";
 
 "Floating right stick" = "Floating right stick";
 
-"A floating stick appears where your thumb lands and follows it." = "A floating stick appears where your thumb lands and follows it.";
+/* Mods applied by themselves, and the mouse cursor */
+"Reset Game Files" = "Reset Game Files";
 
+"Resetting Game Files" = "Resetting Game Files";
+
+"Reset Failed" = "Reset Failed";
+
+"Mods applied with warnings" = "Mods applied with warnings";
+
+"Show mouse cursor" = "Show mouse cursor";

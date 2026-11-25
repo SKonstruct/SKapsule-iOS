@@ -398,6 +398,48 @@ static NSString *SKDownloadVerified(NSURL *url, NSString *destPath, NSString *ex
     }
 }
 
+static NSString *const kSyncModsKey = @"mods_sync_mods";
+static NSString *const kSyncJarsKey = @"mods_sync_jars";
+
+/// "name:size:seconds" for each path, joined, nothing for a missing one. Attributes only, no file is read.
+static NSString *SKFingerprint(NSString *dir, NSArray<NSString *> *names) {
+    NSFileManager *fm = NSFileManager.defaultManager;
+    NSMutableArray<NSString *> *parts = [NSMutableArray array];
+    for (NSString *name in [names sortedArrayUsingSelector:@selector(compare:)]) {
+        NSDictionary *attrs = [fm attributesOfItemAtPath:[dir stringByAppendingPathComponent:name] error:nil];
+        if (!attrs) continue;
+        [parts addObject:[NSString stringWithFormat:@"%@:%llu:%.0f", name, attrs.fileSize,
+                                                    [attrs.fileModificationDate timeIntervalSince1970]]];
+    }
+    return [parts componentsJoinedByString:@"|"];
+}
+
+static NSString *SKSkPath(void) {
+    const char *home = getenv("SKAPSULE_HOME");
+    return home ? [[NSString stringWithUTF8String:home] stringByAppendingPathComponent:@"sk"] : nil;
+}
+
+static NSString *SKModsFingerprint(void) {
+    NSString *dir = [SKSkPath() stringByAppendingPathComponent:@"mods"];
+    NSMutableArray *mods = [NSMutableArray array];
+    for (NSString *f in [NSFileManager.defaultManager contentsOfDirectoryAtPath:dir error:nil] ?: @[]) {
+        if ([f hasSuffix:@".zip"] || [f hasSuffix:@".modpack"]) [mods addObject:f];
+    }
+    return SKFingerprint(dir, mods);
+}
+
+/// The game's own file list and digests: they change when the game updates, which puts its jars back. The jars
+/// themselves are no use here, a private-server choice rewrites config.jar after every apply.
+static NSString *SKJarsFingerprint(void) {
+    NSData *digest = [NSData dataWithContentsOfFile:[SKSkPath() stringByAppendingPathComponent:@"digest2.txt"]];
+    if (!digest) return @"";
+    unsigned char sha[CC_SHA1_DIGEST_LENGTH];
+    CC_SHA1(digest.bytes, (CC_LONG)digest.length, sha);
+    NSMutableString *hex = [NSMutableString stringWithCapacity:2 * CC_SHA1_DIGEST_LENGTH];
+    for (int i = 0; i < CC_SHA1_DIGEST_LENGTH; i++) [hex appendFormat:@"%02x", sha[i]];
+    return hex;
+}
+
 + (instancetype)sharedManager {
     static SKModManager *sharedInstance = nil;
     static dispatch_once_t onceToken;
@@ -405,6 +447,26 @@ static NSString *SKDownloadVerified(NSURL *url, NSString *destPath, NSString *ex
       sharedInstance = [[self alloc] init];
     });
     return sharedInstance;
+}
+
+- (SKModSyncAction)pendingSyncAction {
+    NSString *sk = SKSkPath();
+    if (!sk) return SKModSyncNone;
+    BOOL installed = [NSFileManager.defaultManager fileExistsAtPath:[sk stringByAppendingPathComponent:@"rsrc"]];
+    NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
+    return SKModSyncDecide(installed, SKModsFingerprint(), SKJarsFingerprint(), [d stringForKey:kSyncModsKey],
+                           [d stringForKey:kSyncJarsKey]);
+}
+
+- (NSString *)syncKey {
+    return [SKModsFingerprint() stringByAppendingFormat:@"#%@", SKJarsFingerprint()];
+}
+
+/// What was just applied or restored, so the same folder is not applied again.
+- (void)recordSync {
+    NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
+    [d setObject:SKModsFingerprint() forKey:kSyncModsKey];
+    [d setObject:SKJarsFingerprint() forKey:kSyncJarsKey];
 }
 
 - (void)checkModpackStatusWithCompletion:(void (^)(SKModPackStatus *_Nullable status))completion {
@@ -671,6 +733,7 @@ static NSString *SKDownloadVerified(NSURL *url, NSString *destPath, NSString *ex
     void (^completionBlock)(BOOL, NSString *, NSArray<NSString *> *, NSError *) =
         ^(BOOL success, NSString *summary, NSArray<NSString *> *warnings, NSError *error) {
           endBackground();
+          if (success) [self recordSync];
           callerCompletion(success, summary, warnings, error);
         };
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
@@ -1068,6 +1131,7 @@ static NSString *SKDownloadVerified(NSURL *url, NSString *destPath, NSString *ex
     dispatch_block_t endBackground = SKBeginBackgroundWork(@"Remove mods");
     void (^completionBlock)(BOOL, NSString *, NSError *) = ^(BOOL success, NSString *summary, NSError *error) {
       endBackground();
+      if (success) [self recordSync];
       callerCompletion(success, summary, error);
     };
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
