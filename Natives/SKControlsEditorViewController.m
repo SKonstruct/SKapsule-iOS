@@ -13,7 +13,7 @@
  * arranging it in portrait would put everything somewhere else in play. The overlay is
  * inset exactly as GameViewController insets it, for the same reason.
  */
-@interface SKControlsEditorViewController ()
+@interface SKControlsEditorViewController () <SKTouchControlOverlayDelegate>
 @property (nonatomic, strong) SKTouchControlOverlay *overlay;
 @property (nonatomic, strong) UIView *backdrop;
 @property (nonatomic, strong) UIButton *doneButton;
@@ -35,9 +35,10 @@
     self.backdrop.layer.cornerRadius = 4;
     [self.view addSubview:self.backdrop];
 
-    // No delegate: its one method reports a render-scale change to the live GL surface,
-    // and there isn't one. The scale is still persisted by the overlay itself.
+    // The delegate only re-insets when "Avoid screen edges" is switched; its render-scale method has no GL surface
+    // to tell here, and the scale is persisted by the overlay itself.
     self.overlay = [[SKTouchControlOverlay alloc] initWithFrame:CGRectZero];
+    self.overlay.delegate = self;
     [self.view addSubview:self.overlay];
 
     // The handler is what reveals the panel's "Layouts…" button.
@@ -103,6 +104,13 @@
             initWithInterfaceOrientations:UIInterfaceOrientationMaskLandscape];
         [scene requestGeometryUpdateWithPreferences:landscape errorHandler:nil];
     }
+}
+
+- (void)touchOverlay:(SKTouchControlOverlay *)overlay didChangeRenderScale:(CGFloat)renderScale {
+}
+
+- (void)touchOverlay:(SKTouchControlOverlay *)overlay didChangeAvoidEdges:(BOOL)avoid {
+    [self.view setNeedsLayout];  // viewDidLayoutSubviews insets the overlay from the setting
 }
 
 - (void)onDone {

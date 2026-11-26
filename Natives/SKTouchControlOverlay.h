@@ -12,6 +12,8 @@
 - (void)touchOverlayDidChangeGfx:(SKTouchControlOverlay *)overlay;
 /// The FPS counter was switched on or off.
 - (void)touchOverlay:(SKTouchControlOverlay *)overlay didChangeFpsVisible:(BOOL)visible;
+/// "Avoid screen edges" was switched (the default `avoid_screen_edges` holds it): the host re-insets the play area.
+- (void)touchOverlay:(SKTouchControlOverlay *)overlay didChangeAvoidEdges:(BOOL)avoid;
 /// The mouse cursor was switched on or off (read it back from SKGfxSettings.h).
 - (void)touchOverlay:(SKTouchControlOverlay *)overlay didChangeCursorVisible:(BOOL)visible;
 /// Appearance changed (opacity, Show Controls, Show Buttons). The host uses it to keep the

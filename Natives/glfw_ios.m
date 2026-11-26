@@ -422,13 +422,59 @@ static jboolean nativeGetGamepadState(JNIEnv *env, jclass clazz, jbyteArray outB
     return JNI_TRUE;
 }
 
+// The game's own mouse cursor: the art it selected as its window cursor (GLFW.glfwSetCursor in the shim), RGBA with
+// a hotspot, in game pixels. The game screen draws it where the game's cursor is when the setting is on. No pixels
+// (width 0) means there is no cursor to draw. Posted on the main queue; userInfo has `image` (a UIImage, 1 pixel per
+// point of art) and `hotspot` (an NSValue CGPoint in the same pixels) when there is art.
+NSString *const SKGameCursorDidChangeNotification = @"SKGameCursorDidChange";
+
+static void SKFreeCursorPixels(void *info, const void *data, size_t size) {
+    free((void *)data);
+}
+
+static void nativeSetCursor(JNIEnv *env, jclass clazz, jint w, jint h, jbyteArray rgba, jint hx, jint hy) {
+    UIImage *image = nil;
+    if (w > 0 && h > 0 && rgba != NULL && (jlong)w * h <= 128 * 128 && (*env)->GetArrayLength(env, rgba) == w * h * 4) {
+        size_t n = (size_t)w * h * 4;
+        uint8_t *px = malloc(n);
+        if (px) {
+            (*env)->GetByteArrayRegion(env, rgba, 0, (jsize)n, (jbyte *)px);
+            // The game's pixels are straight RGBA; CoreGraphics wants them premultiplied.
+            for (size_t i = 0; i < n; i += 4) {
+                uint32_t a = px[i + 3];
+                px[i] = (uint8_t)((px[i] * a + 127) / 255);
+                px[i + 1] = (uint8_t)((px[i + 1] * a + 127) / 255);
+                px[i + 2] = (uint8_t)((px[i + 2] * a + 127) / 255);
+            }
+            CGDataProviderRef provider = CGDataProviderCreateWithData(NULL, px, n, SKFreeCursorPixels);
+            CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
+            CGImageRef cg = provider ? CGImageCreate(w, h, 8, 32, (size_t)w * 4, space,
+                                                     kCGBitmapByteOrderDefault | kCGImageAlphaPremultipliedLast, provider,
+                                                     NULL, false, kCGRenderingIntentDefault)
+                                     : NULL;
+            if (cg) {
+                image = [UIImage imageWithCGImage:cg scale:1.0 orientation:UIImageOrientationUp];
+                CGImageRelease(cg);
+            }
+            if (provider) CGDataProviderRelease(provider);  // frees the pixels once the image is gone
+            else free(px);
+            CGColorSpaceRelease(space);
+        }
+    }
+    NSDictionary *info = image ? @{@"image" : image, @"hotspot" : [NSValue valueWithCGPoint:CGPointMake(hx, hy)]} : @{};
+    dispatch_async(dispatch_get_main_queue(), ^{
+      [NSNotificationCenter.defaultCenter postNotificationName:SKGameCursorDidChangeNotification object:nil userInfo:info];
+    });
+}
+
 void register_glfw_natives(JNIEnv *env, jclass glfwClass) {
     JNINativeMethod methods[] = {{"nativeDrainInput", "([I)I", (void *)&nativeDrainInput},
                                  {"nativeGetSurfaceSize", "()[I", (void *)&nativeGetSurfaceSize},
                                  {"nativeMakeContextCurrent", "(J)V", (void *)&nativeMakeContextCurrent},
                                  {"nativeSwapBuffers", "(J)V", (void *)&nativeSwapBuffers},
                                  {"nativeGamepadPresent", "()Z", (void *)&nativeGamepadPresent},
-                                 {"nativeGetGamepadState", "([B[F)Z", (void *)&nativeGetGamepadState}};
+                                 {"nativeGetGamepadState", "([B[F)Z", (void *)&nativeGetGamepadState},
+                                 {"nativeSetCursor", "(II[BII)V", (void *)&nativeSetCursor}};
 
     (*env)->RegisterNatives(env, glfwClass, methods, sizeof(methods) / sizeof(methods[0]));
 }

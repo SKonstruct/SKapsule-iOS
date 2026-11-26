@@ -119,6 +119,13 @@ and the natives (`libjava`, `libjimage`, `libzip`, …) live in `jre25/lib`, `co
   no mods left but some applied means restore once. The code jars are deliberately not fingerprinted: a private-server
   choice rewrites `config.jar` after each apply. Reset Game Files saves the current fingerprints, so the folder stays
   unapplied until it changes. A failed state is reported once per fingerprint.
+- **The game's cursor is the game's own art.** SK makes its cursor as a window cursor: `glfwCreateCursor` (RGBA pixels,
+  hotspot) and `glfwSetCursor`. The bootstrap's `GLFW.java` shim keeps each image and passes the selected one to native
+  (`nativeSetCursor`, registered like the other GLFW natives; no art = nothing drawn). `glfw_ios.m` turns it into a
+  `UIImage` and posts `SKGameCursorDidChange`; `GameViewController` draws it, game pixels scaled to points like the
+  game's UI, hotspot on the point `pushCursorAtPoint:` last pushed (touch, trackpad and mouse all feed that point).
+  While it shows, a `UIPointerInteraction` hides the system pointer. Android does the same through
+  `NativeBridge.onCursorImage` and `GameActivity`. The setting is off by default (`SKShowMouseCursor`).
 - **Apply fails closed:** if a jar cannot be rebuilt or swapped, the code jars stay as the
   restored originals and the user gets the error. Apply and remove run under a background
   task (about 30 s of grace if the app is backgrounded).

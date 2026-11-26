@@ -23,6 +23,7 @@
 extern void sk_input_push_cursor(int x, int y);
 extern void sk_input_push_framebuffer_size(int width, int height);
 extern void sk_gl_request_resize(void);
+extern NSString *const SKGameCursorDidChangeNotification;  // glfw_ios.m
 extern int sk_gl_context_taken(void);
 extern void sk_gl_set_drawable_size(int width, int height);
 extern void sk_gl_set_gfx_config(int enabled, float scale, float sharpen, int hud, int nativeWidth, int nativeHeight);
@@ -264,7 +265,7 @@ static BOOL push_key_event(UIKey *key, int action, BOOL emitCharacters) {
 
 typedef NS_ENUM(NSInteger, SKLoginMode);
 
-@interface GameViewController () <SKTouchControlOverlayDelegate>
+@interface GameViewController () <SKTouchControlOverlayDelegate, UIPointerInteractionDelegate>
 @property (nonatomic, strong) UIView *surfaceView;
 @property (nonatomic, strong) SKTouchControlOverlay *touchControls;
 /// Presets and export/import for the in-game editor (the standalone editor has its own).
@@ -278,8 +279,13 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
 @property (nonatomic, assign) BOOL gfxOffscreen;          // the offscreen pass is on (see SKGfxSettings.h)
 @property (nonatomic, strong) UIView *fpsPill;
 @property (nonatomic, strong) UILabel *fpsLabel;
-/// The mouse cursor drawn over the game (a setting, off by default) and where the game last saw it.
+/// The game's own mouse cursor drawn over the game (a setting, off by default): the art it selected as its window
+/// cursor (glfw_ios.m), hotspot on the point the game last saw the pointer. A mouse's own pointer is hidden meanwhile.
 @property (nonatomic, strong) UIImageView *cursorView;
+@property (nonatomic, strong) UIImage *gameCursorImage;
+@property (nonatomic, assign) CGPoint gameCursorHotspot;
+@property (nonatomic, strong) UIPointerInteraction *pointerInteraction;
+@property (nonatomic, assign) BOOL cursorShownState;
 @property (nonatomic, assign) CGPoint cursorPoint;
 @property (nonatomic, assign) BOOL cursorSeen;
 @property (nonatomic, strong) NSTimer *fpsTimer;
@@ -383,6 +389,12 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
     UIHoverGestureRecognizer *hover = [[UIHoverGestureRecognizer alloc] initWithTarget:self
                                                                                 action:@selector(handlePointerHover:)];
     [self.surfaceView addGestureRecognizer:hover];
+    self.pointerInteraction = [[UIPointerInteraction alloc] initWithDelegate:self];
+    [self.surfaceView addInteraction:self.pointerInteraction];
+    [NSNotificationCenter.defaultCenter addObserver:self
+                                           selector:@selector(gameCursorDidChange:)
+                                               name:SKGameCursorDidChangeNotification
+                                             object:nil];
 
     // Scroll wheel / two-finger trackpad scroll. A pan restricted to discrete scroll only
     // fires for real scroll input, so it cannot swallow touches meant for the game.
@@ -1391,28 +1403,54 @@ static const CGFloat kChromeButtonGap = 8.0f;
     [self placeCursorView];
 }
 
+/// "Avoid screen edges" was switched in the editor's Settings page: re-inset the surface now, then hand the render
+/// thread the new size the way the resolution slider does.
+- (void)touchOverlay:(SKTouchControlOverlay *)overlay didChangeAvoidEdges:(BOOL)avoid {
+    [self.view setNeedsLayout];
+    [self.view layoutIfNeeded];  // viewDidLayoutSubviews reads the setting and resizes the surface and the overlay
+    CGSize bounds = self.surfaceView.bounds.size;
+    [self setDrawableSize:CGSizeMake(round(bounds.width * self.renderScaleFactor), round(bounds.height * self.renderScaleFactor))];
+    if (self.jvmKicked) sk_gl_request_resize();
+    [self placeCursorView];
+}
+
 #pragma mark Mouse cursor
 
-/// An arrow whose tip sits on the point the game sees as the cursor. Hidden until the setting is on and the game
-/// has had a pointer position; it never takes touches.
+/// The game's cursor art, in game pixels scaled to points (the way the game's own UI is), hotspot on the point the
+/// game sees as the cursor. Hidden until the setting is on and the game has both art and a pointer position; it
+/// never takes touches.
 - (void)placeCursorView {
+    BOOL show = SKShowMouseCursor() && self.cursorSeen && self.gameCursorImage != nil;
     if (!self.cursorView) {
-        UIImage *arrow = [UIImage systemImageNamed:@"cursorarrow"
-                                 withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:26 weight:UIImageSymbolWeightRegular]];
-        self.cursorView = [[UIImageView alloc] initWithImage:[arrow imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate]];
-        self.cursorView.tintColor = UIColor.whiteColor;
-        self.cursorView.layer.shadowColor = UIColor.blackColor.CGColor;
-        self.cursorView.layer.shadowOpacity = 0.8;
-        self.cursorView.layer.shadowRadius = 1.5;
-        self.cursorView.layer.shadowOffset = CGSizeZero;
+        self.cursorView = [[UIImageView alloc] init];
         self.cursorView.userInteractionEnabled = NO;
         self.cursorView.isAccessibilityElement = NO;
         [self.view addSubview:self.cursorView];
     }
-    self.cursorView.hidden = !(SKShowMouseCursor() && self.cursorSeen);
+    if (self.cursorView.image != self.gameCursorImage) self.cursorView.image = self.gameCursorImage;
+    self.cursorView.hidden = !show;
+    if (show != self.cursorShownState) {
+        self.cursorShownState = show;
+        [self.pointerInteraction invalidate];  // pointerInteraction:styleForRegion: hides a mouse's own pointer while shown
+    }
+    if (!show) return;
+    CGFloat pixelsPerPoint = MAX([self pointToPixelScale], 0.01);
+    CGSize size = CGSizeMake(self.gameCursorImage.size.width / pixelsPerPoint, self.gameCursorImage.size.height / pixelsPerPoint);
     CGPoint tip = [self.surfaceView convertPoint:self.cursorPoint toView:self.view];
-    self.cursorView.frame = CGRectMake(tip.x - 3, tip.y - 2, self.cursorView.bounds.size.width, self.cursorView.bounds.size.height);
+    self.cursorView.frame = CGRectMake(tip.x - self.gameCursorHotspot.x / pixelsPerPoint,
+                                       tip.y - self.gameCursorHotspot.y / pixelsPerPoint, size.width, size.height);
     [self.view bringSubviewToFront:self.cursorView];
+}
+
+- (void)gameCursorDidChange:(NSNotification *)note {
+    self.gameCursorImage = note.userInfo[@"image"];
+    self.gameCursorHotspot = [note.userInfo[@"hotspot"] CGPointValue];
+    [self placeCursorView];
+}
+
+- (UIPointerStyle *)pointerInteraction:(UIPointerInteraction *)interaction styleForRegion:(UIPointerRegion *)region {
+    BOOL gameCursorShown = SKShowMouseCursor() && self.gameCursorImage != nil;
+    return gameCursorShown ? [UIPointerStyle hiddenPointerStyle] : nil;
 }
 
 #pragma mark FPS counter

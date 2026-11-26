@@ -350,6 +350,7 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
     UIStackView *_panelStack;
     UISwitch *_fpsSwitch;
     UISwitch *_cursorSwitch;
+    UISwitch *_avoidEdgesSwitch;
     UISlider *_sharpenSlider;
     UILabel *_sharpenLabel;
     UISwitch *_hudSwitch;
@@ -668,6 +669,12 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
     _fpsSwitch.on = SKGfxShowFps();
     [_fpsSwitch addTarget:self action:@selector(onFpsChanged) forControlEvents:UIControlEventValueChanged];
 
+    // The same setting as the launcher sidebar's "Avoid screen edges"; absent means off.
+    _avoidEdgesSwitch = [UISwitch new];
+    _avoidEdgesSwitch.onTintColor = SKThemeColor();
+    _avoidEdgesSwitch.on = [[NSUserDefaults.standardUserDefaults objectForKey:@"avoid_screen_edges"] boolValue];
+    [_avoidEdgesSwitch addTarget:self action:@selector(onAvoidEdgesChanged) forControlEvents:UIControlEventValueChanged];
+
     _cursorSwitch = [UISwitch new];
     _cursorSwitch.onTintColor = SKThemeColor();
     _cursorSwitch.on = SKShowMouseCursor();
@@ -765,6 +772,7 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
         [self rowWithLabel:@"Show Buttons" control:_actionBarSwitch],
         [self rowWithLabel:@"Opacity" control:_opacitySlider],
         [self rowWithLabel:@"Resolution" control:_resolutionSlider],
+        [self rowWithLabel:NSLocalizedString(@"Avoid screen edges", nil) control:_avoidEdgesSwitch],
         [self rowWithLabel:@"Show FPS counter" control:_fpsSwitch],
         [self rowWithLabel:NSLocalizedString(@"Show mouse cursor", nil) control:_cursorSwitch],
         _sharpenLabel,
@@ -860,6 +868,12 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
     SKGfxSetShowFps(_fpsSwitch.on);
     if ([self.delegate respondsToSelector:@selector(touchOverlay:didChangeFpsVisible:)])
         [self.delegate touchOverlay:self didChangeFpsVisible:_fpsSwitch.on];
+}
+
+- (void)onAvoidEdgesChanged {
+    [NSUserDefaults.standardUserDefaults setBool:_avoidEdgesSwitch.on forKey:@"avoid_screen_edges"];
+    if ([self.delegate respondsToSelector:@selector(touchOverlay:didChangeAvoidEdges:)])
+        [self.delegate touchOverlay:self didChangeAvoidEdges:_avoidEdgesSwitch.on];
 }
 
 - (void)onCursorChanged {
