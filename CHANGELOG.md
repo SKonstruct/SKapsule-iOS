@@ -55,6 +55,9 @@ version: the Release workflow publishes that section as the release notes.
 
 ### Fixed
 
+- **Typing in the game's text boxes works as you type.** The text showed up but did nothing (a search or filter did not
+  update, a form did not enable) until Enter or Backspace was pressed. The on-screen keyboard now sends each
+  character the way a desktop keyboard does, key press then the character then key release.
 - **Mods apply in a fixed order.** They used to apply in whatever order iOS listed the files, so which mod won a
   clash could differ between devices. The mods that change the most files now go first and equal ones by name, so a
   small, targeted mod wins over a broad one (the same rule as SKradle and SKapsule for Android). There is nothing to

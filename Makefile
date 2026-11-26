@@ -352,6 +352,9 @@ test:
 		$(SOURCEDIR)/Natives/Tests/SKModPackTests.m $(SOURCEDIR)/Natives/SKModPack.m -o $(WORKINGDIR)/sk-mod-pack-tests
 	$(WORKINGDIR)/sk-mod-pack-tests
 	xcrun clang -fobjc-arc -Wall -framework Foundation -I$(SOURCEDIR)/Natives \
+		$(SOURCEDIR)/Natives/Tests/SKGlfwKeysTests.m -o $(WORKINGDIR)/sk-glfw-keys-tests
+	$(WORKINGDIR)/sk-glfw-keys-tests
+	xcrun clang -fobjc-arc -Wall -framework Foundation -I$(SOURCEDIR)/Natives \
 		$(SOURCEDIR)/Natives/Tests/SKModSyncTests.m -o $(WORKINGDIR)/sk-mod-sync-tests
 	$(WORKINGDIR)/sk-mod-sync-tests
 	xcrun clang -fobjc-arc -Wall -framework Foundation -framework CoreGraphics -I$(SOURCEDIR)/Natives \

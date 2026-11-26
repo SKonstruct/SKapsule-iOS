@@ -126,6 +126,12 @@ and the natives (`libjava`, `libjimage`, `libzip`, …) live in `jre25/lib`, `co
   game's UI, hotspot on the point `pushCursorAtPoint:` last pushed (touch, trackpad and mouse all feed that point).
   While it shows, a `UIPointerInteraction` hides the system pointer. Android does the same through
   `NativeBridge.onCursorImage` and `GameActivity`. The setting is off by default (`SKShowMouseCursor`).
+- **A typed character is key press, char, key release** (`SKKeyboardBridge.m`, `SKGlfwKeys.h`). The game's char
+  callback only calls `keyPressed(char, keyCode -1)`, and the game releases only real key codes, so a character alone
+  is a press that never ends: the text shows but live searches and form checks wait for the next real key
+  transition (Enter, Backspace). A desktop keyboard sends the key press, the char, then the key release; the bridge
+  does too, with the US-layout key for the character (text with no key, such as accents and emoji, goes as the
+  char only). Same rule and cases as Android's `GlfwKeys.kt`.
 - **Apply fails closed:** if a jar cannot be rebuilt or swapped, the code jars stay as the
   restored originals and the user gets the error. Apply and remove run under a background
   task (about 30 s of grace if the app is backgrounded).
