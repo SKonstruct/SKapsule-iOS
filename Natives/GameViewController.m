@@ -289,6 +289,7 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
 @property (nonatomic, assign) CGPoint cursorPoint;
 @property (nonatomic, assign) BOOL cursorSeen;
 @property (nonatomic, strong) NSTimer *fpsTimer;
+@property (nonatomic, assign) BOOL chromeDragActive;       // a chrome button's drag has passed the tap slop
 @property (nonatomic, assign) uint64_t fpsLastFrames;
 @property (nonatomic, assign) NSTimeInterval fpsLastTime;
 @property (nonatomic, strong) UILabel *bootStatus;
@@ -1221,14 +1222,19 @@ static const CGFloat kChromeDragSlop = 20.0f;
 /// All three chrome buttons are the same square, so they read as one row of controls.
 static const CGFloat kChromeButtonSize = 44.0f;
 
-/// Gap between adjacent buttons in the ESC/gear/keyboard/eye row.
-static const CGFloat kChromeButtonGap = 8.0f;
+/// Default centres (fractions of the surface) of the chrome row, on ESC's line: ESC, gear, keyboard, eye. Android
+/// holds the same numbers (GameActivity.kt).
+static const CGFloat kChromeY = 0.05f;
+static const CGFloat kChromeGearX = 0.2553f;
+static const CGFloat kChromeKeyboardX = 0.3058f;
+static const CGFloat kChromeEyeX = 0.3563f;
 
 - (UIButton *)chromeButtonWithSymbol:(NSString *)symbolName action:(SEL)action {
     UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
     [self setChromeSymbol:symbolName onButton:button];
     button.tintColor = UIColor.whiteColor;
-    button.backgroundColor = [UIColor colorWithWhite:0 alpha:0.55];
+    // The touch buttons' idle fill (SKButtonControl), so both read at the same opacity.
+    button.backgroundColor = [UIColor colorWithWhite:0.12 alpha:0.60];
     button.layer.cornerRadius = 12;
     // Same hairline edge the touch buttons carry (SKButtonControl).
     button.layer.borderWidth = 1.0f;
@@ -1265,7 +1271,7 @@ static const CGFloat kChromeButtonGap = 8.0f;
  */
 - (void)migrateChromeLayoutOnce {
     static NSString *const kLayoutVersionKey = @"game_chrome_layout_version";
-    static const NSInteger kLayoutVersion = 3;
+    static const NSInteger kLayoutVersion = 4;
 
     NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
     if ([defaults integerForKey:kLayoutVersionKey] >= kLayoutVersion) return;
@@ -1278,29 +1284,24 @@ static const CGFloat kChromeButtonGap = 8.0f;
     if (CGRectIsEmpty(bounds))
         return;
 
-    CGFloat alpha = MAX(self.touchControls.layout.globalOpacity, 0.2);
+    // The same opacity the touch buttons are drawn at, including the editor's boost while arranging.
+    CGFloat alpha = MAX(self.touchControls.effectiveOpacity, 0.2);
     CGPoint fraction;
 
-    // Default row: ESC, gear, keyboard, eye, evenly gapped on ESC's line. ESC is a
-    // control node so it is width * SKButtonWidthPercent across; the chrome squares are a
-    // fixed size, so the first gap is measured off ESC and the rest off each other.
-    CGFloat escHalf = bounds.size.width * SKButtonWidthPercent * 0.5f;
-    CGFloat step = kChromeButtonSize + kChromeButtonGap;
-    CGFloat firstX = bounds.size.width * SKEscXPercent + escHalf + kChromeButtonGap +
-                     kChromeButtonSize * 0.5f;
-    CGFloat defaultY = SKEscYPercent;
+    // Default row: ESC, gear, keyboard, eye on one line, at fixed centres.
+    CGFloat defaultY = kChromeY;
 
-    [self chromePositionForKey:@"gear" defaultX:firstX / bounds.size.width defaultY:defaultY into:&fraction];
+    [self chromePositionForKey:@"gear" defaultX:kChromeGearX defaultY:defaultY into:&fraction];
     self.editLayoutButton.center = CGPointMake(CGRectGetMinX(bounds) + bounds.size.width * fraction.x,
                                                CGRectGetMinY(bounds) + bounds.size.height * fraction.y);
     self.editLayoutButton.alpha = alpha;
 
-    [self chromePositionForKey:@"kb" defaultX:(firstX + step) / bounds.size.width defaultY:defaultY into:&fraction];
+    [self chromePositionForKey:@"kb" defaultX:kChromeKeyboardX defaultY:defaultY into:&fraction];
     self.keyboardButton.center = CGPointMake(CGRectGetMinX(bounds) + bounds.size.width * fraction.x,
                                              CGRectGetMinY(bounds) + bounds.size.height * fraction.y);
     self.keyboardButton.alpha = alpha;
 
-    [self chromePositionForKey:@"eye" defaultX:(firstX + 2 * step) / bounds.size.width defaultY:defaultY into:&fraction];
+    [self chromePositionForKey:@"eye" defaultX:kChromeEyeX defaultY:defaultY into:&fraction];
     self.buttonsToggle.center = CGPointMake(CGRectGetMinX(bounds) + bounds.size.width * fraction.x,
                                             CGRectGetMinY(bounds) + bounds.size.height * fraction.y);
     self.buttonsToggle.alpha = alpha;
@@ -1335,14 +1336,18 @@ static const CGFloat kChromeButtonGap = 8.0f;
 
     UIView *button = pan.view;
     CGPoint translation = [pan translationInView:self.view];
-    if (hypot(translation.x, translation.y) < kChromeDragSlop && pan.state != UIGestureRecognizerStateEnded)
-        return;
+    if (pan.state == UIGestureRecognizerStateBegan) self.chromeDragActive = NO;
 
     if (pan.state == UIGestureRecognizerStateChanged) {
+        // The slop only separates a tap from a drag. Once the finger has crossed it the button follows the
+        // finger exactly: applying the slop to every move made it step along in jumps of the slop's size.
+        if (!self.chromeDragActive && hypot(translation.x, translation.y) < kChromeDragSlop) return;
+        self.chromeDragActive = YES;
         button.center = CGPointMake(button.center.x + translation.x, button.center.y + translation.y);
         [pan setTranslation:CGPointZero inView:self.view];
     } else if (pan.state == UIGestureRecognizerStateEnded || pan.state == UIGestureRecognizerStateCancelled) {
-        [self persistChromePosition:button];
+        if (self.chromeDragActive) [self persistChromePosition:button];
+        self.chromeDragActive = NO;
     }
 }
 
@@ -1501,9 +1506,13 @@ static const CGFloat kChromeButtonGap = 8.0f;
     CGFloat padX = 6, padY = 1;
     self.fpsLabel.frame = CGRectMake(padX, padY, ceil(text.width), ceil(text.height));
     UIEdgeInsets safe = self.view.safeAreaInsets;
-    CGFloat x = MAX(CGRectGetMinX(self.surfaceView.frame), safe.left) + 3;
+    // Top centre of the game surface.
+    CGFloat width = ceil(text.width) + 2 * padX;
+    CGFloat left = MAX(CGRectGetMinX(self.surfaceView.frame), safe.left);
+    CGFloat right = MIN(CGRectGetMaxX(self.surfaceView.frame), self.view.bounds.size.width - safe.right);
+    CGFloat x = left + (right - left - width) * 0.5f;
     CGFloat y = safe.top + 1;
-    self.fpsPill.frame = CGRectMake(x, y, ceil(text.width) + 2 * padX, ceil(text.height) + 2 * padY);
+    self.fpsPill.frame = CGRectMake(x, y, width, ceil(text.height) + 2 * padY);
     [self.view bringSubviewToFront:self.fpsPill];
 }
 

@@ -14,9 +14,10 @@ static inline void SKGfxSetShowFps(BOOL on) {
     [NSUserDefaults.standardUserDefaults setBool:on forKey:@"gfx_show_fps"];
 }
 
-/// The game's mouse cursor drawn on screen (off by default): a touch screen has no pointer to see.
+/// The game's mouse cursor drawn on screen (on by default): it shows where a tap will land.
 static inline BOOL SKShowMouseCursor(void) {
-    return [NSUserDefaults.standardUserDefaults boolForKey:@"show_mouse_cursor"];
+    id stored = [NSUserDefaults.standardUserDefaults objectForKey:@"show_mouse_cursor"];
+    return stored ? [stored boolValue] : YES;
 }
 
 static inline void SKSetShowMouseCursor(BOOL on) {

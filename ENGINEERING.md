@@ -437,21 +437,25 @@ usually belongs in the other.
   (`make test`) and Android's `TouchLayoutShareTest.kt` parse the same two fixtures, one written by each app
   (`Natives/Tests/fixtures/`, copied to Android's `src/test/resources/`); keep them identical.
 - **Editor pages and floating sticks.** The overlay's tab strip (Edit | Settings; the gear closes the editor, the standalone editor has Done) switches `_page`: Edit shows the selected control's own dialog, docked by
-  `SKDockPlacement.h` (never over that control or the tab strip/Done, least cover of other controls; same rule and
-  cases as Android's `DialogDock.kt`), Settings the full panel with controls shown untouchable. A floating stick
-  (`SKControlNode.floating`) is a square zone, not a circle: the overlay lays its view out as the zone (1.5 stick
-  diameters, capped at 62% of the height and 36% of the width, 12 pt from the bottom and its side edge; the left
-  stick bottom-left, the right bottom-right, ignoring `xPercent`/`yPercent`) and sets `stickRadius` for the stick
-  inside it. The view is hit like any control (buttons are added later, so they win), `hitTest:` returns nil for
+  `SKDockPlacement.h` (fixed at the top right, moved down only to clear the standalone editor's Done button; same rule
+  and cases as Android's `DialogDock.kt`), Settings the full panel with controls shown untouchable. A floating stick
+  (`SKControlNode.floating`) is a square zone, not a circle, and on by default: the overlay lays its view out as the zone (1.5 stick
+  diameters, capped at 62% of the height and 36% of the width) centred on `xPercent`/`yPercent`, kept on screen, and
+  sets `stickRadius` for the stick inside it. The view is hit like any control (buttons are added later, so they win), `hitTest:` returns nil for
   anything else so it reaches the game, `touchesBegan:` puts the base (`_base`) under the thumb clamped inside the
   zone, the base follows a thumb dragged past 0.6 of the stick radius (still inside the zone), and release puts it
   back at the middle. The zone is drawn always (rounded square, hairline edge); the stick only under a held thumb,
-  a faint ghost otherwise. The editor does not drag a floating zone. Android does the same (`TouchJoystickView`).
+  a faint ghost otherwise. The editor drags a zone like any control. Android does the same (`TouchJoystickView`). Touch defaults: opacity 100%
+  (`SKDefaultOpacity`), Show Buttons on, every button (ESC too) at 0.8 of its base size, positions on a grid in
+  `defaultLayout` (identical to Android's `createDefaultLayout`). The chrome row (gear, keyboard, eye) defaults to fixed
+  centres on y 0.05 (`kChrome*` in `GameViewController.m`, same as Android's `CHROME_*`; bump the layout version when
+  they change), uses the touch buttons' fill and `-[SKTouchControlOverlay effectiveOpacity]`, and drags freely: the
+  tap slop applies only until the finger first crosses it (`chromeDragActive`). The FPS pill sits at the top centre.
 - **Combat button icons.** `btn_strafe/defend/attack/dodge/shieldbash` draw a vector glyph (`SKGlyphForNode` in
   `SKTouchControlOverlay.m`; path data is absolute M/L/C/Z on a 24-unit grid, parsed by `SKGlyphPath`) instead of
   their label, tinted in the game's HUD colours (attack red `#EB2121`, defend blue `#3B82F6`, dodge cyan `#28D9FF`,
   bash stun-star gold `#FEB200`; strafe stays neutral). Keep the paths and colours identical to Android's
-  `ControlGlyphs.kt`. `btn_attack` (right trigger, axis 5, above Defend at 0.72, 0.55) is added by `loadLayout` to
+  `ControlGlyphs.kt`. `btn_attack` (right trigger, axis 5, above Defend, at 0.664, 0.431) is added by `loadLayout` to
   layouts saved before it existed; the share fixtures are old exports without it, which still import.
 - **The launcher turns.** `LauncherViewController` supports every orientation but upside down; the centre column
   has a portrait and a landscape constraint set (`portraitConstraints` / `landscapeConstraints`) swapped in

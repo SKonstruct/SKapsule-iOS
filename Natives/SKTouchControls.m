@@ -5,15 +5,15 @@
 // not, so the floor sits above that with room to spare.
 // Fully transparent controls are unusable and there is no way back except Reset.
 const CGFloat SKMinOpacity = 0.2f;
-const CGFloat SKDefaultOpacity = 0.4f;
+const CGFloat SKDefaultOpacity = 1.0f;
 
 const CGFloat SKMinRenderScale = 0.6f;
 const CGFloat SKMaxRenderScale = 1.0f;
 const CGFloat SKMinNodeScale = 0.5f;
 const CGFloat SKMaxNodeScale = 2.5f;
 
-const CGFloat SKEscXPercent = 0.06f;
-const CGFloat SKEscYPercent = 0.10f;
+const CGFloat SKEscXPercent = 0.197f;
+const CGFloat SKEscYPercent = 0.05f;
 const CGFloat SKButtonWidthPercent = 0.067f;
 
 static NSString *const kDefaultsKey = @"touch_controls_layout";
@@ -130,7 +130,7 @@ static NSString *SKLabelForNode(NSString *nodeId, NSString *persisted) {
 /// right stick, for a thumb that would rather not use the stick. Also added to layouts saved before it existed.
 /// Keep these values identical to Android's (TouchControlModels.kt).
 + (SKControlNode *)defaultAttackNode {
-    SKControlNode *attack = [self nodeWithId:@"btn_attack" type:SKControlTypeButton label:@"Attack" x:0.72 y:0.55];
+    SKControlNode *attack = [self nodeWithId:@"btn_attack" type:SKControlTypeButton label:@"Attack" x:0.664 y:0.431];
     attack.buttonCode = 5;  // right trigger axis
     attack.isAxisTrigger = YES;
     return attack;
@@ -140,7 +140,7 @@ static NSString *SKLabelForNode(NSString *nodeId, NSString *persisted) {
     SKTouchLayout *layout = [SKTouchLayout new];
     layout.globalOpacity = SKDefaultOpacity;
     layout.controlsEnabled = YES;
-    layout.actionBarVisible = NO;
+    layout.actionBarVisible = YES;
     // Half resolution by default: SK sizes its HUD in raw framebuffer pixels, so at native
     // retina density the UI is too small to read or tap.
     layout.renderScale = SKMinRenderScale;
@@ -148,8 +148,16 @@ static NSString *SKLabelForNode(NSString *nodeId, NSString *persisted) {
 
     void (^add)(SKControlNode *) = ^(SKControlNode *node) { [layout.nodes addObject:node]; };
 
-    add([self nodeWithId:@"joy_move" type:SKControlTypeJoystickLeft label:@"" x:0.15 y:0.70]);
-    add([self nodeWithId:@"joy_face" type:SKControlTypeJoystickRight label:@"" x:0.85 y:0.70]);
+    // Positions are the author's hand-tuned layout, snapped to a grid (Android holds the same numbers,
+    // TouchControlModels.kt): the sticks mirror each other, the right cluster is two columns by four rows, and
+    // the bottom row is one even pitch with a wider gap between the attacks and the items.
+    // Both sticks float by default: each appears under the thumb inside its pad.
+    SKControlNode *joyMove = [self nodeWithId:@"joy_move" type:SKControlTypeJoystickLeft label:@"" x:0.205 y:0.617];
+    joyMove.floating = YES;
+    add(joyMove);
+    SKControlNode *joyFace = [self nodeWithId:@"joy_face" type:SKControlTypeJoystickRight label:@"" x:0.795 y:0.617];
+    joyFace.floating = YES;
+    add(joyFace);
 
     SKControlNode *esc = [self nodeWithId:@"btn_esc"
                                      type:SKControlTypeButton
@@ -159,12 +167,12 @@ static NSString *SKLabelForNode(NSString *nodeId, NSString *persisted) {
     esc.keyCode = 256;  // GLFW_KEY_ESCAPE
     add(esc);
 
-    SKControlNode *strafe = [self nodeWithId:@"btn_strafe" type:SKControlTypeButton label:@"Strafe" x:0.28 y:0.72];
+    SKControlNode *strafe = [self nodeWithId:@"btn_strafe" type:SKControlTypeButton label:@"Strafe" x:0.3517 y:0.768];
     strafe.buttonCode = 10;  // right thumb
     strafe.isToggle = YES;
     add(strafe);
 
-    SKControlNode *defend = [self nodeWithId:@"btn_defend" type:SKControlTypeButton label:@"Defend" x:0.72 y:0.72];
+    SKControlNode *defend = [self nodeWithId:@"btn_defend" type:SKControlTypeButton label:@"Defend" x:0.664 y:0.648];
     defend.buttonCode = 4;  // left trigger axis
     defend.isAxisTrigger = YES;
     add(defend);
@@ -172,20 +180,21 @@ static NSString *SKLabelForNode(NSString *nodeId, NSString *persisted) {
     add([self defaultAttackNode]);
 
     struct { NSString *nodeId; NSString *label; CGFloat x; CGFloat y; NSInteger button; } plain[] = {
-        {@"btn_dodge",      @"Dodge", 0.78, 0.38,  9},
-        {@"btn_shieldbash", @"Bash",  0.88, 0.38,  3},
-        {@"btn_prevweap",   @"↑", 0.95, 0.55, 4},
-        {@"btn_nextweap",   @"↓", 0.95, 0.85, 5},
-        // Bottom action row, 1-7. Buttons are width*0.067 across and spaced 0.07 apart, so
-        // they nearly touch; the extra 0.03 before button 4 separates attacks from items.
-        // Keep these x values identical to Android's (TouchControlModels.kt).
-        {@"btn_ab1",        @"1",     0.275, 0.90,  0},
-        {@"btn_ab2",        @"2",     0.345, 0.90,  1},
-        {@"btn_ab3",        @"3",     0.415, 0.90,  2},
-        {@"btn_item1",      @"4",     0.515, 0.90, 11},
-        {@"btn_item2",      @"5",     0.585, 0.90, 12},
-        {@"btn_item3",      @"6",     0.655, 0.90, 13},
-        {@"btn_item4",      @"7",     0.725, 0.90, 14},
+        // Right cluster: ShieldBash above Dodge in the inner column (x 0.607); Prev and Next Weap join Attack
+        // and Defend in the outer column (x 0.664).
+        {@"btn_dodge",      @"Dodge", 0.607, 0.648,  9},
+        {@"btn_shieldbash", @"Bash",  0.607, 0.431,  3},
+        {@"btn_prevweap",   @"↑", 0.664, 0.312, 4},
+        {@"btn_nextweap",   @"↓", 0.664, 0.768, 5},
+        // Bottom action row, 1-7: one even pitch (0.0575), with a wider gap before button 4 to set the
+        // attacks apart from the items. Keep these x values identical to Android's (TouchControlModels.kt).
+        {@"btn_ab1",        @"1",     0.2942, 0.90,  0},
+        {@"btn_ab2",        @"2",     0.3517, 0.90,  1},
+        {@"btn_ab3",        @"3",     0.4092, 0.90,  2},
+        {@"btn_item1",      @"4",     0.4967, 0.90, 11},
+        {@"btn_item2",      @"5",     0.5542, 0.90, 12},
+        {@"btn_item3",      @"6",     0.6117, 0.90, 13},
+        {@"btn_item4",      @"7",     0.6692, 0.90, 14},
     };
     for (size_t i = 0; i < sizeof(plain) / sizeof(plain[0]); i++) {
         SKControlNode *node = [self nodeWithId:plain[i].nodeId

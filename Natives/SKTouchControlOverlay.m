@@ -17,9 +17,10 @@ static UIColor *SKThemeColor(void) {
     return color;
 }
 
-/// A floating stick's zone is this many stick-diameters across, and this far (pt) from the screen edges.
+/// A floating stick's zone is this many stick-diameters across.
 static const CGFloat SKFloatZoneFactor = 1.5f;
-static const CGFloat SKFloatZoneMargin = 12.0f;
+/// Every button, ESC included, is drawn at this fraction of the base button size (times its own scale).
+static const CGFloat SKButtonSizeFactor = 0.8f;
 static const CGFloat kEditMinOpacity = 0.85f;
 static const CGFloat kEditHiddenOpacity = 0.3f;
 static const CGFloat kResetConfirmWindow = 2.5f;
@@ -560,17 +561,17 @@ static UIBezierPath *SKGlyphPath(NSString *data) {
 
     for (SKControlView *view in _controls) {
         SKControlNode *node = view.node;
-        CGFloat base = (node.type == SKControlTypeButton) ? baseButton : baseJoystick;
+        CGFloat base = (node.type == SKControlTypeButton) ? baseButton * SKButtonSizeFactor : baseJoystick;
         CGFloat size = base * node.scale;
-        // A floating stick lives in a square zone in its bottom corner (left stick bottom-left, right
-        // stick bottom-right), not at a saved spot; the stick appears inside it.
+        // A floating stick lives in a square zone around its saved spot (kept on screen); the stick
+        // appears inside it, under the thumb.
         if ([view isKindOfClass:SKJoystickControl.class] && node.floating) {
-            CGFloat margin = SKFloatZoneMargin;
             CGFloat zone = MIN(MIN(size * SKFloatZoneFactor, height * 0.62f), width * 0.36f);
-            CGFloat zoneX = (node.type == SKControlTypeJoystickLeft) ? margin : width - margin - zone;
-            ((SKJoystickControl *)view).stickRadius = MIN(size * 0.5f, zone * 0.5f);
+            CGFloat half = zone * 0.5f;
+            ((SKJoystickControl *)view).stickRadius = MIN(size * 0.5f, half);
             view.bounds = CGRectMake(0, 0, zone, zone);
-            view.center = CGPointMake(zoneX + zone * 0.5f, height - margin - zone * 0.5f);
+            view.center = CGPointMake(MIN(MAX(width * node.xPercent, half), MAX(half, width - half)),
+                                      MIN(MAX(height * node.yPercent, half), MAX(half, height - half)));
             continue;
         }
         view.bounds = CGRectMake(0, 0, size, size);
@@ -597,8 +598,7 @@ static UIBezierPath *SKGlyphPath(NSString *data) {
     [self dockNodePanel];
 }
 
-/// The selected control's dialog goes where it never covers that control (the player is dragging it),
-/// the tab strip or Done, and covers as few other controls as it can (see SKDockPlacement.h).
+/// The selected control's dialog goes at the top right, below the standalone editor's Done button (see SKDockPlacement.h).
 - (void)dockNodePanel {
     if (_nodeSection.hidden || !_selected) return;
     CGFloat width = self.bounds.size.width, height = self.bounds.size.height;
@@ -607,13 +607,7 @@ static UIBezierPath *SKGlyphPath(NSString *data) {
                                      withHorizontalFittingPriority:UILayoutPriorityRequired
                                            verticalFittingPriority:UILayoutPriorityFittingSizeLevel].height + 24.0f;
     CGRect reserved[2] = {CGRectInset(_tabs.frame, -8, -8), CGRectMake(width - 150, 0, 150, 64)};
-    CGRect others[64];
-    int count = 0;
-    for (SKControlView *view in _controls) {
-        if (view != _selected && count < 64) others[count++] = view.frame;
-    }
-    CGPoint origin = SKDockPlace(CGSizeMake(width, height), CGSizeMake(dialogWidth, dialogHeight), _selected.frame,
-                                 reserved, 2, others, count, 12, 16);
+    CGPoint origin = SKDockPlace(CGSizeMake(width, height), CGSizeMake(dialogWidth, dialogHeight), reserved, 2, 12, 16);
     _nodeSection.frame = CGRectMake(origin.x, origin.y, dialogWidth, dialogHeight);
 }
 
@@ -673,6 +667,11 @@ static UIBezierPath *SKGlyphPath(NSString *data) {
 
 #pragma mark Edit mode
 
+- (CGFloat)effectiveOpacity {
+    BOOL arranging = self.editing && _page == 0;
+    return arranging ? MAX(_layout.globalOpacity, kEditMinOpacity) : _layout.globalOpacity;
+}
+
 - (void)toggleEditMode {
     // A control held when the mode flips stops receiving touches, so release it here or
     // its button/axis stays latched in the gamepad mailbox.
@@ -728,7 +727,9 @@ static UIBezierPath *SKGlyphPath(NSString *data) {
     // Only the Edit page arranges controls; on Settings a tap on the bare backdrop does nothing.
     if (!self.editing || _page != 0) return;
     CGPoint point = [touches.anyObject locationInView:self];
-    if (CGRectContainsPoint(_panel.frame, point)) return;
+    // Only the panels actually on screen swallow a tap: a hidden one keeps its frame, and the Settings
+    // panel's frame is the middle of the screen, which is where most of the bottom row of buttons sits.
+    if (!_panel.hidden && CGRectContainsPoint(_panel.frame, point)) return;
     if (!_nodeSection.hidden && CGRectContainsPoint(_nodeSection.frame, point)) return;
 
     SKControlView *hit = [self controlAtPoint:point];
@@ -739,8 +740,6 @@ static UIBezierPath *SKGlyphPath(NSString *data) {
 
 - (void)touchesMoved:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
     if (!self.editing || !_dragging) return;
-    // A floating stick's zone is fixed in its corner, so it is not dragged.
-    if (_dragging.node.floating) return;
     CGPoint point = [touches.anyObject locationInView:self];
     CGFloat halfWidth = _dragging.bounds.size.width * 0.5f;
     CGFloat halfHeight = _dragging.bounds.size.height * 0.5f;

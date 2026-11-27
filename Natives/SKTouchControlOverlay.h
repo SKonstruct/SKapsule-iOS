@@ -28,6 +28,10 @@
 
 - (void)toggleEditMode;
 
+/// The opacity the controls are drawn at right now: the layout's own, raised while the editor is arranging them.
+/// The chrome buttons use it too, so they always read like the other buttons.
+- (CGFloat)effectiveOpacity;
+
 /// Set by the host (the standalone editor and the game) to open the layout library (presets,
 /// export, import); setting it is what reveals the panel's "Layouts…" button.
 @property (nonatomic, copy) void (^layoutLibraryHandler)(void);

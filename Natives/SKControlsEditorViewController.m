@@ -134,4 +134,10 @@
     return YES;
 }
 
+/// The bottom row of buttons sits near the home indicator's swipe area; like the game screen, ask the system
+/// for a second swipe there so a tap on a button is not held back or taken as a gesture.
+- (UIRectEdge)preferredScreenEdgesDeferringSystemGestures {
+    return UIRectEdgeAll;
+}
+
 @end

@@ -13,7 +13,7 @@ version: the Release workflow publishes that section as the release notes.
   (text not translated yet shows in English). The interface text now goes through `NSLocalizedString`.
 - **A credit.** "Built with ♥ by SirDank" in the top-left corner of the main screen, quiet and grey with a
   pink heart; the name opens the author's site.
-- **FPS counter.** A small "FPS 55" in the top-left corner, on by default. **Show FPS counter** in the
+- **FPS counter.** A small "FPS 55" at the top centre, on by default. **Show FPS counter** in the
   settings panel (tap ⚙ in game) turns it off.
 - **Sharpening.** A slider in the same panel sharpens the picture on its way to the screen, which is what
   you want when **Resolution** is below 100%: the game is drawn smaller and stretched, and sharpening
@@ -36,7 +36,7 @@ version: the Release workflow publishes that section as the release notes.
 - **The game's own mouse cursor.** **Show mouse cursor** in the sidebar and in the editor's Settings tab shows
   Spiral Knights' real cursor, the one the game draws on desktop, where the game last saw the pointer. It follows a
   finger, a trackpad or an external mouse, and a mouse's own pointer is hidden while it shows, so there is only one.
-  Off by default.
+  On by default.
 - **Avoid screen edges in the editor.** The Settings tab has the same switch as the sidebar, and it re-insets the
   game at once.
 - **A calmer touch-controls editor.** A tab strip at the top switches between **Edit** and **Settings**. On Edit,
@@ -46,11 +46,11 @@ version: the Release workflow publishes that section as the release notes.
   The tab strip is Edit | Settings: the settings button closes the editor.
 - **A tidier sidebar.** The descriptions under **Send crash reports**, **Sharp HUD** and **Floating right stick** are
   gone, and the settings sidebar runs to the bottom edge of the screen.
-- **Floating thumb sticks.** Turn on **Floating left stick** and/or **Floating right stick** in Settings: each stick
-  gets a square pad in its bottom corner (left stick bottom-left, right stick bottom-right) and appears where your
-  thumb lands inside it, following the thumb but never leaving the pad, with a faint ghost where it waits. A touch
-  outside the pad reaches the game, and buttons over the pad still win it. The pads stay in their corners, so they
-  are not dragged in the editor. The choice is saved in layouts, presets and exported files (older versions ignore it).
+- **Floating thumb sticks, on by default.** Each stick gets a square pad and appears where your thumb lands inside
+  it, following the thumb but never leaving the pad, with a faint ghost where it waits. A touch outside the pad
+  reaches the game, and buttons over the pad still win it. Drag a pad anywhere in the editor; **Floating left stick**
+  and **Floating right stick** in Settings turn it off. The choice is saved in layouts, presets and exported files
+  (older versions ignore it).
 - **An Attack button.** A hold button above **Defend**, the same primary attack as the right stick, for a thumb
   that would rather not use the stick. Layouts you already have get it at that spot.
 - **Icons on the combat buttons.** Strafe, Defend, Attack, Dodge and Bash show an icon instead of text, in the
@@ -65,6 +65,11 @@ version: the Release workflow publishes that section as the release notes.
 - **Typing in the game's text boxes works as you type.** The text showed up but did nothing (a search or filter did not
   update, a form did not enable) until Enter or Backspace was pressed. The on-screen keyboard now sends each
   character the way a desktop keyboard does, key press then the character then key release.
+- **The settings, keyboard and eye buttons move freely.** Dragging one stepped along in jumps of 20 points instead
+  of following your finger; it now follows it exactly once you pass the tap threshold.
+- **The buttons along the bottom can be selected in the control editor.** Taps on buttons 2 to 6 were ignored, because
+  the hidden Settings panel still claimed the middle of the screen. The standalone editor also asks the system to defer
+  its bottom-edge swipe, as the game screen does.
 - **Mods apply in a fixed order.** They used to apply in whatever order iOS listed the files, so which mod won a
   clash could differ between devices. The mods that change the most files now go first and equal ones by name, so a
   small, targeted mod wins over a broad one (the same rule as SKradle and SKapsule for Android). There is nothing to
@@ -76,6 +81,13 @@ version: the Release workflow publishes that section as the release notes.
   shows a QR code in portrait, before the game starts and the screen turns landscape: scan it with the Steam mobile app and approve, or tap **Open Steam app**. SKapsule
   no longer asks for your Steam password or a Steam Guard code, and keeps only the sign-in token it
   already stored. If you were signed in you stay signed in. **Cancel** carries on without Steam.
+- **A new default touch layout.** The buttons are laid out on a grid (the sticks mirror each other, the right cluster
+  is two columns, the bottom row has one even spacing), **Show Buttons** is on, the sticks float, and opacity starts at
+  full (it was 40%). Every button, ESC included, is a fifth smaller. **Reset Layout** and new installs get it; layouts
+  you already saved keep their positions and opacity, and the smaller buttons apply to them too.
+- **The settings, keyboard and eye buttons match the other buttons.** They use the same translucent fill and the same
+  opacity, including the boost while you arrange controls. Their default spot moved to the top, level with ESC.
+- **The control editor's dialog is always at the top right**, below the Done button in the standalone editor.
 - **Open Folder goes straight to the Files app**, on the game folder, instead of a folder picker.
 - **The default memory limit for the game is now 1024 MB** (it was 768 MB). It applies if you never changed
   the setting, and it is only a ceiling: the game still starts small and takes what it needs.
