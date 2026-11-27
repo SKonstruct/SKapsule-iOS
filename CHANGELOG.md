@@ -46,10 +46,17 @@ version: the Release workflow publishes that section as the release notes.
   The tab strip is Edit | Settings: the settings button closes the editor.
 - **A tidier sidebar.** The descriptions under **Send crash reports**, **Sharp HUD** and **Floating right stick** are
   gone, and the settings sidebar runs to the bottom edge of the screen.
-- **Floating thumb sticks.** Turn on **Floating left stick** and/or **Floating right stick** in Settings: the stick
-  appears where your thumb lands on that half of the screen and follows it, leaving a faint ghost where it
-  waits. Buttons still win a touch. The choice is saved in layouts, presets and exported files (older versions
-  ignore it).
+- **Floating thumb sticks.** Turn on **Floating left stick** and/or **Floating right stick** in Settings: each stick
+  gets a square pad in its bottom corner (left stick bottom-left, right stick bottom-right) and appears where your
+  thumb lands inside it, following the thumb but never leaving the pad, with a faint ghost where it waits. A touch
+  outside the pad reaches the game, and buttons over the pad still win it. The pads stay in their corners, so they
+  are not dragged in the editor. The choice is saved in layouts, presets and exported files (older versions ignore it).
+- **An Attack button.** A hold button above **Defend**, the same primary attack as the right stick, for a thumb
+  that would rather not use the stick. Layouts you already have get it at that spot.
+- **Icons on the combat buttons.** Strafe, Defend, Attack, Dodge and Bash show an icon instead of text, in the
+  game's colours: red for Attack, blue for Defend, light blue for Dodge and yellow (the stun colour) for Bash.
+- **The main screen turns sideways.** It is no longer locked to portrait: in landscape the title and news sit on the
+  left and the server, mode and **Launch** on the right.
 - **The modpack button says what to do.** It reads **Download Modpack**, **Update Modpack** when the modpack
   has changed, or **Modpack up to date**. SKapsule asks GitHub once when it starts.
 
@@ -69,6 +76,7 @@ version: the Release workflow publishes that section as the release notes.
   shows a QR code in portrait, before the game starts and the screen turns landscape: scan it with the Steam mobile app and approve, or tap **Open Steam app**. SKapsule
   no longer asks for your Steam password or a Steam Guard code, and keeps only the sign-in token it
   already stored. If you were signed in you stay signed in. **Cancel** carries on without Steam.
+- **Open Folder goes straight to the Files app**, on the game folder, instead of a folder picker.
 - **The default memory limit for the game is now 1024 MB** (it was 768 MB). It applies if you never changed
   the setting, and it is only a ceiling: the game still starts small and takes what it needs.
 - **The game now runs with two more of KnightLauncher's recommended settings.** Its own requests to run

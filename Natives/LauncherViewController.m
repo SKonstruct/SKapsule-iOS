@@ -78,6 +78,10 @@ static const float kPlayerEstimateMult = 1.4f;
 @property (nonatomic, strong) UILabel *ramValueLabel;
 @property (nonatomic, strong) UILabel *ramFreeLabel;
 @property (nonatomic, assign) BOOL sidebarOpen;
+/// The centre column's constraints for a portrait and a landscape screen; one set is active at a time.
+@property (nonatomic, copy) NSArray<NSLayoutConstraint *> *portraitConstraints;
+@property (nonatomic, copy) NSArray<NSLayoutConstraint *> *landscapeConstraints;
+@property (nonatomic, assign) BOOL landscapeLayoutActive;
 @end
 
 @implementation LauncherViewController
@@ -600,51 +604,14 @@ static const float kPlayerEstimateMult = 1.4f;
         [btnDonate.trailingAnchor constraintEqualToAnchor:btnOptions.leadingAnchor constant:-12],
         [btnDonate.widthAnchor constraintEqualToConstant:44], [btnDonate.heightAnchor constraintEqualToConstant:44],
 
-        // Title & Subtitle Layout
-        [titleLabel.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
-        [titleLabel.bottomAnchor constraintEqualToAnchor:self.subtitleLabel.topAnchor constant:-4],
-
-        [self.subtitleLabel.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
-        [self.subtitleLabel.bottomAnchor constraintEqualToAnchor:self.serverStack.topAnchor constant:-30],
-        [self.updateButton.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
-        [self.updateButton.topAnchor constraintEqualToAnchor:self.subtitleLabel.bottomAnchor constant:2],
-        [self.updateButton.heightAnchor constraintEqualToConstant:26],
-
-        // Server picker + segmented control
-        [self.serverStack.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
-        [self.serverStack.bottomAnchor constraintEqualToAnchor:self.btnLaunch.topAnchor constant:-20],
+        // The title, server picker, Launch, status and news card are laid out by
+        // portraitConstraints / landscapeConstraints (built below), swapped on rotation.
         [self.modeSegmentedControl.widthAnchor constraintEqualToConstant:240],
         [self.modeSegmentedControl.heightAnchor constraintEqualToConstant:48],
-
-        // Launch Button Layout
-        [self.btnLaunch.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
-        [self.btnLaunch.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor constant:30],
         [self.btnLaunch.widthAnchor constraintEqualToConstant:240],
         [self.btnLaunch.heightAnchor constraintEqualToConstant:52],
-
-        // Setup status / spinner
-        [self.spinner.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
-        [self.jitStatusButton.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
-        [self.jitStatusButton.topAnchor constraintEqualToAnchor:self.btnLaunch.bottomAnchor constant:16],
-
-        [self.spinner.topAnchor constraintEqualToAnchor:self.jitStatusButton.bottomAnchor constant:16],
-
-        [self.setupStatus.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
-        [self.setupStatus.topAnchor constraintEqualToAnchor:self.spinner.bottomAnchor constant:8],
-        [self.setupStatus.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:32],
-        [self.setupStatus.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-32],
-
-        // Pinned to the bottom; the >= keeps it from colliding with the status
-        // line on a short screen rather than overlapping it.
-        [self.newsCard.leadingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.leadingAnchor
-                                                   constant:24],
-        [self.newsCard.trailingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.trailingAnchor
-                                                     constant:-24],
-        [self.newsCard.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor
-                                                   constant:-24],
+        [self.updateButton.heightAnchor constraintEqualToConstant:26],
         [self.newsCard.heightAnchor constraintEqualToConstant:112],
-        [self.newsCard.topAnchor constraintGreaterThanOrEqualToAnchor:self.setupStatus.bottomAnchor
-                                                            constant:16],
 
         [self.newsImageView.topAnchor constraintEqualToAnchor:self.newsCard.topAnchor],
         [self.newsImageView.bottomAnchor constraintEqualToAnchor:self.newsCard.bottomAnchor],
@@ -723,6 +690,91 @@ static const float kPlayerEstimateMult = 1.4f;
         [ramRow.heightAnchor constraintEqualToConstant:40]
     ]];
 
+    // The home screen's two arrangements. Portrait stacks everything down the middle; landscape
+    // puts the title, update link and news on the left half and the server, Launch and status on the right,
+    // so it fits a short screen. viewWillLayoutSubviews swaps the active set.
+    UILayoutGuide *leftColumn = [[UILayoutGuide alloc] init];
+    UILayoutGuide *rightColumn = [[UILayoutGuide alloc] init];
+    [self.view addLayoutGuide:leftColumn];
+    [self.view addLayoutGuide:rightColumn];
+    [NSLayoutConstraint activateConstraints:@[
+        [leftColumn.leadingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.leadingAnchor],
+        [leftColumn.trailingAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+        [rightColumn.leadingAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+        [rightColumn.trailingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.trailingAnchor],
+    ]];
+
+    self.portraitConstraints = @[
+        // Title & Subtitle Layout
+        [titleLabel.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+        [titleLabel.bottomAnchor constraintEqualToAnchor:self.subtitleLabel.topAnchor constant:-4],
+        [self.subtitleLabel.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+        [self.subtitleLabel.bottomAnchor constraintEqualToAnchor:self.serverStack.topAnchor constant:-30],
+        [self.updateButton.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+        [self.updateButton.topAnchor constraintEqualToAnchor:self.subtitleLabel.bottomAnchor constant:2],
+
+        // Server picker + segmented control
+        [self.serverStack.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+        [self.serverStack.bottomAnchor constraintEqualToAnchor:self.btnLaunch.topAnchor constant:-20],
+
+        // Launch Button Layout
+        [self.btnLaunch.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+        [self.btnLaunch.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor constant:30],
+
+        // Setup status / spinner
+        [self.spinner.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+        [self.jitStatusButton.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+        [self.jitStatusButton.topAnchor constraintEqualToAnchor:self.btnLaunch.bottomAnchor constant:16],
+        [self.spinner.topAnchor constraintEqualToAnchor:self.jitStatusButton.bottomAnchor constant:16],
+        [self.setupStatus.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+        [self.setupStatus.topAnchor constraintEqualToAnchor:self.spinner.bottomAnchor constant:8],
+        [self.setupStatus.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:32],
+        [self.setupStatus.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-32],
+
+        // Pinned to the bottom; the >= keeps it from colliding with the status
+        // line on a short screen rather than overlapping it.
+        [self.newsCard.leadingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.leadingAnchor
+                                                   constant:24],
+        [self.newsCard.trailingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.trailingAnchor
+                                                     constant:-24],
+        [self.newsCard.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor
+                                                   constant:-24],
+        [self.newsCard.topAnchor constraintGreaterThanOrEqualToAnchor:self.setupStatus.bottomAnchor
+                                                            constant:16],
+    ];
+
+    self.landscapeConstraints = @[
+        // Left: title, subtitle, update link, with the news card under them.
+        [titleLabel.centerXAnchor constraintEqualToAnchor:leftColumn.centerXAnchor],
+        [titleLabel.bottomAnchor constraintEqualToAnchor:self.subtitleLabel.topAnchor constant:-4],
+        [self.subtitleLabel.centerXAnchor constraintEqualToAnchor:leftColumn.centerXAnchor],
+        [self.subtitleLabel.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor constant:-6],
+        [self.updateButton.centerXAnchor constraintEqualToAnchor:leftColumn.centerXAnchor],
+        [self.updateButton.topAnchor constraintEqualToAnchor:self.subtitleLabel.bottomAnchor constant:2],
+        [self.newsCard.leadingAnchor constraintEqualToAnchor:leftColumn.leadingAnchor constant:24],
+        [self.newsCard.trailingAnchor constraintEqualToAnchor:leftColumn.trailingAnchor constant:-16],
+        [self.newsCard.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor
+                                                   constant:-16],
+        [self.newsCard.topAnchor constraintGreaterThanOrEqualToAnchor:self.updateButton.bottomAnchor
+                                                            constant:12],
+
+        // Right: server picker, Launch, JIT pill and setup status, centred in the half.
+        [self.serverStack.centerXAnchor constraintEqualToAnchor:rightColumn.centerXAnchor],
+        [self.serverStack.bottomAnchor constraintEqualToAnchor:self.btnLaunch.topAnchor constant:-16],
+        [self.btnLaunch.centerXAnchor constraintEqualToAnchor:rightColumn.centerXAnchor],
+        [self.btnLaunch.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor constant:20],
+        [self.jitStatusButton.centerXAnchor constraintEqualToAnchor:rightColumn.centerXAnchor],
+        [self.jitStatusButton.topAnchor constraintEqualToAnchor:self.btnLaunch.bottomAnchor constant:12],
+        [self.spinner.centerXAnchor constraintEqualToAnchor:rightColumn.centerXAnchor],
+        [self.spinner.topAnchor constraintEqualToAnchor:self.jitStatusButton.bottomAnchor constant:10],
+        [self.setupStatus.centerXAnchor constraintEqualToAnchor:rightColumn.centerXAnchor],
+        [self.setupStatus.topAnchor constraintEqualToAnchor:self.spinner.bottomAnchor constant:6],
+        [self.setupStatus.leadingAnchor constraintEqualToAnchor:rightColumn.leadingAnchor constant:16],
+        [self.setupStatus.trailingAnchor constraintEqualToAnchor:rightColumn.trailingAnchor constant:-16],
+    ];
+    [NSLayoutConstraint activateConstraints:self.portraitConstraints];
+    self.landscapeLayoutActive = NO;
+
     [self setButtonsEnabled:NO];
     [self fetchPlayerCount];
     [self fetchNews];
@@ -769,21 +821,32 @@ static const float kPlayerEstimateMult = 1.4f;
 }
 
 /**
- * Re-assert portrait when the launcher comes back.
+ * Let the launcher follow the device again when it comes back.
  *
- * supportedInterfaceOrientations already says portrait-only, but iOS does not
- * re-evaluate it on its own after the landscape game controller is dismissed --
- * the launcher would stay sideways until the device was physically rotated.
+ * The launcher turns either way, but iOS does not re-evaluate the supported
+ * orientations on its own after the landscape-only game controller is dismissed --
+ * the launcher would stay as the game left it until the device was physically rotated.
  */
-- (void)enforcePortraitOrientation {
+- (void)refreshOrientation {
     [self setNeedsUpdateOfSupportedInterfaceOrientations];
     UIWindowScene *scene = self.view.window.windowScene;
     if (scene) {
-        UIWindowSceneGeometryPreferencesIOS *portrait =
+        UIWindowSceneGeometryPreferencesIOS *any =
           [[UIWindowSceneGeometryPreferencesIOS alloc]
-            initWithInterfaceOrientations:UIInterfaceOrientationMaskPortrait];
-        [scene requestGeometryUpdateWithPreferences:portrait errorHandler:nil];
+            initWithInterfaceOrientations:UIInterfaceOrientationMaskAllButUpsideDown];
+        [scene requestGeometryUpdateWithPreferences:any errorHandler:nil];
     }
+}
+
+/// Swaps the centre column between its portrait and landscape arrangement as the screen turns.
+- (void)viewWillLayoutSubviews {
+    [super viewWillLayoutSubviews];
+    if (!self.portraitConstraints) return;
+    BOOL landscape = self.view.bounds.size.width > self.view.bounds.size.height;
+    if (landscape == self.landscapeLayoutActive) return;
+    self.landscapeLayoutActive = landscape;
+    [NSLayoutConstraint deactivateConstraints:landscape ? self.portraitConstraints : self.landscapeConstraints];
+    [NSLayoutConstraint activateConstraints:landscape ? self.landscapeConstraints : self.portraitConstraints];
 }
 
 - (void)viewDidAppear:(BOOL)animated {
@@ -793,7 +856,7 @@ static const float kPlayerEstimateMult = 1.4f;
     [self warnIfJITTrapWentUnserviced];
     // In viewDidAppear, not viewWillAppear: the window scene is nil until the view
     // is actually in a window, and the scene is what performs the rotation.
-    [self enforcePortraitOrientation];
+    [self refreshOrientation];
     [self syncModsIfNeeded];
 }
 
@@ -1391,11 +1454,30 @@ static int SKCompareVersions(NSString *a, NSString *b) {
         return;
     }
     NSURL *docsURL = [NSURL fileURLWithPath:docsDir];
-    UIDocumentPickerViewController *picker = [[UIDocumentPickerViewController alloc]
-        initForOpeningContentTypes:@[[UTType typeWithIdentifier:@"public.folder"]]];
-    picker.directoryURL = docsURL;
-    picker.delegate = (id)self;
-    [self presentViewController:picker animated:YES completion:nil];
+    // The Files app opens straight onto the game folder (shareddocuments:// + the Documents path,
+    // which UIFileSharingEnabled makes visible to it). Only if that cannot be opened, fall back to
+    // the folder picker, which at least starts in the same place.
+    NSString *escaped = [docsDir stringByAddingPercentEncodingWithAllowedCharacters:NSCharacterSet.URLPathAllowedCharacterSet];
+    NSURL *filesURL = escaped ? [NSURL URLWithString:[@"shareddocuments://" stringByAppendingString:escaped]] : nil;
+    __weak typeof(self) weakSelf = self;
+    void (^pickFolder)(void) = ^{
+        typeof(self) strongSelf = weakSelf;
+        if (!strongSelf) return;
+        UIDocumentPickerViewController *picker = [[UIDocumentPickerViewController alloc]
+            initForOpeningContentTypes:@[[UTType typeWithIdentifier:@"public.folder"]]];
+        picker.directoryURL = docsURL;
+        picker.delegate = (id)strongSelf;
+        [strongSelf presentViewController:picker animated:YES completion:nil];
+    };
+    if (!filesURL) {
+        pickFolder();
+        return;
+    }
+    [UIApplication.sharedApplication openURL:filesURL
+                                     options:@{}
+                           completionHandler:^(BOOL opened) {
+        if (!opened) dispatch_async(dispatch_get_main_queue(), pickFolder);
+    }];
 }
 
 - (void)onGitHub {
@@ -2085,7 +2167,7 @@ static int SKCompareVersions(NSString *a, NSString *b) {
 }
 
 - (UIInterfaceOrientationMask)supportedInterfaceOrientations {
-    return UIInterfaceOrientationMaskPortrait;
+    return UIInterfaceOrientationMaskAllButUpsideDown;
 }
 
 @end

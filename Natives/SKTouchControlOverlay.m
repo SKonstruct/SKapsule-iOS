@@ -17,6 +17,9 @@ static UIColor *SKThemeColor(void) {
     return color;
 }
 
+/// A floating stick's zone is this many stick-diameters across, and this far (pt) from the screen edges.
+static const CGFloat SKFloatZoneFactor = 1.5f;
+static const CGFloat SKFloatZoneMargin = 12.0f;
 static const CGFloat kEditMinOpacity = 0.85f;
 static const CGFloat kEditHiddenOpacity = 0.3f;
 static const CGFloat kResetConfirmWindow = 2.5f;
@@ -38,6 +41,92 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
     } else {
         sk_gamepad_set_button((int)node.buttonCode, pressed);
     }
+}
+
+#pragma mark - Button glyphs
+
+/// Icons for the combat buttons, vector glyphs on a 24x24 grid instead of text. The path data and colours
+/// are identical to Android's (ControlGlyphs.kt): keep the two in step. The colours come from the game's own
+/// HUD icons: attack red, buff-ring cyan for Dodge, the stun star's gold for Bash; Defend is a deeper blue so
+/// it reads apart from Dodge, Strafe stays neutral.
+static const CGFloat SKGlyphGrid = 24.0f;
+
+@interface SKGlyph : NSObject
+@property (nonatomic, copy) NSString *pathData;
+@property (nonatomic, strong) UIColor *color;
+/// Neutral glyphs keep the plain dark button; the rest are tinted in their colour.
+@property (nonatomic, assign) BOOL tinted;
+@end
+@implementation SKGlyph
+@end
+
+static SKGlyph *SKGlyphForNode(NSString *nodeId) {
+    static NSDictionary<NSString *, SKGlyph *> *glyphs;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+      SKGlyph * (^make)(NSString *, uint32_t, BOOL) = ^SKGlyph *(NSString *path, uint32_t rgb, BOOL tinted) {
+        SKGlyph *glyph = [SKGlyph new];
+        glyph.pathData = path;
+        glyph.color = [UIColor colorWithRed:((rgb >> 16) & 0xFF) / 255.0
+                                      green:((rgb >> 8) & 0xFF) / 255.0
+                                       blue:(rgb & 0xFF) / 255.0
+                                      alpha:1.0];
+        glyph.tinted = tinted;
+        return glyph;
+      };
+      glyphs = @{
+          // Two opposed arrows: strafe lock.
+          @"btn_strafe" : make(@"M2 6 L15 6 L15 3.5 L22 7.5 L15 11.5 L15 9 L2 9 Z "
+                               @"M22 15 L9 15 L9 12.5 L2 16.5 L9 20.5 L9 18 L22 18 Z", 0xFFFFFF, NO),
+          // Shield.
+          @"btn_defend" : make(@"M12 2 L20 5 L20 11 C20 16.5 16.5 20.5 12 22 C7.5 20.5 4 16.5 4 11 L4 5 Z",
+                               0x3B82F6, YES),
+          // Sword, tip up and to the right.
+          @"btn_attack" : make(@"M19.4 4.6 L18.6 8.7 L11.5 15.7 L8.3 12.5 L15.3 5.4 Z "
+                               @"M5.8 10.0 L14.0 18.2 L12.3 19.9 L4.1 11.7 Z "
+                               @"M7.3 15.0 L9.0 16.7 L6.5 19.2 L4.8 17.5 Z "
+                               @"M4.2 16.9 L7.1 19.8 L6.0 21.0 L3.0 18.0 Z", 0xEB2121, YES),
+          // Double chevron: a dash.
+          @"btn_dodge" : make(@"M3 5 L10 12 L3 19 L6.6 19 L13.6 12 L6.6 5 Z "
+                              @"M11 5 L18 12 L11 19 L14.6 19 L21.6 12 L14.6 5 Z", 0x28D9FF, YES),
+          // The stun star.
+          @"btn_shieldbash" : make(@"M12.0 1.5 L14.6 8.4 L22.0 8.8 L16.2 13.4 L18.2 20.5 L12.0 16.4 "
+                                   @"L5.8 20.5 L7.8 13.4 L2.0 8.8 L9.4 8.4 Z", 0xFEB200, YES),
+      };
+    });
+    return glyphs[nodeId];
+}
+
+/// Parses the glyphs' path data: absolute M, L, C and Z only, which is all they use.
+static UIBezierPath *SKGlyphPath(NSString *data) {
+    UIBezierPath *path = [UIBezierPath bezierPath];
+    NSRegularExpression *token = [NSRegularExpression regularExpressionWithPattern:@"[MLCZ]|-?[0-9]*\\.?[0-9]+"
+                                                                           options:0
+                                                                             error:nil];
+    NSMutableArray<NSString *> *tokens = [NSMutableArray array];
+    for (NSTextCheckingResult *match in [token matchesInString:data options:0 range:NSMakeRange(0, data.length)]) {
+        [tokens addObject:[data substringWithRange:match.range]];
+    }
+    __block NSUInteger i = 0;
+    CGFloat (^num)(void) = ^CGFloat {
+      return i < tokens.count ? tokens[i++].doubleValue : 0;
+    };
+    while (i < tokens.count) {
+        NSString *cmd = tokens[i++];
+        if ([cmd isEqualToString:@"M"]) {
+            CGFloat x = num(), y = num();
+            [path moveToPoint:CGPointMake(x, y)];
+        } else if ([cmd isEqualToString:@"L"]) {
+            CGFloat x = num(), y = num();
+            [path addLineToPoint:CGPointMake(x, y)];
+        } else if ([cmd isEqualToString:@"C"]) {
+            CGFloat x1 = num(), y1 = num(), x2 = num(), y2 = num(), x = num(), y = num();
+            [path addCurveToPoint:CGPointMake(x, y) controlPoint1:CGPointMake(x1, y1) controlPoint2:CGPointMake(x2, y2)];
+        } else if ([cmd isEqualToString:@"Z"]) {
+            [path closePath];
+        }
+    }
+    return path;
 }
 
 #pragma mark - Base control
@@ -92,6 +181,10 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
 
 @implementation SKButtonControl {
     UILabel *_label;
+    /// The icon, for a combat button; the label is hidden then.
+    SKGlyph *_glyph;
+    CAShapeLayer *_glyphLayer;
+    UIBezierPath *_glyphPath;
     BOOL _pressed;
     BOOL _toggledOn;
 }
@@ -102,7 +195,18 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
     self.layer.borderWidth = 1.0f;
     self.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.28].CGColor;
 
+    _glyph = SKGlyphForNode(node.nodeId);
+    if (_glyph) {
+        _glyphPath = SKGlyphPath(_glyph.pathData);
+        _glyphLayer = [CAShapeLayer layer];
+        _glyphLayer.fillColor = _glyph.color.CGColor;
+        _glyphLayer.fillRule = kCAFillRuleNonZero;
+        [self.layer addSublayer:_glyphLayer];
+        if (_glyph.tinted) self.layer.borderColor = [_glyph.color colorWithAlphaComponent:0.6].CGColor;
+    }
+
     _label = [[UILabel alloc] initWithFrame:CGRectZero];
+    _label.hidden = _glyph != nil;
     _label.text = node.label;
     _label.textColor = UIColor.whiteColor;
     _label.textAlignment = NSTextAlignmentCenter;
@@ -118,11 +222,37 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
 - (void)layoutSubviews {
     [super layoutSubviews];
     _label.frame = self.bounds;
-    self.layer.cornerRadius = MIN(self.bounds.size.width, self.bounds.size.height) * 0.24f;
+    CGFloat size = MIN(self.bounds.size.width, self.bounds.size.height);
+    self.layer.cornerRadius = size * 0.24f;
+    if (_glyphLayer) {
+        // The glyph fills 56% of the button, centred.
+        CGFloat glyphSize = size * 0.56f;
+        CGFloat scale = glyphSize / SKGlyphGrid;
+        UIBezierPath *placed = [_glyphPath copy];
+        [placed applyTransform:CGAffineTransformMakeScale(scale, scale)];
+        [placed applyTransform:CGAffineTransformMakeTranslation((self.bounds.size.width - glyphSize) * 0.5f,
+                                                                (self.bounds.size.height - glyphSize) * 0.5f)];
+        [CATransaction begin];
+        [CATransaction setDisableActions:YES];
+        _glyphLayer.frame = self.bounds;
+        _glyphLayer.path = placed.CGPath;
+        [CATransaction commit];
+    }
 }
 
 - (void)refreshFill {
     BOOL lit = _pressed || _toggledOn;
+    if (_glyph.tinted) {
+        // The dark button with a wash of the glyph's colour, stronger while pressed.
+        CGFloat r, g, b, a;
+        [_glyph.color getRed:&r green:&g blue:&b alpha:&a];
+        CGFloat wash = lit ? 0.50 : 0.20, base = 0.12;
+        self.backgroundColor = [UIColor colorWithRed:base * (1 - wash) + r * wash
+                                               green:base * (1 - wash) + g * wash
+                                                blue:base * (1 - wash) + b * wash
+                                               alpha:lit ? 0.85 : 0.65];
+        return;
+    }
     self.backgroundColor = [UIColor colorWithWhite:(lit ? 0.48 : 0.12) alpha:(lit ? 0.80 : 0.60)];
 }
 
@@ -161,27 +291,43 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
 #pragma mark - Joystick
 
 @interface SKJoystickControl : SKControlView
-/// A floating stick at rest in play mode: drawn faintly, where it will reappear.
-@property (nonatomic, assign) BOOL idleGhost;
-/// Being held, so the overlay must not move it back to its saved spot.
-@property (nonatomic, readonly) BOOL isHeld;
+/// Radius of the stick itself. A floating stick's view is the larger square zone it moves in, so the
+/// overlay says how big the stick inside it is; a fixed stick fills its view.
+@property (nonatomic, assign) CGFloat stickRadius;
 @end
 
 @implementation SKJoystickControl {
     CGPoint _knob;
+    /// Where the stick's centre is inside the view: the middle, except a floating stick following the thumb.
+    CGPoint _base;
     BOOL _dragging;
     NSInteger _aimGeneration;
     int _axisX;
     int _axisY;
 }
 
-- (BOOL)isHeld {
-    return _dragging;
+- (void)setStickRadius:(CGFloat)stickRadius {
+    _stickRadius = stickRadius;
+    [self setNeedsDisplay];
 }
 
-- (void)setIdleGhost:(BOOL)idleGhost {
-    _idleGhost = idleGhost;
-    [self setNeedsDisplay];
+- (CGFloat)radius {
+    if (self.node.floating && _stickRadius > 0) return _stickRadius;
+    return MIN(self.bounds.size.width, self.bounds.size.height) * 0.5f;
+}
+
+- (CGPoint)middle {
+    return CGPointMake(CGRectGetMidX(self.bounds), CGRectGetMidY(self.bounds));
+}
+
+/// Moves the base to [point] (view coordinates), kept inside the zone; returns how far it moved.
+- (CGPoint)placeBase:(CGPoint)point {
+    CGFloat r = [self radius];
+    CGFloat x = MIN(MAX(point.x, r), MAX(r, self.bounds.size.width - r));
+    CGFloat y = MIN(MAX(point.y, r), MAX(r, self.bounds.size.height - r));
+    CGPoint moved = CGPointMake(x - _base.x, y - _base.y);
+    _base = CGPointMake(x, y);
+    return moved;
 }
 
 - (instancetype)initWithNode:(SKControlNode *)node {
@@ -199,63 +345,67 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
 
 - (void)layoutSubviews {
     [super layoutSubviews];
-    if (!_dragging) _knob = CGPointMake(CGRectGetMidX(self.bounds), CGRectGetMidY(self.bounds));
+    if (!_dragging) {
+        _base = [self middle];
+        _knob = _base;
+    }
     [self setNeedsDisplay];
 }
 
 - (void)drawRect:(CGRect)rect {
-    CGFloat radius = MIN(self.bounds.size.width, self.bounds.size.height) * 0.5f;
-    CGPoint centre = CGPointMake(CGRectGetMidX(self.bounds), CGRectGetMidY(self.bounds));
+    CGFloat radius = [self radius];
+    BOOL floating = self.node.floating;
 
-    UIBezierPath *base = [UIBezierPath bezierPathWithArcCenter:centre
+    if (floating) {
+        // The zone the stick may start in: a rounded square, always shown so the player knows where
+        // to put a thumb. The stick itself only appears under a held thumb.
+        CGRect zone = CGRectInset(self.bounds, 0.5f, 0.5f);
+        UIBezierPath *square = [UIBezierPath bezierPathWithRoundedRect:zone
+                                                          cornerRadius:MIN(zone.size.width, zone.size.height) * 0.12f];
+        [[UIColor colorWithWhite:0.12 alpha:0.40] setFill];
+        [square fill];
+        [[UIColor colorWithWhite:1 alpha:0.28] setStroke];
+        square.lineWidth = 1;
+        [square stroke];
+    }
+
+    UIBezierPath *base = [UIBezierPath bezierPathWithArcCenter:_base
                                                         radius:radius - 2
                                                     startAngle:0
                                                       endAngle:M_PI * 2
                                                      clockwise:YES];
     // A floating stick waiting for a thumb is only a faint hint of where it will appear.
-    BOOL ghost = self.idleGhost && !_dragging;
+    BOOL ghost = floating && !_dragging;
     [[UIColor colorWithWhite:0.12 alpha:ghost ? 0.19 : 0.40] setFill];
     [base fill];
 
+    if (ghost) return;
     UIBezierPath *knob = [UIBezierPath bezierPathWithArcCenter:_knob
                                                         radius:radius * 0.40f
                                                     startAngle:0
                                                       endAngle:M_PI * 2
                                                      clockwise:YES];
-    [[UIColor colorWithWhite:0.62 alpha:ghost ? 0.30 : 0.80] setFill];
+    [[UIColor colorWithWhite:0.62 alpha:0.80] setFill];
     [knob fill];
 }
 
-/// A floating stick starts under the thumb (kept on screen), not at its saved spot.
-- (void)floatToTouch:(UITouch *)touch {
-    UIView *parent = self.superview;
-    if (!parent) return;
-    CGPoint p = [touch locationInView:parent];
-    CGFloat halfW = self.bounds.size.width * 0.5f, halfH = self.bounds.size.height * 0.5f;
-    self.center = CGPointMake(MIN(MAX(p.x, halfW), MAX(halfW, parent.bounds.size.width - halfW)),
-                              MIN(MAX(p.y, halfH), MAX(halfH, parent.bounds.size.height - halfH)));
-}
-
 - (void)updateForTouch:(UITouch *)touch {
-    CGFloat radius = MIN(self.bounds.size.width, self.bounds.size.height) * 0.5f;
+    CGFloat radius = [self radius];
     CGFloat maxDistance = radius * kJoystickTravel;
-    UIView *parent = self.superview;
+    CGPoint point = [touch locationInView:self];
 
     // Past its travel a floating stick's base is dragged along, so the thumb never runs out of room.
-    if (self.node.floating && parent && maxDistance > 0) {
-        CGPoint p = [touch locationInView:parent];
-        CGFloat ex = p.x - self.center.x, ey = p.y - self.center.y;
+    // It stays inside the zone.
+    if (self.node.floating && maxDistance > 0) {
+        CGFloat ex = point.x - _base.x, ey = point.y - _base.y;
         CGFloat d = hypot(ex, ey);
         if (d > maxDistance) {
             CGFloat pull = (d - maxDistance) / d;
-            CGFloat halfW = self.bounds.size.width * 0.5f, halfH = self.bounds.size.height * 0.5f;
-            self.center = CGPointMake(MIN(MAX(self.center.x + ex * pull, halfW), MAX(halfW, parent.bounds.size.width - halfW)),
-                                      MIN(MAX(self.center.y + ey * pull, halfH), MAX(halfH, parent.bounds.size.height - halfH)));
+            [self placeBase:CGPointMake(_base.x + ex * pull, _base.y + ey * pull)];
         }
     }
 
-    CGPoint point = [touch locationInView:self];
-    CGPoint centre = CGPointMake(CGRectGetMidX(self.bounds), CGRectGetMidY(self.bounds));
+    CGPoint centre = _base;
 
     CGFloat dx = point.x - centre.x;
     CGFloat dy = point.y - centre.y;
@@ -279,7 +429,8 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
 - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
     _dragging = YES;
     _aimGeneration++;
-    if (self.node.floating) [self floatToTouch:touches.anyObject];
+    // A floating stick starts anywhere in its zone, under the thumb.
+    if (self.node.floating) [self placeBase:[touches.anyObject locationInView:self]];
     // Right stick doubles as attack: holding it charges, a tap fires.
     if (self.isRightStick) sk_gamepad_set_axis(5, 1.0f);
     [self updateForTouch:touches.anyObject];
@@ -292,9 +443,10 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
 - (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
     if (!_dragging) return;
     _dragging = NO;
-    _knob = CGPointMake(CGRectGetMidX(self.bounds), CGRectGetMidY(self.bounds));
+    // A floating stick goes back to the middle of its zone.
+    _base = [self middle];
+    _knob = _base;
     [self setNeedsDisplay];
-    [self.superview setNeedsLayout];  // a floating stick goes back to its saved spot
 
     if (self.isRightStick) {
         sk_gamepad_set_axis(5, -1.0f);
@@ -325,9 +477,9 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
     _aimGeneration++;
     [self zeroAxes];
     if (self.isRightStick) sk_gamepad_set_axis(5, -1.0f);
-    _knob = CGPointMake(CGRectGetMidX(self.bounds), CGRectGetMidY(self.bounds));
+    _base = [self middle];
+    _knob = _base;
     [self setNeedsDisplay];
-    [self.superview setNeedsLayout];
 }
 
 @end
@@ -394,19 +546,9 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
     UIView *hit = [super hitTest:point withEvent:event];
     if (self.editing) return hit ?: self;
-    // A floating stick takes touches anywhere on its half of the screen, but a button or the
-    // other controls under the thumb win: only a touch that would reach the game is claimed.
-    if (hit == self) return [self floatingStickAtPoint:point];
-    return hit;
-}
-
-- (SKJoystickControl *)floatingStickAtPoint:(CGPoint)point {
-    BOOL rightHalf = point.x >= self.bounds.size.width * 0.5f;
-    for (SKControlView *view in _controls.reverseObjectEnumerator) {
-        if (![view isKindOfClass:SKJoystickControl.class] || view.hidden || !view.node.floating) continue;
-        if ((view.node.type == SKControlTypeJoystickRight) == rightHalf) return (SKJoystickControl *)view;
-    }
-    return nil;
+    // A floating stick's view is its zone, so it is hit like any control; buttons are added after
+    // the sticks, so one lying over the zone wins. Anything else falls through to the game.
+    return hit == self ? nil : hit;
 }
 
 - (void)layoutSubviews {
@@ -420,9 +562,18 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
         SKControlNode *node = view.node;
         CGFloat base = (node.type == SKControlTypeButton) ? baseButton : baseJoystick;
         CGFloat size = base * node.scale;
+        // A floating stick lives in a square zone in its bottom corner (left stick bottom-left, right
+        // stick bottom-right), not at a saved spot; the stick appears inside it.
+        if ([view isKindOfClass:SKJoystickControl.class] && node.floating) {
+            CGFloat margin = SKFloatZoneMargin;
+            CGFloat zone = MIN(MIN(size * SKFloatZoneFactor, height * 0.62f), width * 0.36f);
+            CGFloat zoneX = (node.type == SKControlTypeJoystickLeft) ? margin : width - margin - zone;
+            ((SKJoystickControl *)view).stickRadius = MIN(size * 0.5f, zone * 0.5f);
+            view.bounds = CGRectMake(0, 0, zone, zone);
+            view.center = CGPointMake(zoneX + zone * 0.5f, height - margin - zone * 0.5f);
+            continue;
+        }
         view.bounds = CGRectMake(0, 0, size, size);
-        // A floating stick under a thumb moves itself; it goes home when released.
-        if ([view isKindOfClass:SKJoystickControl.class] && ((SKJoystickControl *)view).isHeld) continue;
         view.center = CGPointMake(width * node.xPercent, height * node.yPercent);
     }
 
@@ -507,7 +658,6 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
         }
         // While editing the overlay drives selection/drag itself, and the Settings page must not press anything.
         view.userInteractionEnabled = !self.editing;
-        if ([view isKindOfClass:SKJoystickControl.class]) ((SKJoystickControl *)view).idleGhost = node.floating && !self.editing;
     }
     // SK only reads the virtual pad while it reports as connected, so this gate is what
     // actually disables the controls rather than merely hiding them.
@@ -589,6 +739,8 @@ static void SKEmitNode(SKControlNode *node, BOOL pressed) {
 
 - (void)touchesMoved:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
     if (!self.editing || !_dragging) return;
+    // A floating stick's zone is fixed in its corner, so it is not dragged.
+    if (_dragging.node.floating) return;
     CGPoint point = [touches.anyObject locationInView:self];
     CGFloat halfWidth = _dragging.bounds.size.width * 0.5f;
     CGFloat halfHeight = _dragging.bounds.size.height * 0.5f;

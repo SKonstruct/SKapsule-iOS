@@ -439,9 +439,25 @@ usually belongs in the other.
 - **Editor pages and floating sticks.** The overlay's tab strip (Edit | Settings; the gear closes the editor, the standalone editor has Done) switches `_page`: Edit shows the selected control's own dialog, docked by
   `SKDockPlacement.h` (never over that control or the tab strip/Done, least cover of other controls; same rule and
   cases as Android's `DialogDock.kt`), Settings the full panel with controls shown untouchable. A floating stick
-  (`SKControlNode.floating`) is claimed in `hitTest:` only when the touch would otherwise reach the game (buttons
-  and other controls win), moves under the thumb in `touchesBegan:`, drags its base past 0.6 of its radius, and
-  goes home on release (the overlay's layout skips a held stick).
+  (`SKControlNode.floating`) is a square zone, not a circle: the overlay lays its view out as the zone (1.5 stick
+  diameters, capped at 62% of the height and 36% of the width, 12 pt from the bottom and its side edge; the left
+  stick bottom-left, the right bottom-right, ignoring `xPercent`/`yPercent`) and sets `stickRadius` for the stick
+  inside it. The view is hit like any control (buttons are added later, so they win), `hitTest:` returns nil for
+  anything else so it reaches the game, `touchesBegan:` puts the base (`_base`) under the thumb clamped inside the
+  zone, the base follows a thumb dragged past 0.6 of the stick radius (still inside the zone), and release puts it
+  back at the middle. The zone is drawn always (rounded square, hairline edge); the stick only under a held thumb,
+  a faint ghost otherwise. The editor does not drag a floating zone. Android does the same (`TouchJoystickView`).
+- **Combat button icons.** `btn_strafe/defend/attack/dodge/shieldbash` draw a vector glyph (`SKGlyphForNode` in
+  `SKTouchControlOverlay.m`; path data is absolute M/L/C/Z on a 24-unit grid, parsed by `SKGlyphPath`) instead of
+  their label, tinted in the game's HUD colours (attack red `#EB2121`, defend blue `#3B82F6`, dodge cyan `#28D9FF`,
+  bash stun-star gold `#FEB200`; strafe stays neutral). Keep the paths and colours identical to Android's
+  `ControlGlyphs.kt`. `btn_attack` (right trigger, axis 5, above Defend at 0.72, 0.55) is added by `loadLayout` to
+  layouts saved before it existed; the share fixtures are old exports without it, which still import.
+- **The launcher turns.** `LauncherViewController` supports every orientation but upside down; the centre column
+  has a portrait and a landscape constraint set (`portraitConstraints` / `landscapeConstraints`) swapped in
+  `viewWillLayoutSubviews` by the view's aspect. `refreshOrientation` (from `viewDidAppear:`) asks the scene to
+  follow the device again after the landscape-only game controller is dismissed. Open Folder opens the Files app on
+  the Documents folder with `shareddocuments://`, and falls back to the folder picker only if that fails.
 - `Natives/SKKeyboardBridge.{h,m}`: offscreen `UIKeyInput` first responder.
 - **Touch routing differs by necessity.** iOS relies on UIKit hit testing: each control is
   a real subview with its own `UITouch`, and the overlay's `hitTest:` returns nil in the

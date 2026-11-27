@@ -126,6 +126,16 @@ static NSString *SKLabelForNode(NSString *nodeId, NSString *persisted) {
     return node;
 }
 
+/// Attack (right trigger): a hold button straight above Defend, the same primary attack as tapping the
+/// right stick, for a thumb that would rather not use the stick. Also added to layouts saved before it existed.
+/// Keep these values identical to Android's (TouchControlModels.kt).
++ (SKControlNode *)defaultAttackNode {
+    SKControlNode *attack = [self nodeWithId:@"btn_attack" type:SKControlTypeButton label:@"Attack" x:0.72 y:0.55];
+    attack.buttonCode = 5;  // right trigger axis
+    attack.isAxisTrigger = YES;
+    return attack;
+}
+
 + (instancetype)defaultLayout {
     SKTouchLayout *layout = [SKTouchLayout new];
     layout.globalOpacity = SKDefaultOpacity;
@@ -159,9 +169,11 @@ static NSString *SKLabelForNode(NSString *nodeId, NSString *persisted) {
     defend.isAxisTrigger = YES;
     add(defend);
 
+    add([self defaultAttackNode]);
+
     struct { NSString *nodeId; NSString *label; CGFloat x; CGFloat y; NSInteger button; } plain[] = {
-        {@"btn_dodge",      @"Dodge", 0.78, 0.45,  9},
-        {@"btn_shieldbash", @"Bash",  0.88, 0.45,  3},
+        {@"btn_dodge",      @"Dodge", 0.78, 0.38,  9},
+        {@"btn_shieldbash", @"Bash",  0.88, 0.38,  3},
         {@"btn_prevweap",   @"↑", 0.95, 0.55, 4},
         {@"btn_nextweap",   @"↓", 0.95, 0.85, 5},
         // Bottom action row, 1-7. Buttons are width*0.067 across and spaced 0.07 apart, so
@@ -206,6 +218,10 @@ static NSString *SKLabelForNode(NSString *nodeId, NSString *persisted) {
         if (node) [nodes addObject:node];
     }
     if (nodes.count == 0) return [self defaultLayout];
+    // A layout saved before the Attack button existed gets it at its default spot.
+    BOOL hasAttack = NO;
+    for (SKControlNode *node in nodes) hasAttack |= [node.nodeId isEqualToString:@"btn_attack"];
+    if (!hasAttack) [nodes addObject:[self defaultAttackNode]];
 
     SKTouchLayout *layout = [SKTouchLayout new];
     layout.nodes = nodes;
