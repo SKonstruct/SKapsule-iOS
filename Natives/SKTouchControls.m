@@ -5,7 +5,8 @@
 // not, so the floor sits above that with room to spare.
 // Fully transparent controls are unusable and there is no way back except Reset.
 const CGFloat SKMinOpacity = 0.2f;
-const CGFloat SKDefaultOpacity = 1.0f;
+const CGFloat SKDefaultOpacity = 0.6f;
+const NSInteger SKDefaultLayoutVersion = 2;
 
 const CGFloat SKMinRenderScale = 0.6f;
 const CGFloat SKMaxRenderScale = 1.0f;
@@ -58,7 +59,6 @@ static SKControlType SKControlTypeFromString(NSString *string) {
         @"keyCode": @(self.keyCode),
         @"isAxisTrigger": @(self.isAxisTrigger),
         @"isToggle": @(self.isToggle),
-        @"floating": @(self.floating),
         @"label": self.label ?: @"",
     };
 }
@@ -99,7 +99,6 @@ static NSString *SKLabelForNode(NSString *nodeId, NSString *persisted) {
     node.keyCode = [dict[@"keyCode"] ?: @(-1) integerValue];
     node.isAxisTrigger = [dict[@"isAxisTrigger"] boolValue];
     node.isToggle = [dict[@"isToggle"] boolValue];
-    node.floating = node.type != SKControlTypeButton && [dict[@"floating"] boolValue];
     node.label = SKLabelForNode(nodeId, dict[@"label"]);
     // A layout saved before `scale` existed would decode as 0 and lay out at zero size.
     CGFloat scale = [dict[@"scale"] doubleValue];
@@ -140,7 +139,8 @@ static NSString *SKLabelForNode(NSString *nodeId, NSString *persisted) {
     SKTouchLayout *layout = [SKTouchLayout new];
     layout.globalOpacity = SKDefaultOpacity;
     layout.controlsEnabled = YES;
-    layout.actionBarVisible = YES;
+    layout.actionBarVisible = NO;
+    layout.defaultVersion = SKDefaultLayoutVersion;
     // Half resolution by default: SK sizes its HUD in raw framebuffer pixels, so at native
     // retina density the UI is too small to read or tap.
     layout.renderScale = SKMinRenderScale;
@@ -151,13 +151,9 @@ static NSString *SKLabelForNode(NSString *nodeId, NSString *persisted) {
     // Positions are the author's hand-tuned layout, snapped to a grid (Android holds the same numbers,
     // TouchControlModels.kt): the sticks mirror each other, the right cluster is two columns by four rows, and
     // the bottom row is one even pitch with a wider gap between the attacks and the items.
-    // Both sticks float by default: each appears under the thumb inside its pad.
-    SKControlNode *joyMove = [self nodeWithId:@"joy_move" type:SKControlTypeJoystickLeft label:@"" x:0.205 y:0.617];
-    joyMove.floating = YES;
-    add(joyMove);
-    SKControlNode *joyFace = [self nodeWithId:@"joy_face" type:SKControlTypeJoystickRight label:@"" x:0.795 y:0.617];
-    joyFace.floating = YES;
-    add(joyFace);
+    // Both sticks float: each appears under the thumb inside its pad.
+    add([self nodeWithId:@"joy_move" type:SKControlTypeJoystickLeft label:@"" x:0.205 y:0.617]);
+    add([self nodeWithId:@"joy_face" type:SKControlTypeJoystickRight label:@"" x:0.795 y:0.617]);
 
     SKControlNode *esc = [self nodeWithId:@"btn_esc"
                                      type:SKControlTypeButton
@@ -235,7 +231,7 @@ static NSString *SKLabelForNode(NSString *nodeId, NSString *persisted) {
     SKTouchLayout *layout = [SKTouchLayout new];
     layout.nodes = nodes;
     layout.controlsEnabled = root[@"controlsEnabled"] ? [root[@"controlsEnabled"] boolValue] : YES;
-    layout.actionBarVisible = [root[@"actionBarVisible"] boolValue];
+    layout.defaultVersion = [root[@"defaultVersion"] integerValue];
     CGFloat opacity = [root[@"globalOpacity"] doubleValue];
     layout.globalOpacity =
         (opacity <= 0) ? SKDefaultOpacity : MIN(MAX(opacity, SKMinOpacity), 1.0f);
@@ -253,7 +249,7 @@ static NSString *SKLabelForNode(NSString *nodeId, NSString *persisted) {
     NSDictionary *root = @{
         @"globalOpacity": @(self.globalOpacity),
         @"controlsEnabled": @(self.controlsEnabled),
-        @"actionBarVisible": @(self.actionBarVisible),
+        @"defaultVersion": @(self.defaultVersion),
         @"renderScale": @(self.renderScale),
         @"nodes": nodeDicts,
     };
@@ -286,7 +282,6 @@ static NSString *SKLabelForNode(NSString *nodeId, NSString *persisted) {
         out.yPercent = node.yPercent;
         out.scale = node.scale;
         out.visible = node.visible;
-        out.floating = node.floating;
         [nodes addObject:out];
     }
     shared.nodes = nodes;
@@ -296,7 +291,7 @@ static NSString *SKLabelForNode(NSString *nodeId, NSString *persisted) {
 - (void)applySharedLayout:(SKSharedLayout *)shared {
     SKTouchLayout *defaults = [SKTouchLayout defaultLayout];
     self.globalOpacity = shared ? shared.globalOpacity : defaults.globalOpacity;
-    self.actionBarVisible = shared ? shared.actionBarVisible : defaults.actionBarVisible;
+    self.defaultVersion = SKDefaultLayoutVersion;
     for (SKControlNode *node in self.nodes) {
         SKSharedNode *state = [shared nodeForId:node.nodeId];
         SKControlNode *fresh = nil;
@@ -308,14 +303,11 @@ static NSString *SKLabelForNode(NSString *nodeId, NSString *persisted) {
             node.yPercent = state.yPercent;
             node.scale = state.scale;
             node.visible = state.visible;
-            // Only a joystick floats: a file cannot make a button do it.
-            node.floating = state.floating && node.type != SKControlTypeButton;
         } else if (fresh) {
             node.xPercent = fresh.xPercent;
             node.yPercent = fresh.yPercent;
             node.scale = fresh.scale;
             node.visible = fresh.visible;
-            node.floating = fresh.floating;
         }
     }
 }

@@ -61,7 +61,7 @@
 
 "Download Failed" = "Błąd pobierania";
 
-"Download Modpack" = "Pobierz modpack";
+"Get SirDank's Modpack" = "Pobierz modpack";
 
 "Downloading Mods" = "Pobieranie modów";
 
@@ -283,10 +283,6 @@
 /* Touch editor pages */
 "Edit" = "Edytuj";
 
-
-"Floating left stick" = "Pływający lewy drążek";
-
-"Floating right stick" = "Pływający prawy drążek";
 
 /* Mods applied by themselves, and the mouse cursor */
 "Reset Game Files" = "Reset Game Files";

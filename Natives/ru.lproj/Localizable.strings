@@ -61,7 +61,7 @@
 
 "Download Failed" = "Сбой загрузки";
 
-"Download Modpack" = "Скачать модпак";
+"Get SirDank's Modpack" = "Скачать модпак";
 
 "Downloading Mods" = "Загрузка модов";
 
@@ -283,10 +283,6 @@
 /* Touch editor pages */
 "Edit" = "Изменить";
 
-
-"Floating left stick" = "Плавающий левый стик";
-
-"Floating right stick" = "Плавающий правый стик";
 
 /* Mods applied by themselves, and the mouse cursor */
 "Reset Game Files" = "Reset Game Files";

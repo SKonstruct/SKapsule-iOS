@@ -4,7 +4,7 @@ Notable changes per release. Versions are the git tags the IPAs are built from
 (`vX.Y.Z` → `SKapsule.ipa` on that release). Before releasing, rename **Unreleased** to the new
 version: the Release workflow publishes that section as the release notes.
 
-## 1.1.0
+## 2.0.0
 
 ### Added
 
@@ -44,20 +44,19 @@ version: the Release workflow publishes that section as the release notes.
   that control so it never covers what you are dragging. Settings shows the full panel with the controls
   visible but untouchable.
   The tab strip is Edit | Settings: the settings button closes the editor.
-- **A tidier sidebar.** The descriptions under **Send crash reports**, **Sharp HUD** and **Floating right stick** are
+- **A tidier sidebar.** The descriptions under **Send crash reports** and **Sharp HUD** are
   gone, and the settings sidebar runs to the bottom edge of the screen.
-- **Floating thumb sticks, on by default.** Each stick gets a square pad and appears where your thumb lands inside
+- **Floating thumb sticks.** Each stick gets a square pad and appears where your thumb lands inside
   it, following the thumb but never leaving the pad, with a faint ghost where it waits. A touch outside the pad
-  reaches the game, and buttons over the pad still win it. Drag a pad anywhere in the editor; **Floating left stick**
-  and **Floating right stick** in Settings turn it off. The choice is saved in layouts, presets and exported files
-  (older versions ignore it).
+  reaches the game, and buttons over the pad still win it. Drag a pad anywhere in the editor. The fixed round sticks
+  and the **Floating left stick** and **Floating right stick** switches are gone: this is the only kind.
 - **An Attack button.** A hold button above **Defend**, the same primary attack as the right stick, for a thumb
   that would rather not use the stick. Layouts you already have get it at that spot.
 - **Icons on the combat buttons.** Strafe, Defend, Attack, Dodge and Bash show an icon instead of text, in the
   game's colours: red for Attack, blue for Defend, light blue for Dodge and yellow (the stun colour) for Bash.
 - **The main screen turns sideways.** It is no longer locked to portrait: in landscape the title and news sit on the
   left and the server, mode and **Launch** on the right.
-- **The modpack button says what to do.** It reads **Download Modpack**, **Update Modpack** when the modpack
+- **The modpack button says what to do.** It reads **Get SirDank's Modpack**, **Update Modpack** when the modpack
   has changed, or **Modpack up to date**. SKapsule asks GitHub once when it starts.
 
 ### Fixed
@@ -86,9 +85,16 @@ version: the Release workflow publishes that section as the release notes.
 - **The events on the home screen slide.** Instead of fading from one to the next, the card slides every 8 seconds
   and you can swipe between events; dots show how many there are and which one you are on.
 - **A new default touch layout.** The buttons are laid out on a grid (the sticks mirror each other, the right cluster
-  is two columns, the bottom row has one even spacing), **Show Buttons** is on, the sticks float, and opacity starts at
-  full (it was 40%). Every button, ESC included, is a fifth smaller. **Reset Layout** and new installs get it; layouts
-  you already saved keep their positions and opacity, and the smaller buttons apply to them too.
+  is two columns, the bottom row has one even spacing), the sticks float, and opacity starts at half of the slider
+  (it was 40%, then full). Every button, ESC included, is a fifth smaller. **Reset Layout** and new installs get it;
+  layouts you already saved keep their positions and opacity, and the smaller buttons apply to them too.
+- **Reset Layout tells you when the default changed.** It reads **Reset Layout ● New default** until you reset (or
+  load a preset or file), so you can try the new controls when you like.
+- **Show Buttons starts off every time.** Each start of the app begins with only ESC and the sticks showing; the eye
+  button or the switch brings the buttons back for that session. The choice is no longer saved, and importing a layout
+  does not change it.
+- **The Steam sign-in dialog uses the SKonstruct colours** (from the brand tokens), including the new
+  username and password form.
 - **The settings, keyboard and eye buttons match the other buttons.** They use the same translucent fill and the same
   opacity, including the boost while you arrange controls. Their default spot moved to the top, level with ESC.
 - **The control editor's dialog is always at the top right**, below the Done button in the standalone editor.

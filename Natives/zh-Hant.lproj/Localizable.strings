@@ -61,7 +61,7 @@
 
 "Download Failed" = "下載失敗";
 
-"Download Modpack" = "下載模組包";
+"Get SirDank's Modpack" = "下載模組包";
 
 "Downloading Mods" = "正在下載模組";
 
@@ -283,10 +283,6 @@
 /* Touch editor pages */
 "Edit" = "編輯";
 
-
-"Floating left stick" = "浮動左搖桿";
-
-"Floating right stick" = "浮動右搖桿";
 
 /* Mods applied by themselves, and the mouse cursor */
 "Reset Game Files" = "Reset Game Files";

@@ -122,21 +122,14 @@ int main(int argc, const char *argv[]) {
         f[@"nodes"] = many;
         CHECK(Parse(Json(f), &code) == nil, "more than 64 nodes");
 
-        // --- floating sticks: optional, boolean when present, written only when on ---
+        // --- floating is gone: an older file may still carry the flag, with any value, and it is ignored ---
         f = ValidFile();
-        CHECK(![[Parse(Json(f), NULL) nodeForId:@"btn_esc"] floating], "floating absent means off");
-        f[@"nodes"] = @[ @{@"id" : @"joy_move", @"xPercent" : @0.1, @"yPercent" : @0.2, @"scale" : @1, @"visible" : @YES, @"floating" : @YES} ];
-        SKSharedLayout *fl = Parse(Json(f), NULL);
-        CHECK([[fl nodeForId:@"joy_move"] floating], "floating true is read");
-        NSArray *floatOut = [NSJSONSerialization JSONObjectWithData:[fl jsonData] options:0 error:nil][@"nodes"];
-        CHECK(floatOut.count == 1 && [floatOut[0][@"floating"] isEqual:@YES], "floating on survives a round trip");
-        SKSharedLayout *plain = Parse(Json(ValidFile()), NULL);
-        NSArray *plainOut = [NSJSONSerialization JSONObjectWithData:[plain jsonData] options:0 error:nil][@"nodes"];
-        CHECK(plainOut[0][@"floating"] == nil, "floating off is not written, so older apps see the same file");
-        f[@"nodes"] = @[ @{@"id" : @"joy_move", @"xPercent" : @0.1, @"yPercent" : @0.2, @"scale" : @1, @"visible" : @YES, @"floating" : @"yes"} ];
-        CHECK(Parse(Json(f), &code) == nil, "a non-boolean floating is refused");
-        f[@"nodes"] = @[ @{@"id" : @"joy_move", @"xPercent" : @0.1, @"yPercent" : @0.2, @"scale" : @1, @"visible" : @YES, @"floating" : @1} ];
-        CHECK(Parse(Json(f), &code) == nil, "a number is not a boolean here either");
+        f[@"nodes"] = @[ @{@"id" : @"joy_move", @"xPercent" : @0.1, @"yPercent" : @0.2, @"scale" : @1, @"visible" : @YES, @"floating" : @NO},
+                         @{@"id" : @"joy_face", @"xPercent" : @0.9, @"yPercent" : @0.2, @"scale" : @1, @"visible" : @YES, @"floating" : @"yes"} ];
+        SKSharedLayout *legacy = Parse(Json(f), NULL);
+        CHECK(legacy != nil && [legacy nodeForId:@"joy_move"] != nil, "a floating flag from an older file, of any type, still imports");
+        NSArray *legacyOut = [NSJSONSerialization JSONObjectWithData:[legacy jsonData] options:0 error:nil][@"nodes"];
+        CHECK(legacyOut.count == 2 && legacyOut[0][@"floating"] == nil, "floating is no longer written");
 
         // --- clamping and names ---
         f = ValidFile();

@@ -61,7 +61,7 @@
 
 "Download Failed" = "Download fehlgeschlagen";
 
-"Download Modpack" = "Modpack herunterladen";
+"Get SirDank's Modpack" = "Modpack herunterladen";
 
 "Downloading Mods" = "Mods werden heruntergeladen";
 
@@ -283,10 +283,6 @@
 /* Touch editor pages */
 "Edit" = "Bearbeiten";
 
-
-"Floating left stick" = "Schwebender linker Stick";
-
-"Floating right stick" = "Schwebender rechter Stick";
 
 /* Mods applied by themselves, and the mouse cursor */
 "Reset Game Files" = "Reset Game Files";

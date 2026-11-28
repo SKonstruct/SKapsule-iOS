@@ -416,7 +416,7 @@ default node table and slider ranges are meant to stay comparable, so a change t
 usually belongs in the other.
 
 - `Natives/SKTouchControls.{h,m}`: percent-based node model + `SKTouchLayout`
-  (`globalOpacity`, `controlsEnabled`, `actionBarVisible`, `renderScale`, nodes),
+  (`globalOpacity`, `controlsEnabled`, `defaultVersion`, `renderScale`, nodes; `actionBarVisible` is session-only and never saved),
   JSON-persisted in `NSUserDefaults`. All 16 Android default nodes including `btn_esc`
   (GLFW 256). `scale`/`renderScale` clamp on load so an older schema can't decode to 0.
 - `Natives/SKTouchControlOverlay.{h,m}`: edit mode, per-node visible/scale, opacity and
@@ -428,26 +428,26 @@ usually belongs in the other.
   store, a port of Android's `touch/TouchLayoutShare.kt` + `TouchLayoutPresets.kt`. An export from either
   app must import on the other, so the two must accept and refuse the same files. The file is
   `{format:"skapsule-controls", version:1 (an integer), name, globalOpacity, actionBarVisible, nodes:[{id,
-  xPercent, yPercent, scale, visible, floating?}]}` (`floating`: optional boolean, written only when true,
-  joystick-only when applied; a non-boolean refuses the file). Only the arrangement is shared (not `renderScale` or
+  xPercent, yPercent, scale, visible}]}` (an older file's `floating` is ignored; `actionBarVisible` is still required and
+  written for older apps, but never applied: Show Buttons is per session). Only the arrangement is shared (not `renderScale` or
   `controlsEnabled`), and a file is untrusted: size capped at 64 KB, at most 64 nodes, finite numbers clamped
   to the editor's own ranges, a repeated known id refused, unknown ids ignored, and any structural error
   refuses the whole file. `-[SKTouchLayout applySharedLayout:]` lays the values over the app's own nodes by id,
   so a file can move controls but never change what they send. `Natives/Tests/SKLayoutShareTests.m`
   (`make test`) and Android's `TouchLayoutShareTest.kt` parse the same two fixtures, one written by each app
   (`Natives/Tests/fixtures/`, copied to Android's `src/test/resources/`); keep them identical.
-- **Editor pages and floating sticks.** The overlay's tab strip (Edit | Settings; the gear closes the editor, the standalone editor has Done) switches `_page`: Edit shows the selected control's own dialog, docked by
+- **Editor pages and the sticks.** The overlay's tab strip (Edit | Settings; the gear closes the editor, the standalone editor has Done) switches `_page`: Edit shows the selected control's own dialog, docked by
   `SKDockPlacement.h` (fixed at the top right, moved down only to clear the standalone editor's Done button; same rule
-  and cases as Android's `DialogDock.kt`), Settings the full panel with controls shown untouchable. A floating stick
-  (`SKControlNode.floating`) is a square zone, not a circle, and on by default: the overlay lays its view out as the zone (1.5 stick
+  and cases as Android's `DialogDock.kt`), Settings the full panel with controls shown untouchable. Every stick is
+  a floating one: a square zone, not a circle (there is no fixed stick any more): the overlay lays its view out as the zone (1.5 stick
   diameters, capped at 62% of the height and 36% of the width) centred on `xPercent`/`yPercent`, kept on screen, and
   sets `stickRadius` for the stick inside it. The view is hit like any control (buttons are added later, so they win), `hitTest:` returns nil for
   anything else so it reaches the game, `touchesBegan:` puts the base (`_base`) under the thumb clamped inside the
   zone, the base follows a thumb dragged past 0.6 of the stick radius (still inside the zone), and release puts it
   back at the middle. The zone is drawn always (rounded square, hairline edge); the stick only under a held thumb,
-  a faint ghost otherwise. The editor drags a zone like any control. Android does the same (`TouchJoystickView`). Touch defaults: opacity 100%
-  (`SKDefaultOpacity`), Show Buttons on, every button (ESC too) at 0.8 of its base size, positions on a grid in
-  `defaultLayout` (identical to Android's `createDefaultLayout`). The chrome row (gear, keyboard, eye) defaults to fixed
+  a faint ghost otherwise. The editor drags a zone like any control. Android does the same (`TouchJoystickView`). Touch defaults: opacity 0.6 (half the slider,
+  `SKDefaultOpacity`), Show Buttons off at every start (`actionBarVisible` is not saved), every button (ESC too) at 0.8 of its base size, positions on a grid in
+  `defaultLayout` (identical to Android's `createDefaultLayout`). `SKDefaultLayoutVersion` (2) marks the default: a layout saved with an older `defaultVersion` gets "● New default" on Reset Layout until it is reset or a preset/file is applied; bump it when the default changes in a way worth trying. The chrome row (gear, keyboard, eye) defaults to fixed
   centres on y 0.05 (`kChrome*` in `GameViewController.m`, same as Android's `CHROME_*`; bump the layout version when
   they change), uses the touch buttons' fill and `-[SKTouchControlOverlay effectiveOpacity]`, and drags freely: the
   tap slop applies only until the finger first crosses it (`chromeDragActive`). The FPS pill sits at the top centre.

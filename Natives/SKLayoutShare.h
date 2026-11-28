@@ -37,8 +37,6 @@ extern NSString *const SKLayoutBuiltInName;
 @property (nonatomic, assign) double yPercent;
 @property (nonatomic, assign) double scale;
 @property (nonatomic, assign) BOOL visible;
-/// Optional in a file (absent means NO); only a joystick can take it when applied.
-@property (nonatomic, assign) BOOL floating;
 @end
 
 @interface SKSharedLayout : NSObject

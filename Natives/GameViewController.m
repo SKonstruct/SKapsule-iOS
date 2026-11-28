@@ -265,6 +265,17 @@ static BOOL push_key_event(UIKey *key, int action, BOOL emitCharacters) {
 
 typedef NS_ENUM(NSInteger, SKLoginMode);
 
+/// Colours of the Steam sign-in card: SKonstruct/brand tokens/colors.json, copied at a750940.
+static UIColor *skBrand(uint32_t rgb) {
+    return [UIColor colorWithRed:((rgb >> 16) & 0xFF) / 255.0 green:((rgb >> 8) & 0xFF) / 255.0 blue:(rgb & 0xFF) / 255.0 alpha:1];
+}
+static UIColor *skBrandSurface(void) { return skBrand(0x141414); }
+static UIColor *skBrandSurfaceElevated(void) { return skBrand(0x1E1E1E); }
+static UIColor *skBrandTextSecondary(void) { return skBrand(0xA6A6A6); }
+static UIColor *skBrandPink(void) { return skBrand(0xAB4A81); }
+static UIColor *skBrandPinkText(void) { return skBrand(0xE08BBB); }
+static UIColor *skBrandError(void) { return skBrand(0xFF7B72); }
+
 @interface GameViewController () <SKTouchControlOverlayDelegate, UIPointerInteractionDelegate, UITextFieldDelegate>
 @property (nonatomic, strong) UIView *surfaceView;
 @property (nonatomic, strong) SKTouchControlOverlay *touchControls;
@@ -833,7 +844,7 @@ static UIImage *skQRImage(NSString *modules) {
     overlay.backgroundColor = [UIColor colorWithWhite:0 alpha:0.75];
 
     UIView *card = [[UIView alloc] init];
-    card.backgroundColor = [UIColor colorWithWhite:0.13 alpha:1];
+    card.backgroundColor = skBrandSurfaceElevated();
     card.layer.cornerRadius = 16;
     card.translatesAutoresizingMaskIntoConstraints = NO;
     [overlay addSubview:card];
@@ -859,18 +870,21 @@ static UIImage *skQRImage(NSString *modules) {
     UILabel *body = [[UILabel alloc] init];
     body.text = NSLocalizedString(@"Scan this code with the Steam mobile app on another device and approve the sign-in, or "
                 @"open the Steam app on this one.", nil);
-    body.textColor = [UIColor colorWithWhite:0.8 alpha:1];
+    body.textColor = skBrandTextSecondary();
     body.font = [UIFont systemFontOfSize:14];
     body.numberOfLines = 0;
 
     UIButtonConfiguration *openConfig = [UIButtonConfiguration filledButtonConfiguration];
     openConfig.title = NSLocalizedString(@"Open Steam app", nil);
     openConfig.cornerStyle = UIButtonConfigurationCornerStyleCapsule;
+    openConfig.baseBackgroundColor = skBrandPink();
+    openConfig.baseForegroundColor = UIColor.whiteColor;
     UIButton *open = [UIButton buttonWithConfiguration:openConfig primaryAction:nil];
     [open addTarget:self action:@selector(onSignInOpenSteam) forControlEvents:UIControlEventTouchUpInside];
 
     UIButtonConfiguration *cancelConfig = [UIButtonConfiguration plainButtonConfiguration];
     cancelConfig.title = NSLocalizedString(@"Cancel", nil);
+    cancelConfig.baseForegroundColor = skBrandPinkText();
     UIButton *cancel = [UIButton buttonWithConfiguration:cancelConfig primaryAction:nil];
     [cancel addTarget:self action:@selector(onSignInCancel) forControlEvents:UIControlEventTouchUpInside];
 
@@ -881,6 +895,7 @@ static UIImage *skQRImage(NSString *modules) {
     // For someone with no second device to show the code to, and no way to scan it from a screenshot.
     UIButtonConfiguration *passwordConfig = [UIButtonConfiguration plainButtonConfiguration];
     passwordConfig.title = NSLocalizedString(@"Use username and password", nil);
+    passwordConfig.baseForegroundColor = skBrandPinkText();
     UIButton *usePassword = [UIButton buttonWithConfiguration:passwordConfig primaryAction:nil];
     [usePassword addTarget:self action:@selector(onSignInUsePassword) forControlEvents:UIControlEventTouchUpInside];
 
@@ -974,12 +989,12 @@ static UIImage *skQRImage(NSString *modules) {
 
 - (UITextField *)signInFieldWithPlaceholder:(NSString *)placeholder {
     UITextField *field = [[UITextField alloc] init];
-    field.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1];
+    field.backgroundColor = skBrandSurface();
     field.textColor = UIColor.whiteColor;
     field.layer.cornerRadius = 10;
     field.attributedPlaceholder = [[NSAttributedString alloc]
       initWithString:placeholder
-          attributes:@{NSForegroundColorAttributeName : [UIColor colorWithWhite:0.55 alpha:1]}];
+          attributes:@{NSForegroundColorAttributeName : skBrandTextSecondary()}];
     field.leftView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 12, 1)];
     field.leftViewMode = UITextFieldViewModeAlways;
     field.autocapitalizationType = UITextAutocapitalizationTypeNone;
@@ -1001,7 +1016,7 @@ static UIImage *skQRImage(NSString *modules) {
     title.font = [UIFont systemFontOfSize:20 weight:UIFontWeightSemibold];
 
     UILabel *message = [[UILabel alloc] init];
-    message.textColor = [UIColor colorWithWhite:0.8 alpha:1];
+    message.textColor = skBrandTextSecondary();
     message.font = [UIFont systemFontOfSize:14];
     message.numberOfLines = 0;
 
@@ -1021,16 +1036,20 @@ static UIImage *skQRImage(NSString *modules) {
 
     UIButtonConfiguration *primaryConfig = [UIButtonConfiguration filledButtonConfiguration];
     primaryConfig.cornerStyle = UIButtonConfigurationCornerStyleCapsule;
+    primaryConfig.baseBackgroundColor = skBrandPink();
+    primaryConfig.baseForegroundColor = UIColor.whiteColor;
     UIButton *primary = [UIButton buttonWithConfiguration:primaryConfig primaryAction:nil];
     [primary addTarget:self action:@selector(onSignInFormSubmit) forControlEvents:UIControlEventTouchUpInside];
 
     UIButtonConfiguration *backConfig = [UIButtonConfiguration plainButtonConfiguration];
     backConfig.title = NSLocalizedString(@"Use QR code instead", nil);
+    backConfig.baseForegroundColor = skBrandPinkText();
     UIButton *back = [UIButton buttonWithConfiguration:backConfig primaryAction:nil];
     [back addTarget:self action:@selector(onSignInUseQR) forControlEvents:UIControlEventTouchUpInside];
 
     UIButtonConfiguration *cancelConfig = [UIButtonConfiguration plainButtonConfiguration];
     cancelConfig.title = NSLocalizedString(@"Cancel", nil);
+    cancelConfig.baseForegroundColor = skBrandPinkText();
     UIButton *cancel = [UIButton buttonWithConfiguration:cancelConfig primaryAction:nil];
     [cancel addTarget:self action:@selector(onSignInCancel) forControlEvents:UIControlEventTouchUpInside];
 
@@ -1098,7 +1117,7 @@ static NSString *skSignInFailureText(NSString *detail) {
     self.signInCode.text = nil;
 
     NSString *text;
-    UIColor *color = [UIColor colorWithWhite:0.8 alpha:1];
+    UIColor *color = skBrandTextSecondary();
     UIButtonConfiguration *primary = self.signInFormPrimary.configuration;
     if (guard) {
         BOOL email = [kind isEqualToString:@"guard-email"];
@@ -1106,12 +1125,12 @@ static NSString *skSignInFailureText(NSString *detail) {
                       : detail.length ? [NSString stringWithFormat:NSLocalizedString(@"Enter the code Steam emailed to %@.", nil), detail]
                                       : NSLocalizedString(@"Enter the code Steam emailed to you.", nil);
         text = retry ? [NSString stringWithFormat:@"%@ %@", NSLocalizedString(@"That code was not accepted.", nil), ask] : ask;
-        if (retry) color = [UIColor colorWithRed:1 green:0.55 blue:0.5 alpha:1];
+        if (retry) color = skBrandError();
         primary.title = NSLocalizedString(@"Continue", nil);
     } else {
         NSString *failure = skSignInFailureText(detail);
         text = failure ?: NSLocalizedString(@"Sign in with your Steam account name and password. The password is only used to sign in and is never saved.", nil);
-        if (failure) color = [UIColor colorWithRed:1 green:0.55 blue:0.5 alpha:1];
+        if (failure) color = skBrandError();
         primary.title = NSLocalizedString(@"Sign in", nil);
     }
     self.signInFormMessage.text = text;
@@ -1155,7 +1174,7 @@ static NSString *skSignInFailureText(NSString *detail) {
         waiting = NSLocalizedString(@"Signing in…", nil);
     }
     self.signInFormMessage.text = waiting;
-    self.signInFormMessage.textColor = [UIColor colorWithWhite:0.8 alpha:1];
+    self.signInFormMessage.textColor = skBrandTextSecondary();
     for (UIControl *control in @[ self.signInUsername, self.signInPassword, self.signInCode, self.signInFormPrimary ]) {
         control.enabled = NO;
     }

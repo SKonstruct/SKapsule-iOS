@@ -61,7 +61,7 @@
 
 "Download Failed" = "فشل التنزيل";
 
-"Download Modpack" = "تنزيل حزمة التعديلات";
+"Get SirDank's Modpack" = "تنزيل حزمة التعديلات";
 
 "Downloading Mods" = "جارٍ تنزيل التعديلات";
 
@@ -283,10 +283,6 @@
 /* Touch editor pages */
 "Edit" = "تعديل";
 
-
-"Floating left stick" = "عصا يسرى عائمة";
-
-"Floating right stick" = "عصا يمنى عائمة";
 
 /* Mods applied by themselves, and the mouse cursor */
 "Reset Game Files" = "Reset Game Files";

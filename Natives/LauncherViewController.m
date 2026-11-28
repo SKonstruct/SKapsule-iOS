@@ -358,7 +358,7 @@ static const float kPlayerEstimateMult = 1.4f;
                                                      action:@selector(onShareLogs)];
     [stackView addArrangedSubview:btnShare];
 
-    UIButton *btnDownloadMods = [self createSidebarButtonWithTitle:NSLocalizedString(@"Download Modpack", nil)
+    UIButton *btnDownloadMods = [self createSidebarButtonWithTitle:NSLocalizedString(@"Get SirDank's Modpack", nil)
                                                           iconName:@"icloud.and.arrow.down"
                                                             action:@selector(onDownloadMods)];
     [stackView addArrangedSubview:btnDownloadMods];
@@ -2142,10 +2142,10 @@ static int SKCompareVersions(NSString *a, NSString *b) {
     }
 }
 
-/// "Download Modpack", "Update Modpack" when the modpack changed, "Modpack up to date" when it matches.
+/// "Get SirDank's Modpack", "Update Modpack" when the modpack changed, "Modpack up to date" when it matches.
 - (void)refreshModpackButton {
     SKModPackStatus *status = SKModManager.sharedManager.modpackStatus;
-    NSString *title = NSLocalizedString(@"Download Modpack", nil);
+    NSString *title = NSLocalizedString(@"Get SirDank's Modpack", nil);
     if (status.state == SKModPackStateUpdate) {
         title = NSLocalizedString(@"Update Modpack", nil);
     } else if (status.state == SKModPackStateCurrent) {
@@ -2171,7 +2171,7 @@ static int SKCompareVersions(NSString *a, NSString *b) {
                                         if (success) {
                                             [self refreshModpackButton];
                                             UIAlertController *done = [UIAlertController
-                                                alertControllerWithTitle:NSLocalizedString(@"Download Modpack", nil)
+                                                alertControllerWithTitle:NSLocalizedString(@"Get SirDank's Modpack", nil)
                                                                  message:summary
                                                           preferredStyle:UIAlertControllerStyleAlert];
                                             [done addAction:[UIAlertAction actionWithTitle:@"OK"

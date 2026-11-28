@@ -25,8 +25,6 @@ typedef NS_ENUM(NSInteger, SKControlType) {
 @property (nonatomic, assign) BOOL isAxisTrigger;
 /// Latching: press flips the state, release emits nothing.
 @property (nonatomic, assign) BOOL isToggle;
-/// A joystick that appears where the thumb lands instead of sitting at its saved spot.
-@property (nonatomic, assign) BOOL floating;
 @property (nonatomic, copy) NSString *label;
 /// Part of the bottom action row (attacks + items), which has its own show/hide switch.
 @property (nonatomic, assign) BOOL isActionBar;
@@ -35,7 +33,12 @@ typedef NS_ENUM(NSInteger, SKControlType) {
 @interface SKTouchLayout : NSObject
 @property (nonatomic, assign) CGFloat globalOpacity;
 @property (nonatomic, assign) BOOL controlsEnabled;
+/// "Show Buttons". Not saved: every start of the app begins with the buttons hidden (only ESC and the
+/// sticks show), and the eye button or the switch brings them back for that session.
 @property (nonatomic, assign) BOOL actionBarVisible;
+/// SKDefaultLayoutVersion of the default this layout was last reset to or made from. 0 (a layout saved
+/// before it existed) is older than any default, which lights the "new default" mark on Reset Layout.
+@property (nonatomic, assign) NSInteger defaultVersion;
 @property (nonatomic, assign) CGFloat renderScale;
 @property (nonatomic, strong) NSMutableArray<SKControlNode *> *nodes;
 
@@ -50,14 +53,18 @@ typedef NS_ENUM(NSInteger, SKControlType) {
 /// The node ids this build has: the only ones an imported layout may touch.
 + (NSSet<NSString *> *)knownNodeIds;
 - (SKSharedLayout *)sharedLayoutNamed:(NSString *)name;
-/// Lays `shared` over the live nodes (position, size, visibility) plus opacity and "Show
-/// Buttons"; nil means the built-in default arrangement. A node the layout doesn't mention takes
+/// Lays `shared` over the live nodes (position, size, visibility) plus opacity; nil means the
+/// built-in default arrangement. "Show Buttons" is per session and stays as it is. A node the layout doesn't mention takes
 /// its default. `controlsEnabled` and `renderScale` are left alone. Doesn't save.
 - (void)applySharedLayout:(SKSharedLayout *)shared;
 @end
 
 extern const CGFloat SKMinOpacity;
+/// Half way along the opacity slider (SKMinOpacity to 1).
 extern const CGFloat SKDefaultOpacity;
+/// Bumped whenever the default layout changes in a way worth trying. A saved layout made from an older
+/// default gets a mark on Reset Layout, so the new controls are one tap away.
+extern const NSInteger SKDefaultLayoutVersion;
 extern const CGFloat SKMinRenderScale;
 extern const CGFloat SKMaxRenderScale;
 extern const CGFloat SKMinNodeScale;

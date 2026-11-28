@@ -61,7 +61,7 @@
 
 "Download Failed" = "Allalaadimine nurjus";
 
-"Download Modpack" = "Laadi modipakk alla";
+"Get SirDank's Modpack" = "Laadi modipakk alla";
 
 "Downloading Mods" = "Modide allalaadimine";
 
@@ -283,10 +283,6 @@
 /* Touch editor pages */
 "Edit" = "Muuda";
 
-
-"Floating left stick" = "Ujuv vasak kang";
-
-"Floating right stick" = "Ujuv parem kang";
 
 /* Mods applied by themselves, and the mouse cursor */
 "Reset Game Files" = "Reset Game Files";

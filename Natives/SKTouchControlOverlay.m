@@ -17,7 +17,7 @@ static UIColor *SKThemeColor(void) {
     return color;
 }
 
-/// A floating stick's zone is this many stick-diameters across.
+/// A stick's zone is this many stick-diameters across.
 static const CGFloat SKFloatZoneFactor = 1.5f;
 /// Every button, ESC included, is drawn at this fraction of the base button size (times its own scale).
 static const CGFloat SKButtonSizeFactor = 0.8f;
@@ -292,14 +292,14 @@ static UIBezierPath *SKGlyphPath(NSString *data) {
 #pragma mark - Joystick
 
 @interface SKJoystickControl : SKControlView
-/// Radius of the stick itself. A floating stick's view is the larger square zone it moves in, so the
-/// overlay says how big the stick inside it is; a fixed stick fills its view.
+/// Radius of the stick itself. The view is the larger square zone the stick moves in, so the
+/// overlay says how big the stick inside it is.
 @property (nonatomic, assign) CGFloat stickRadius;
 @end
 
 @implementation SKJoystickControl {
     CGPoint _knob;
-    /// Where the stick's centre is inside the view: the middle, except a floating stick following the thumb.
+    /// Where the stick's centre is inside the view: the middle at rest, then wherever the thumb lands.
     CGPoint _base;
     BOOL _dragging;
     NSInteger _aimGeneration;
@@ -313,7 +313,7 @@ static UIBezierPath *SKGlyphPath(NSString *data) {
 }
 
 - (CGFloat)radius {
-    if (self.node.floating && _stickRadius > 0) return _stickRadius;
+    if (_stickRadius > 0) return _stickRadius;
     return MIN(self.bounds.size.width, self.bounds.size.height) * 0.5f;
 }
 
@@ -355,28 +355,25 @@ static UIBezierPath *SKGlyphPath(NSString *data) {
 
 - (void)drawRect:(CGRect)rect {
     CGFloat radius = [self radius];
-    BOOL floating = self.node.floating;
 
-    if (floating) {
-        // The zone the stick may start in: a rounded square, always shown so the player knows where
-        // to put a thumb. The stick itself only appears under a held thumb.
-        CGRect zone = CGRectInset(self.bounds, 0.5f, 0.5f);
-        UIBezierPath *square = [UIBezierPath bezierPathWithRoundedRect:zone
-                                                          cornerRadius:MIN(zone.size.width, zone.size.height) * 0.12f];
-        [[UIColor colorWithWhite:0.12 alpha:0.40] setFill];
-        [square fill];
-        [[UIColor colorWithWhite:1 alpha:0.28] setStroke];
-        square.lineWidth = 1;
-        [square stroke];
-    }
+    // The zone the stick may start in: a rounded square, always shown so the player knows where
+    // to put a thumb. The stick itself only appears under a held thumb.
+    CGRect zone = CGRectInset(self.bounds, 0.5f, 0.5f);
+    UIBezierPath *square = [UIBezierPath bezierPathWithRoundedRect:zone
+                                                      cornerRadius:MIN(zone.size.width, zone.size.height) * 0.12f];
+    [[UIColor colorWithWhite:0.12 alpha:0.40] setFill];
+    [square fill];
+    [[UIColor colorWithWhite:1 alpha:0.28] setStroke];
+    square.lineWidth = 1;
+    [square stroke];
 
     UIBezierPath *base = [UIBezierPath bezierPathWithArcCenter:_base
                                                         radius:radius - 2
                                                     startAngle:0
                                                       endAngle:M_PI * 2
                                                      clockwise:YES];
-    // A floating stick waiting for a thumb is only a faint hint of where it will appear.
-    BOOL ghost = floating && !_dragging;
+    // A stick waiting for a thumb is only a faint hint of where it will appear.
+    BOOL ghost = !_dragging;
     [[UIColor colorWithWhite:0.12 alpha:ghost ? 0.19 : 0.40] setFill];
     [base fill];
 
@@ -395,9 +392,9 @@ static UIBezierPath *SKGlyphPath(NSString *data) {
     CGFloat maxDistance = radius * kJoystickTravel;
     CGPoint point = [touch locationInView:self];
 
-    // Past its travel a floating stick's base is dragged along, so the thumb never runs out of room.
+    // Past its travel the stick's base is dragged along, so the thumb never runs out of room.
     // It stays inside the zone.
-    if (self.node.floating && maxDistance > 0) {
+    if (maxDistance > 0) {
         CGFloat ex = point.x - _base.x, ey = point.y - _base.y;
         CGFloat d = hypot(ex, ey);
         if (d > maxDistance) {
@@ -430,8 +427,8 @@ static UIBezierPath *SKGlyphPath(NSString *data) {
 - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
     _dragging = YES;
     _aimGeneration++;
-    // A floating stick starts anywhere in its zone, under the thumb.
-    if (self.node.floating) [self placeBase:[touches.anyObject locationInView:self]];
+    // The stick starts anywhere in its zone, under the thumb.
+    [self placeBase:[touches.anyObject locationInView:self]];
     // Right stick doubles as attack: holding it charges, a tap fires.
     if (self.isRightStick) sk_gamepad_set_axis(5, 1.0f);
     [self updateForTouch:touches.anyObject];
@@ -444,7 +441,7 @@ static UIBezierPath *SKGlyphPath(NSString *data) {
 - (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
     if (!_dragging) return;
     _dragging = NO;
-    // A floating stick goes back to the middle of its zone.
+    // The stick goes back to the middle of its zone.
     _base = [self middle];
     _knob = _base;
     [self setNeedsDisplay];
@@ -513,8 +510,6 @@ static UIBezierPath *SKGlyphPath(NSString *data) {
     UISlider *_scaleSlider;
     UIStackView *_nodeStack;
     UISegmentedControl *_tabs;
-    UISwitch *_floatLeftSwitch;
-    UISwitch *_floatRightSwitch;
     /// 0 = arranging controls (a small dialog only for the selected one), 1 = the full settings panel.
     NSInteger _page;
 
@@ -547,7 +542,7 @@ static UIBezierPath *SKGlyphPath(NSString *data) {
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
     UIView *hit = [super hitTest:point withEvent:event];
     if (self.editing) return hit ?: self;
-    // A floating stick's view is its zone, so it is hit like any control; buttons are added after
+    // A stick's view is its zone, so it is hit like any control; buttons are added after
     // the sticks, so one lying over the zone wins. Anything else falls through to the game.
     return hit == self ? nil : hit;
 }
@@ -563,9 +558,9 @@ static UIBezierPath *SKGlyphPath(NSString *data) {
         SKControlNode *node = view.node;
         CGFloat base = (node.type == SKControlTypeButton) ? baseButton * SKButtonSizeFactor : baseJoystick;
         CGFloat size = base * node.scale;
-        // A floating stick lives in a square zone around its saved spot (kept on screen); the stick
+        // A stick lives in a square zone around its saved spot (kept on screen); the stick
         // appears inside it, under the thumb.
-        if ([view isKindOfClass:SKJoystickControl.class] && node.floating) {
+        if ([view isKindOfClass:SKJoystickControl.class]) {
             CGFloat zone = MIN(MIN(size * SKFloatZoneFactor, height * 0.62f), width * 0.36f);
             CGFloat half = zone * 0.5f;
             ((SKJoystickControl *)view).stickRadius = MIN(size * 0.5f, half);
@@ -864,8 +859,8 @@ static UIBezierPath *SKGlyphPath(NSString *data) {
     _layoutsButton.hidden = (self.layoutLibraryHandler == nil);
 
     _resetButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    [_resetButton setTitle:@"Reset Layout" forState:UIControlStateNormal];
     [_resetButton addTarget:self action:@selector(onResetTapped) forControlEvents:UIControlEventTouchUpInside];
+    [self updateResetButton];
 
     _nodeTitle = [self panelLabel:@""];
     _visibleSwitch = [UISwitch new];
@@ -898,15 +893,6 @@ static UIBezierPath *SKGlyphPath(NSString *data) {
     ]];
     _nodeSection.hidden = YES;
 
-    // Floating sticks, one switch each (saved in the layout).
-    _floatLeftSwitch = [UISwitch new];
-    _floatLeftSwitch.onTintColor = SKThemeColor();
-    [_floatLeftSwitch addTarget:self action:@selector(onFloatChanged:) forControlEvents:UIControlEventValueChanged];
-    _floatRightSwitch = [UISwitch new];
-    _floatRightSwitch.onTintColor = SKThemeColor();
-    [_floatRightSwitch addTarget:self action:@selector(onFloatChanged:) forControlEvents:UIControlEventValueChanged];
-    [self syncFloatSwitches];
-
     _tabs = [[UISegmentedControl alloc] initWithItems:@[
         NSLocalizedString(@"Edit", nil), NSLocalizedString(@"Settings", nil)]];
     _tabs.selectedSegmentIndex = 0;
@@ -929,8 +915,6 @@ static UIBezierPath *SKGlyphPath(NSString *data) {
         _sharpenLabel,
         sharpenRow,
         [self rowWithLabel:@"Sharp HUD (experimental)" control:_hudSwitch],
-        [self rowWithLabel:NSLocalizedString(@"Floating left stick", nil) control:_floatLeftSwitch],
-        [self rowWithLabel:NSLocalizedString(@"Floating right stick", nil) control:_floatRightSwitch],
         _layoutsButton,
         _resetButton,
     ]];
@@ -961,19 +945,19 @@ static UIBezierPath *SKGlyphPath(NSString *data) {
     [self addSubview:_tabs];
 }
 
-- (void)syncFloatSwitches {
-    for (SKControlNode *node in _layout.nodes) {
-        if (node.type == SKControlTypeJoystickLeft) _floatLeftSwitch.on = node.floating;
-        if (node.type == SKControlTypeJoystickRight) _floatRightSwitch.on = node.floating;
-    }
+/// Reset Layout's title, marked when the default has changed since this layout was made or reset.
+- (BOOL)defaultIsNewer {
+    return _layout.defaultVersion < SKDefaultLayoutVersion;
 }
 
-- (void)onFloatChanged:(UISwitch *)sender {
-    SKControlType type = (sender == _floatLeftSwitch) ? SKControlTypeJoystickLeft : SKControlTypeJoystickRight;
-    for (SKControlNode *node in _layout.nodes) {
-        if (node.type == type) node.floating = sender.on;
-    }
-    [self applyAppearance];
+- (void)updateResetButton {
+    if (_resetArmed) return;
+    BOOL newer = [self defaultIsNewer];
+    [_resetButton setTitle:newer ? NSLocalizedString(@"Reset Layout  ● New default", nil) : @"Reset Layout"
+                  forState:UIControlStateNormal];
+    // brand pinkText; nil puts the system tint back.
+    [_resetButton setTitleColor:newer ? [UIColor colorWithRed:0xE0 / 255.0 green:0x8B / 255.0 blue:0xBB / 255.0 alpha:1] : nil
+                       forState:UIControlStateNormal];
 }
 
 - (void)onEnableChanged {
@@ -1078,18 +1062,18 @@ static UIBezierPath *SKGlyphPath(NSString *data) {
             typeof(self) strongSelf = weakSelf;
             if (strongSelf && strongSelf->_resetArmed) {
                 strongSelf->_resetArmed = NO;
-                [strongSelf->_resetButton setTitle:@"Reset Layout" forState:UIControlStateNormal];
+                [strongSelf updateResetButton];
             }
         });
         return;
     }
     _resetArmed = NO;
-    [_resetButton setTitle:@"Reset Layout" forState:UIControlStateNormal];
 
     SKTouchLayout *defaults = [SKTouchLayout defaultLayout];
     _layout.globalOpacity = defaults.globalOpacity;
     _layout.controlsEnabled = defaults.controlsEnabled;
-    _layout.actionBarVisible = defaults.actionBarVisible;
+    // "Show Buttons" belongs to the session: a reset does not flip it.
+    _layout.defaultVersion = defaults.defaultVersion;
     _layout.renderScale = defaults.renderScale;
     for (SKControlNode *fresh in defaults.nodes) {
         for (SKControlView *view in _controls) {
@@ -1098,11 +1082,10 @@ static UIBezierPath *SKGlyphPath(NSString *data) {
             view.node.yPercent = fresh.yPercent;
             view.node.scale = fresh.scale;
             view.node.visible = fresh.visible;
-            view.node.floating = fresh.floating;
         }
     }
     [_layout save];
-    [self syncFloatSwitches];
+    [self updateResetButton];
 
     _enableSwitch.on = _layout.controlsEnabled;
     _actionBarSwitch.on = _layout.actionBarVisible;
@@ -1125,12 +1108,12 @@ static UIBezierPath *SKGlyphPath(NSString *data) {
 }
 
 - (void)applySharedLayout:(SKSharedLayout *)shared {
-    [_layout applySharedLayout:shared];  // mutates the nodes the control views hold
+    [_layout applySharedLayout:shared];  // mutates the nodes the control views hold; Show Buttons is left as it is
     [_layout save];
 
     _actionBarSwitch.on = _layout.actionBarVisible;
     _opacitySlider.value = _layout.globalOpacity;
-    [self syncFloatSwitches];
+    [self updateResetButton];
     [self selectControl:nil];
     [self applyAppearance];
     [self setNeedsLayout];

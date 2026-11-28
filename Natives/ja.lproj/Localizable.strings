@@ -61,7 +61,7 @@
 
 "Download Failed" = "ダウンロード失敗";
 
-"Download Modpack" = "Modパックをダウンロード";
+"Get SirDank's Modpack" = "Modパックをダウンロード";
 
 "Downloading Mods" = "Modをダウンロード中";
 
@@ -283,10 +283,6 @@
 /* Touch editor pages */
 "Edit" = "編集";
 
-
-"Floating left stick" = "フローティング左スティック";
-
-"Floating right stick" = "フローティング右スティック";
 
 /* Mods applied by themselves, and the mouse cursor */
 "Reset Game Files" = "Reset Game Files";
