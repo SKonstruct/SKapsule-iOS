@@ -369,6 +369,33 @@ JNIEXPORT jboolean JNICALL Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeS
     return [SKNativeBridge signInCancelled] ? JNI_TRUE : JNI_FALSE;
 }
 
+JNIEXPORT void JNICALL Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeShowSignInForm(JNIEnv *env, jclass clazz,
+                                                                                          jstring kind, jstring detail,
+                                                                                          jboolean retry) {
+    NSString *detailText = detail ? skJString(env, detail) : nil;
+    [SKNativeBridge onShowSignInForm:skJString(env, kind) detail:detailText retry:retry == JNI_TRUE];
+}
+
+JNIEXPORT jboolean JNICALL Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeSignInPasswordRequested(JNIEnv *env,
+                                                                                                       jclass clazz) {
+    return [SKNativeBridge signInPasswordRequested] ? JNI_TRUE : JNI_FALSE;
+}
+
+/// A string, or NULL for nil, which is how the JVM side tells "nothing submitted" from an empty value.
+static jstring skNewJString(JNIEnv *env, NSString *s) {
+    return s ? (*env)->NewStringUTF(env, s.UTF8String) : NULL;
+}
+
+JNIEXPORT jstring JNICALL Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeTakeSignInCredentials(JNIEnv *env,
+                                                                                                    jclass clazz) {
+    return skNewJString(env, [SKNativeBridge takeSignInCredentials]);
+}
+
+JNIEXPORT jstring JNICALL Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeTakeSignInGuardCode(JNIEnv *env,
+                                                                                                  jclass clazz) {
+    return skNewJString(env, [SKNativeBridge takeSignInGuardCode]);
+}
+
 JNIEXPORT void JNICALL Java_com_skarm_launcher_bootstrap_SkBootstrap_registerGlfwNatives(JNIEnv *env, jclass clazz,
                                                                                          jclass glfwClass) {
     extern void register_glfw_natives(JNIEnv * env, jclass glfwClass);
@@ -448,6 +475,14 @@ static void register_sk_natives(void) {
             {"nativeHideSignIn", "()V", (void *)&Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeHideSignIn},
             {"nativeSignInCancelled", "()Z",
              (void *)&Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeSignInCancelled},
+            {"nativeShowSignInForm", "(Ljava/lang/String;Ljava/lang/String;Z)V",
+             (void *)&Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeShowSignInForm},
+            {"nativeSignInPasswordRequested", "()Z",
+             (void *)&Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeSignInPasswordRequested},
+            {"nativeTakeSignInCredentials", "()Ljava/lang/String;",
+             (void *)&Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeTakeSignInCredentials},
+            {"nativeTakeSignInGuardCode", "()Ljava/lang/String;",
+             (void *)&Java_com_skarm_launcher_bootstrap_SkBootstrap_nativeTakeSignInGuardCode},
             {"registerGlfwNatives", "(Ljava/lang/Class;)V",
              (void *)&Java_com_skarm_launcher_bootstrap_SkBootstrap_registerGlfwNatives},
         };

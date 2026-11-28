@@ -20,7 +20,7 @@
 /// Steam only knows Steam players; the count is scaled for standalone installs, as KnightLauncher does.
 static const float kPlayerEstimateMult = 1.4f;
 
-@interface LauncherViewController () <UITextViewDelegate>
+@interface LauncherViewController () <UITextViewDelegate, UIScrollViewDelegate>
 @property (nonatomic, strong) UITextView *creditView;
 @property (nonatomic, strong) UISegmentedControl *modeSegmentedControl;
 @property (nonatomic, strong) UIStackView *serverStack;
@@ -30,12 +30,11 @@ static const float kPlayerEstimateMult = 1.4f;
 @property (nonatomic, strong) UIButton *btnLaunch;
 @property (nonatomic, strong) UILabel *subtitleLabel;
 @property (nonatomic, strong) UIView *newsCard;
-@property (nonatomic, strong) UIImageView *newsImageView;
-@property (nonatomic, strong) UILabel *newsEndsInLabel;
-@property (nonatomic, strong) NSLayoutConstraint *newsEndsInHeight;
-@property (nonatomic, strong) UILabel *newsTitleLabel;
-@property (nonatomic, strong) UILabel *newsBodyLabel;
-@property (nonatomic, copy) NSString *newsLink;
+@property (nonatomic, strong) UIScrollView *newsScroll;
+@property (nonatomic, strong) UIStackView *newsPages;
+@property (nonatomic, strong) UIPageControl *newsDots;
+@property (nonatomic, copy) NSArray<UIImageView *> *newsPageImages;  // per page, the wrap repeat included
+@property (nonatomic, assign) CGFloat newsLaidOutWidth;
 @property (nonatomic, copy) NSArray<SKNewsItem *> *newsItems;
 @property (nonatomic, assign) NSUInteger newsIndex;
 @property (nonatomic, strong) NSTimer *newsTimer;
@@ -286,45 +285,29 @@ static const float kPlayerEstimateMult = 1.4f;
                                                     action:@selector(onNewsTapped)]];
     [self.view addSubview:self.newsCard];
 
-    self.newsImageView = [[UIImageView alloc] init];
-    self.newsImageView.contentMode = UIViewContentModeScaleAspectFill;
-    self.newsImageView.clipsToBounds = YES;
-    self.newsImageView.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.newsCard addSubview:self.newsImageView];
+    // The events are pages of a paging scroll view, built when the feed arrives (see fetchNews).
+    self.newsScroll = [[UIScrollView alloc] init];
+    self.newsScroll.pagingEnabled = YES;
+    self.newsScroll.showsHorizontalScrollIndicator = NO;
+    self.newsScroll.delegate = self;
+    self.newsScroll.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.newsCard addSubview:self.newsScroll];
 
-    // The banner art is arbitrary, so the text carries its own contrast rather
-    // than trusting whatever image arrives.
-    UIView *newsScrim = [[UIView alloc] init];
-    newsScrim.backgroundColor = [UIColor colorWithWhite:0 alpha:0.65];
-    newsScrim.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.newsCard addSubview:newsScrim];
+    self.newsPages = [[UIStackView alloc] init];
+    self.newsPages.axis = UILayoutConstraintAxisHorizontal;
+    self.newsPages.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.newsScroll addSubview:self.newsPages];
 
-    self.newsEndsInLabel = [[UILabel alloc] init];
-    self.newsEndsInLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightSemibold];
-    self.newsEndsInLabel.textColor = UIColor.whiteColor;
     self.newsChipColor = [themeColor colorWithAlphaComponent:0.8];
-    self.newsEndsInLabel.backgroundColor = self.newsChipColor;
-    self.newsEndsInLabel.textAlignment = NSTextAlignmentCenter;
-    self.newsEndsInLabel.layer.cornerRadius = 4;
-    self.newsEndsInLabel.clipsToBounds = YES;
-    self.newsEndsInLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    // Collapsed rather than merely hidden when there is no expiry: a hidden view
-    // keeps its frame, which would leave the chip's gap above the title.
-    self.newsEndsInHeight = [self.newsEndsInLabel.heightAnchor constraintEqualToConstant:18];
-    [self.newsCard addSubview:self.newsEndsInLabel];
 
-    self.newsTitleLabel = [[UILabel alloc] init];
-    self.newsTitleLabel.font = [UIFont boldSystemFontOfSize:16];
-    self.newsTitleLabel.textColor = UIColor.whiteColor;
-    self.newsTitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.newsCard addSubview:self.newsTitleLabel];
-
-    self.newsBodyLabel = [[UILabel alloc] init];
-    self.newsBodyLabel.font = [UIFont systemFontOfSize:12];
-    self.newsBodyLabel.textColor = [UIColor colorWithWhite:0.87 alpha:1.0];
-    self.newsBodyLabel.numberOfLines = 2;
-    self.newsBodyLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.newsCard addSubview:self.newsBodyLabel];
+    // Display only: a tap on the card opens the event, and a swipe moves between them.
+    self.newsDots = [[UIPageControl alloc] init];
+    self.newsDots.userInteractionEnabled = NO;
+    self.newsDots.hidden = YES;
+    self.newsDots.pageIndicatorTintColor = [UIColor colorWithWhite:1.0 alpha:0.35];
+    self.newsDots.currentPageIndicatorTintColor = UIColor.whiteColor;
+    self.newsDots.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.newsCard addSubview:self.newsDots];
 
     self.dimmingView = [[UIView alloc] init];
     self.dimmingView.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.4];
@@ -613,32 +596,18 @@ static const float kPlayerEstimateMult = 1.4f;
         [self.updateButton.heightAnchor constraintEqualToConstant:26],
         [self.newsCard.heightAnchor constraintEqualToConstant:112],
 
-        [self.newsImageView.topAnchor constraintEqualToAnchor:self.newsCard.topAnchor],
-        [self.newsImageView.bottomAnchor constraintEqualToAnchor:self.newsCard.bottomAnchor],
-        [self.newsImageView.leadingAnchor constraintEqualToAnchor:self.newsCard.leadingAnchor],
-        [self.newsImageView.trailingAnchor constraintEqualToAnchor:self.newsCard.trailingAnchor],
-        [newsScrim.topAnchor constraintEqualToAnchor:self.newsCard.topAnchor],
-        [newsScrim.bottomAnchor constraintEqualToAnchor:self.newsCard.bottomAnchor],
-        [newsScrim.leadingAnchor constraintEqualToAnchor:self.newsCard.leadingAnchor],
-        [newsScrim.trailingAnchor constraintEqualToAnchor:self.newsCard.trailingAnchor],
-
-        [self.newsEndsInLabel.topAnchor constraintEqualToAnchor:self.newsCard.topAnchor constant:12],
-        [self.newsEndsInLabel.leadingAnchor constraintEqualToAnchor:self.newsCard.leadingAnchor
-                                                           constant:12],
-        self.newsEndsInHeight,
-        [self.newsEndsInLabel.widthAnchor constraintGreaterThanOrEqualToConstant:64],
-        [self.newsTitleLabel.topAnchor constraintEqualToAnchor:self.newsEndsInLabel.bottomAnchor
-                                                      constant:6],
-        [self.newsTitleLabel.leadingAnchor constraintEqualToAnchor:self.newsCard.leadingAnchor
-                                                          constant:12],
-        [self.newsTitleLabel.trailingAnchor constraintEqualToAnchor:self.newsCard.trailingAnchor
-                                                           constant:-12],
-        [self.newsBodyLabel.topAnchor constraintEqualToAnchor:self.newsTitleLabel.bottomAnchor
-                                                     constant:2],
-        [self.newsBodyLabel.leadingAnchor constraintEqualToAnchor:self.newsCard.leadingAnchor
-                                                         constant:12],
-        [self.newsBodyLabel.trailingAnchor constraintEqualToAnchor:self.newsCard.trailingAnchor
-                                                          constant:-12],
+        [self.newsScroll.topAnchor constraintEqualToAnchor:self.newsCard.topAnchor],
+        [self.newsScroll.bottomAnchor constraintEqualToAnchor:self.newsCard.bottomAnchor],
+        [self.newsScroll.leadingAnchor constraintEqualToAnchor:self.newsCard.leadingAnchor],
+        [self.newsScroll.trailingAnchor constraintEqualToAnchor:self.newsCard.trailingAnchor],
+        [self.newsPages.topAnchor constraintEqualToAnchor:self.newsScroll.contentLayoutGuide.topAnchor],
+        [self.newsPages.bottomAnchor constraintEqualToAnchor:self.newsScroll.contentLayoutGuide.bottomAnchor],
+        [self.newsPages.leadingAnchor constraintEqualToAnchor:self.newsScroll.contentLayoutGuide.leadingAnchor],
+        [self.newsPages.trailingAnchor constraintEqualToAnchor:self.newsScroll.contentLayoutGuide.trailingAnchor],
+        [self.newsPages.heightAnchor constraintEqualToAnchor:self.newsScroll.frameLayoutGuide.heightAnchor],
+        [self.newsDots.centerXAnchor constraintEqualToAnchor:self.newsCard.centerXAnchor],
+        [self.newsDots.bottomAnchor constraintEqualToAnchor:self.newsCard.bottomAnchor constant:-2],
+        [self.newsDots.heightAnchor constraintEqualToConstant:20],
 
         // Dimming overlay constraints
         [self.dimmingView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
@@ -1146,10 +1115,12 @@ static const float kPlayerEstimateMult = 1.4f;
 #pragma mark - News
 
 /**
- * Fills the home-screen card from the feed and, when it carries more than one event,
- * rotates through them as KnightLauncher does: a random first event, then the next every
- * SKNewsRotateInterval. The card stays hidden when there is nothing to show, and only
- * rotates while this screen is visible.
+ * Fills the home-screen card from the feed as a paging carousel. With more than one event it
+ * starts on a random one and slides to the next every SKNewsRotateInterval, as KnightLauncher
+ * rotates, and the user can swipe between them. The first event is repeated after the last so
+ * the slide from the end wraps forward instead of rewinding; the repeat is swapped for the real
+ * first page once the slide settles. The card stays hidden when there is nothing to show, and
+ * only slides while this screen is visible.
  */
 - (void)fetchNews {
     __weak typeof(self) weakSelf = self;
@@ -1160,10 +1131,113 @@ static const float kPlayerEstimateMult = 1.4f;
       self.newsImages = [NSMutableDictionary dictionary];
       self.newsImageRequests = [NSMutableSet set];
       self.newsIndex = arc4random_uniform((uint32_t)items.count);
+      [self buildNewsPages];
       self.newsCard.hidden = NO;
-      [self showNewsItem:items[self.newsIndex] animated:NO];
+      [self.view layoutIfNeeded];
+      self.newsLaidOutWidth = 0;
+      [self syncNewsOffset];
+      for (SKNewsItem *item in items) [self loadNewsImage:item];
       [self startNewsRotation];
     });
+}
+
+- (void)buildNewsPages {
+    for (UIView *page in self.newsPages.arrangedSubviews) {
+        [self.newsPages removeArrangedSubview:page];
+        [page removeFromSuperview];
+    }
+    NSUInteger count = self.newsItems.count;
+    NSMutableArray<UIImageView *> *images = [NSMutableArray array];
+    for (NSUInteger i = 0; i < (count > 1 ? count + 1 : count); i++) {
+        UIImageView *image = nil;
+        UIView *page = [self newsPageForItem:self.newsItems[i % count] image:&image];
+        [self.newsPages addArrangedSubview:page];
+        [page.widthAnchor constraintEqualToAnchor:self.newsScroll.frameLayoutGuide.widthAnchor].active = YES;
+        [images addObject:image];
+    }
+    self.newsPageImages = images;
+    self.newsDots.numberOfPages = count;
+    self.newsDots.currentPage = self.newsIndex;
+    self.newsDots.hidden = count < 2;
+    self.newsScroll.scrollEnabled = count > 1;
+}
+
+/// One event's page: banner, the scrim that keeps the text legible over any art, the status chip,
+/// title and body.
+- (UIView *)newsPageForItem:(SKNewsItem *)item image:(UIImageView **)imageOut {
+    UIView *page = [[UIView alloc] init];
+    page.translatesAutoresizingMaskIntoConstraints = NO;
+
+    UIImageView *image = [[UIImageView alloc] init];
+    image.contentMode = UIViewContentModeScaleAspectFill;
+    image.clipsToBounds = YES;
+    image.image = item.imageURL ? self.newsImages[item.imageURL] : nil;
+    image.translatesAutoresizingMaskIntoConstraints = NO;
+    [page addSubview:image];
+
+    // The banner art is arbitrary, so the text carries its own contrast rather
+    // than trusting whatever image arrives.
+    UIView *scrim = [[UIView alloc] init];
+    scrim.backgroundColor = [UIColor colorWithWhite:0 alpha:0.65];
+    scrim.translatesAutoresizingMaskIntoConstraints = NO;
+    [page addSubview:scrim];
+
+    // Evergreen events carry no window; drop the chip rather than inventing a countdown. It is
+    // collapsed rather than merely hidden: a hidden view keeps its frame, which would leave the
+    // chip's gap above the title.
+    NSString *status = SKNewsStatusLabel(item.startsAt, item.endsAt);
+    BOOL endingSoon = item.isEndingSoon;
+    UILabel *chip = [[UILabel alloc] init];
+    chip.font = [UIFont systemFontOfSize:11 weight:UIFontWeightSemibold];
+    chip.textAlignment = NSTextAlignmentCenter;
+    chip.layer.cornerRadius = 4;
+    chip.clipsToBounds = YES;
+    chip.hidden = (status == nil);
+    chip.text = status ? [NSString stringWithFormat:@"  %@  ", status] : @"";
+    // KnightLauncher's CustomColors.WARNING, with dark text as on its badge.
+    chip.backgroundColor =
+      endingSoon ? [UIColor colorWithRed:251 / 255.0 green:198 / 255.0 blue:91 / 255.0 alpha:1.0] : self.newsChipColor;
+    chip.textColor = endingSoon ? [UIColor colorWithWhite:0.125 alpha:1.0] : UIColor.whiteColor;
+    chip.translatesAutoresizingMaskIntoConstraints = NO;
+    [page addSubview:chip];
+
+    UILabel *title = [[UILabel alloc] init];
+    title.font = [UIFont boldSystemFontOfSize:16];
+    title.textColor = UIColor.whiteColor;
+    title.text = item.title;
+    title.translatesAutoresizingMaskIntoConstraints = NO;
+    [page addSubview:title];
+
+    UILabel *body = [[UILabel alloc] init];
+    body.font = [UIFont systemFontOfSize:12];
+    body.textColor = [UIColor colorWithWhite:0.87 alpha:1.0];
+    body.numberOfLines = 2;
+    body.text = item.body;
+    body.translatesAutoresizingMaskIntoConstraints = NO;
+    [page addSubview:body];
+
+    [NSLayoutConstraint activateConstraints:@[
+        [image.topAnchor constraintEqualToAnchor:page.topAnchor],
+        [image.bottomAnchor constraintEqualToAnchor:page.bottomAnchor],
+        [image.leadingAnchor constraintEqualToAnchor:page.leadingAnchor],
+        [image.trailingAnchor constraintEqualToAnchor:page.trailingAnchor],
+        [scrim.topAnchor constraintEqualToAnchor:page.topAnchor],
+        [scrim.bottomAnchor constraintEqualToAnchor:page.bottomAnchor],
+        [scrim.leadingAnchor constraintEqualToAnchor:page.leadingAnchor],
+        [scrim.trailingAnchor constraintEqualToAnchor:page.trailingAnchor],
+        [chip.topAnchor constraintEqualToAnchor:page.topAnchor constant:12],
+        [chip.leadingAnchor constraintEqualToAnchor:page.leadingAnchor constant:12],
+        [chip.heightAnchor constraintEqualToConstant:status ? 18 : 0],
+        [chip.widthAnchor constraintGreaterThanOrEqualToConstant:64],
+        [title.topAnchor constraintEqualToAnchor:chip.bottomAnchor constant:6],
+        [title.leadingAnchor constraintEqualToAnchor:page.leadingAnchor constant:12],
+        [title.trailingAnchor constraintEqualToAnchor:page.trailingAnchor constant:-12],
+        [body.topAnchor constraintEqualToAnchor:title.bottomAnchor constant:2],
+        [body.leadingAnchor constraintEqualToAnchor:page.leadingAnchor constant:12],
+        [body.trailingAnchor constraintEqualToAnchor:page.trailingAnchor constant:-12],
+    ]];
+    *imageOut = image;
+    return page;
 }
 
 - (void)startNewsRotation {
@@ -1177,17 +1251,73 @@ static const float kPlayerEstimateMult = 1.4f;
                                                        block:^(NSTimer *timer) {
                                                          [weakSelf advanceNews];
                                                        }];
-    [self loadNewsImage:self.newsItems[(self.newsIndex + 1) % self.newsItems.count]];
 }
 
+/// Slides to the next page; from the last event that is the repeat of the first.
 - (void)advanceNews {
-    self.newsIndex = (self.newsIndex + 1) % self.newsItems.count;
-    [self showNewsItem:self.newsItems[self.newsIndex] animated:YES];
-    // Have the next banner ready by the time we rotate to it.
-    [self loadNewsImage:self.newsItems[(self.newsIndex + 1) % self.newsItems.count]];
+    CGFloat width = self.newsScroll.bounds.size.width;
+    if (width <= 0 || self.newsItems.count < 2) return;
+    [self.newsScroll setContentOffset:CGPointMake((self.newsIndex + 1) * width, 0) animated:YES];
 }
 
-/// Fetches an event's banner into newsImages, then shows it if that event is still up.
+/// Puts the scroll view back on the current event after the card's width changed (rotation, first
+/// layout), so it never rests between two pages.
+- (void)syncNewsOffset {
+    CGFloat width = self.newsScroll.bounds.size.width;
+    if (width <= 0 || width == self.newsLaidOutWidth) return;
+    self.newsLaidOutWidth = width;
+    self.newsScroll.contentOffset = CGPointMake(self.newsIndex * width, 0);
+}
+
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    [self syncNewsOffset];
+}
+
+/// The page under the viewport, counting the wrap repeat as the first event.
+- (void)scrollViewDidScroll:(UIScrollView *)scrollView {
+    CGFloat width = scrollView.bounds.size.width;
+    NSUInteger count = self.newsItems.count;
+    // A width that has not been synced yet means a relayout is pending and the offset is stale.
+    if (scrollView != self.newsScroll || width <= 0 || width != self.newsLaidOutWidth || count == 0) return;
+    NSInteger page = lround(scrollView.contentOffset.x / width);
+    self.newsIndex = (NSUInteger)MAX(page, 0) % count;
+    self.newsDots.currentPage = self.newsIndex;
+}
+
+/// Swaps the wrap repeat for the real first page; they look the same, so nothing visibly moves.
+- (void)settleNewsPage {
+    CGFloat width = self.newsScroll.bounds.size.width;
+    if (width > 0 && self.newsScroll.contentOffset.x >= self.newsItems.count * width - 0.5) {
+        self.newsScroll.contentOffset = CGPointZero;
+    }
+}
+
+- (void)scrollViewDidEndScrollingAnimation:(UIScrollView *)scrollView {
+    if (scrollView == self.newsScroll) [self settleNewsPage];
+}
+
+- (void)scrollViewWillBeginDragging:(UIScrollView *)scrollView {
+    if (scrollView != self.newsScroll) return;
+    // Hold the slide while a finger is on the card; the interval restarts when it settles.
+    [self.newsTimer invalidate];
+    self.newsTimer = nil;
+}
+
+- (void)scrollViewDidEndDragging:(UIScrollView *)scrollView willDecelerate:(BOOL)decelerate {
+    if (scrollView == self.newsScroll && !decelerate) {
+        [self settleNewsPage];
+        [self startNewsRotation];
+    }
+}
+
+- (void)scrollViewDidEndDecelerating:(UIScrollView *)scrollView {
+    if (scrollView != self.newsScroll) return;
+    [self settleNewsPage];
+    [self startNewsRotation];
+}
+
+/// Fetches an event's banner into newsImages, then puts it on that event's page(s).
 /// Each URL is requested once per feed load, so a failing one is not retried every rotation.
 - (void)loadNewsImage:(SKNewsItem *)item {
     if (!item.imageURL || [self.newsImageRequests containsObject:item.imageURL]) return;
@@ -1197,41 +1327,16 @@ static const float kPlayerEstimateMult = 1.4f;
       typeof(self) self = weakSelf;
       if (!self || !image) return;
       self.newsImages[item.imageURL] = image;
-      if (self.newsItems[self.newsIndex] == item) self.newsImageView.image = image;
+      NSUInteger count = self.newsItems.count;
+      [self.newsPageImages enumerateObjectsUsingBlock:^(UIImageView *view, NSUInteger i, BOOL *stop) {
+        if ([self.newsItems[i % count].imageURL isEqualToString:item.imageURL]) view.image = image;
+      }];
     });
 }
 
-- (void)showNewsItem:(SKNewsItem *)item animated:(BOOL)animated {
-    void (^apply)(void) = ^{
-      self.newsLink = item.link;
-      NSString *status = SKNewsStatusLabel(item.startsAt, item.endsAt);
-      // Evergreen events carry no window; drop the chip rather than inventing a countdown.
-      self.newsEndsInLabel.hidden = (status == nil);
-      self.newsEndsInHeight.constant = status ? 18 : 0;
-      self.newsEndsInLabel.text = status ? [NSString stringWithFormat:@"  %@  ", status] : @"";
-      // KnightLauncher's CustomColors.WARNING, with dark text as on its badge.
-      BOOL endingSoon = item.isEndingSoon;
-      self.newsEndsInLabel.backgroundColor =
-        endingSoon ? [UIColor colorWithRed:251 / 255.0 green:198 / 255.0 blue:91 / 255.0 alpha:1.0] : self.newsChipColor;
-      self.newsEndsInLabel.textColor = endingSoon ? [UIColor colorWithWhite:0.125 alpha:1.0] : UIColor.whiteColor;
-      self.newsTitleLabel.text = item.title;
-      self.newsBodyLabel.text = item.body;
-      self.newsImageView.image = item.imageURL ? self.newsImages[item.imageURL] : nil;
-    };
-    if (animated) {
-        [UIView transitionWithView:self.newsCard
-                          duration:0.35
-                           options:UIViewAnimationOptionTransitionCrossDissolve
-                        animations:apply
-                        completion:nil];
-    } else {
-        apply();
-    }
-    [self loadNewsImage:item];
-}
-
 - (void)onNewsTapped {
-    if (self.newsLink) [self openURLWithSafariFallback:self.newsLink];
+    NSString *link = self.newsIndex < self.newsItems.count ? self.newsItems[self.newsIndex].link : nil;
+    if (link) [self openURLWithSafariFallback:link];
 }
 
 #pragma mark - Update check

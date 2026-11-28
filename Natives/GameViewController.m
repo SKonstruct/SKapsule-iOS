@@ -265,7 +265,7 @@ static BOOL push_key_event(UIKey *key, int action, BOOL emitCharacters) {
 
 typedef NS_ENUM(NSInteger, SKLoginMode);
 
-@interface GameViewController () <SKTouchControlOverlayDelegate, UIPointerInteractionDelegate>
+@interface GameViewController () <SKTouchControlOverlayDelegate, UIPointerInteractionDelegate, UITextFieldDelegate>
 @property (nonatomic, strong) UIView *surfaceView;
 @property (nonatomic, strong) SKTouchControlOverlay *touchControls;
 /// Presets and export/import for the in-game editor (the standalone editor has its own).
@@ -301,6 +301,15 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
 /// Raised when the portrait sign-in phase ends: the drawable still has the portrait size.
 @property (nonatomic, assign) BOOL resyncDrawableAfterPortrait;
 @property (nonatomic, strong) UILabel *signInBody;
+// The username/password form, shown in the sign-in card in place of the QR code.
+@property (nonatomic, strong) UIStackView *signInForm;
+@property (nonatomic, strong) UILabel *signInFormTitle;
+@property (nonatomic, strong) UILabel *signInFormMessage;
+@property (nonatomic, strong) UITextField *signInUsername;
+@property (nonatomic, strong) UITextField *signInPassword;
+@property (nonatomic, strong) UITextField *signInCode;
+@property (nonatomic, strong) UIButton *signInFormPrimary;
+@property (nonatomic, copy) NSString *signInFormKind;  // "credentials", "guard-device", "guard-email", or nil for the QR code
 @property (nonatomic, copy) NSString *signInURL;
 @property (nonatomic, assign) UIBackgroundTaskIdentifier signInTask;
 @property (nonatomic, strong) UIActivityIndicatorView *spinner;
@@ -487,6 +496,10 @@ typedef NS_ENUM(NSInteger, SKLoginMode);
 
     [SKNativeBridge setHideSignInHandler:^{
       [weakSelf hideSignIn];
+    }];
+
+    [SKNativeBridge setShowSignInFormHandler:^(NSString *kind, NSString *detail, BOOL retry) {
+      [weakSelf showSignInFormKind:kind detail:detail retry:retry];
     }];
 }
 
@@ -865,7 +878,13 @@ static UIImage *skQRImage(NSString *modules) {
     buttons.spacing = 8;
     buttons.alignment = UIStackViewAlignmentCenter;
 
-    UIStackView *text = [[UIStackView alloc] initWithArrangedSubviews:@[ title, body, buttons ]];
+    // For someone with no second device to show the code to, and no way to scan it from a screenshot.
+    UIButtonConfiguration *passwordConfig = [UIButtonConfiguration plainButtonConfiguration];
+    passwordConfig.title = NSLocalizedString(@"Use username and password", nil);
+    UIButton *usePassword = [UIButton buttonWithConfiguration:passwordConfig primaryAction:nil];
+    [usePassword addTarget:self action:@selector(onSignInUsePassword) forControlEvents:UIControlEventTouchUpInside];
+
+    UIStackView *text = [[UIStackView alloc] initWithArrangedSubviews:@[ title, body, buttons, usePassword ]];
     text.axis = UILayoutConstraintAxisVertical;
     text.alignment = UIStackViewAlignmentLeading;
     text.spacing = 12;
@@ -876,19 +895,30 @@ static UIImage *skQRImage(NSString *modules) {
     UIStackView *row = [[UIStackView alloc] initWithArrangedSubviews:@[ qr, text ]];
     row.spacing = 24;
     row.alignment = UIStackViewAlignmentCenter;
-    row.translatesAutoresizingMaskIntoConstraints = NO;
-    [card addSubview:row];
+    UIStackView *form = [self buildSignInForm];
+
+    // One of the two shows at a time; a stack skips the hidden one, so the card is sized by what is
+    // on screen rather than by the taller of the two.
+    UIStackView *container = [[UIStackView alloc] initWithArrangedSubviews:@[ row, form ]];
+    container.axis = UILayoutConstraintAxisVertical;
+    container.translatesAutoresizingMaskIntoConstraints = NO;
+    [card addSubview:container];
 
     UILayoutGuide *safe = overlay.safeAreaLayoutGuide;
+    // Centred, but pushed up out of the keyboard's way while a field is being typed in.
+    NSLayoutConstraint *centerY = [card.centerYAnchor constraintEqualToAnchor:overlay.centerYAnchor];
+    centerY.priority = UILayoutPriorityDefaultHigh;
     [NSLayoutConstraint activateConstraints:@[
         [card.centerXAnchor constraintEqualToAnchor:overlay.centerXAnchor],
-        [card.centerYAnchor constraintEqualToAnchor:overlay.centerYAnchor],
+        centerY,
+        [card.topAnchor constraintGreaterThanOrEqualToAnchor:safe.topAnchor constant:8],
+        [card.bottomAnchor constraintLessThanOrEqualToAnchor:overlay.keyboardLayoutGuide.topAnchor constant:-12],
         [card.leadingAnchor constraintGreaterThanOrEqualToAnchor:safe.leadingAnchor constant:16],
         [card.trailingAnchor constraintLessThanOrEqualToAnchor:safe.trailingAnchor constant:-16],
-        [row.topAnchor constraintEqualToAnchor:card.topAnchor constant:24],
-        [row.bottomAnchor constraintEqualToAnchor:card.bottomAnchor constant:-24],
-        [row.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:24],
-        [row.trailingAnchor constraintEqualToAnchor:card.trailingAnchor constant:-24],
+        [container.topAnchor constraintEqualToAnchor:card.topAnchor constant:24],
+        [container.bottomAnchor constraintEqualToAnchor:card.bottomAnchor constant:-24],
+        [container.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:24],
+        [container.trailingAnchor constraintEqualToAnchor:card.trailingAnchor constant:-24],
     ]];
 
     self.signInOverlay = overlay;
@@ -924,19 +954,230 @@ static UIImage *skQRImage(NSString *modules) {
     self.signInQR.image = image;
     if (!self.signInOverlay.superview) [self.view addSubview:self.signInOverlay];
     [self.view bringSubviewToFront:self.signInOverlay];
+    // A rotated code arrives while the user is already at the form: leave it be.
+    if (![SKNativeBridge signInPasswordRequested]) [self showSignInQRRow];
+    [self beginSignInBackgroundTask];
+}
 
-    // Approving in the Steam app backgrounds this one. The window iOS grants is short, so
-    // frenchpress starts a new challenge if the connection dies meanwhile.
-    if (self.signInTask == UIBackgroundTaskInvalid) {
-        __weak typeof(self) weakSelf = self;
-        self.signInTask = [UIApplication.sharedApplication beginBackgroundTaskWithName:@"SKapsule steam sign-in"
-                                                                     expirationHandler:^{
-                                                                       [weakSelf endSignInBackgroundTask];
-                                                                     }];
+/// Approving in the Steam app (or reading a Steam Guard code there) backgrounds this one. The window
+/// iOS grants is short, so frenchpress starts again if the connection dies meanwhile.
+- (void)beginSignInBackgroundTask {
+    if (self.signInTask != UIBackgroundTaskInvalid) return;
+    __weak typeof(self) weakSelf = self;
+    self.signInTask = [UIApplication.sharedApplication beginBackgroundTaskWithName:@"SKapsule steam sign-in"
+                                                                 expirationHandler:^{
+                                                                   [weakSelf endSignInBackgroundTask];
+                                                                 }];
+}
+
+#pragma mark - Username and password sign-in
+
+- (UITextField *)signInFieldWithPlaceholder:(NSString *)placeholder {
+    UITextField *field = [[UITextField alloc] init];
+    field.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1];
+    field.textColor = UIColor.whiteColor;
+    field.layer.cornerRadius = 10;
+    field.attributedPlaceholder = [[NSAttributedString alloc]
+      initWithString:placeholder
+          attributes:@{NSForegroundColorAttributeName : [UIColor colorWithWhite:0.55 alpha:1]}];
+    field.leftView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 12, 1)];
+    field.leftViewMode = UITextFieldViewModeAlways;
+    field.autocapitalizationType = UITextAutocapitalizationTypeNone;
+    field.autocorrectionType = UITextAutocorrectionTypeNo;
+    field.spellCheckingType = UITextSpellCheckingTypeNo;
+    field.keyboardType = UIKeyboardTypeASCIICapable;
+    field.keyboardAppearance = UIKeyboardAppearanceDark;
+    field.delegate = self;
+    field.translatesAutoresizingMaskIntoConstraints = NO;
+    [field.heightAnchor constraintEqualToConstant:44].active = YES;
+    return field;
+}
+
+/// Hidden until asked for. Kind of form and what it says are set by presentSignInFormKind.
+- (UIStackView *)buildSignInForm {
+    UILabel *title = [[UILabel alloc] init];
+    title.text = NSLocalizedString(@"Sign in to Steam", nil);
+    title.textColor = UIColor.whiteColor;
+    title.font = [UIFont systemFontOfSize:20 weight:UIFontWeightSemibold];
+
+    UILabel *message = [[UILabel alloc] init];
+    message.textColor = [UIColor colorWithWhite:0.8 alpha:1];
+    message.font = [UIFont systemFontOfSize:14];
+    message.numberOfLines = 0;
+
+    UITextField *username = [self signInFieldWithPlaceholder:NSLocalizedString(@"Steam account name", nil)];
+    username.textContentType = UITextContentTypeUsername;
+    username.returnKeyType = UIReturnKeyNext;
+
+    UITextField *password = [self signInFieldWithPlaceholder:NSLocalizedString(@"Password", nil)];
+    password.textContentType = UITextContentTypePassword;
+    password.secureTextEntry = YES;
+    password.returnKeyType = UIReturnKeyGo;
+
+    UITextField *code = [self signInFieldWithPlaceholder:NSLocalizedString(@"Steam Guard code", nil)];
+    code.textContentType = UITextContentTypeOneTimeCode;
+    code.autocapitalizationType = UITextAutocapitalizationTypeAllCharacters;
+    code.returnKeyType = UIReturnKeyGo;
+
+    UIButtonConfiguration *primaryConfig = [UIButtonConfiguration filledButtonConfiguration];
+    primaryConfig.cornerStyle = UIButtonConfigurationCornerStyleCapsule;
+    UIButton *primary = [UIButton buttonWithConfiguration:primaryConfig primaryAction:nil];
+    [primary addTarget:self action:@selector(onSignInFormSubmit) forControlEvents:UIControlEventTouchUpInside];
+
+    UIButtonConfiguration *backConfig = [UIButtonConfiguration plainButtonConfiguration];
+    backConfig.title = NSLocalizedString(@"Use QR code instead", nil);
+    UIButton *back = [UIButton buttonWithConfiguration:backConfig primaryAction:nil];
+    [back addTarget:self action:@selector(onSignInUseQR) forControlEvents:UIControlEventTouchUpInside];
+
+    UIButtonConfiguration *cancelConfig = [UIButtonConfiguration plainButtonConfiguration];
+    cancelConfig.title = NSLocalizedString(@"Cancel", nil);
+    UIButton *cancel = [UIButton buttonWithConfiguration:cancelConfig primaryAction:nil];
+    [cancel addTarget:self action:@selector(onSignInCancel) forControlEvents:UIControlEventTouchUpInside];
+
+    UIStackView *form = [[UIStackView alloc]
+      initWithArrangedSubviews:@[ title, message, username, password, code, primary, back, cancel ]];
+    form.axis = UILayoutConstraintAxisVertical;
+    form.spacing = 10;
+    form.hidden = YES;
+    NSLayoutConstraint *width = [form.widthAnchor constraintEqualToConstant:300];
+    width.priority = UILayoutPriorityDefaultHigh;
+    width.active = YES;
+
+    self.signInForm = form;
+    self.signInFormTitle = title;
+    self.signInFormMessage = message;
+    self.signInUsername = username;
+    self.signInPassword = password;
+    self.signInCode = code;
+    self.signInFormPrimary = primary;
+    return form;
+}
+
+static NSString *skSignInFailureText(NSString *detail) {
+    if (detail.length == 0) return nil;
+    if ([detail isEqualToString:@"password"]) return NSLocalizedString(@"Wrong account name or password.", nil);
+    if ([detail isEqualToString:@"RateLimitExceeded"] || [detail isEqualToString:@"AccountLoginDeniedThrottle"]) {
+        return NSLocalizedString(@"Steam is limiting sign-in attempts. Wait a few minutes and try again.", nil);
     }
+    return NSLocalizedString(@"Steam did not accept the sign-in. Check your connection and try again.", nil);
+}
+
+- (void)showSignInQRRow {
+    self.signInFormKind = nil;
+    self.signInForm.hidden = YES;
+    self.signInRow.hidden = NO;
+    [self.signInOverlay endEditing:YES];
+}
+
+/// The JVM asks for a form: credentials (detail is why the last ones failed), or a Steam Guard code.
+- (void)showSignInFormKind:(NSString *)kind detail:(NSString *)detail retry:(BOOL)retry {
+    // A Cancel that landed first wins over a form already in flight.
+    if ([SKNativeBridge signInCancelled]) return;
+    if (!self.signInOverlay) [self buildSignInOverlay];
+    // The user's own tap already put the form up; the JVM's answer to it must not wipe what they typed.
+    BOOL showing = [self.signInFormKind isEqualToString:kind] && !self.signInForm.hidden;
+    if (showing && detail.length == 0 && !retry && self.signInFormPrimary.enabled) return;
+    if (!self.signInOverlay.superview) [self.view addSubview:self.signInOverlay];
+    [self.view bringSubviewToFront:self.signInOverlay];
+    [self beginSignInBackgroundTask];
+    [self presentSignInFormKind:kind detail:detail retry:retry];
+}
+
+- (void)presentSignInFormKind:(NSString *)kind detail:(NSString *)detail retry:(BOOL)retry {
+    BOOL guard = [kind hasPrefix:@"guard"];
+    self.signInFormKind = kind;
+    self.signInRow.hidden = YES;
+    self.signInForm.hidden = NO;
+    self.signInUsername.hidden = guard;
+    self.signInPassword.hidden = guard;
+    self.signInCode.hidden = !guard;
+    for (UIControl *control in @[ self.signInUsername, self.signInPassword, self.signInCode, self.signInFormPrimary ]) {
+        control.enabled = YES;
+    }
+    self.signInPassword.text = nil;
+    self.signInCode.text = nil;
+
+    NSString *text;
+    UIColor *color = [UIColor colorWithWhite:0.8 alpha:1];
+    UIButtonConfiguration *primary = self.signInFormPrimary.configuration;
+    if (guard) {
+        BOOL email = [kind isEqualToString:@"guard-email"];
+        NSString *ask = !email ? NSLocalizedString(@"Enter the Steam Guard code from the Steam app.", nil)
+                      : detail.length ? [NSString stringWithFormat:NSLocalizedString(@"Enter the code Steam emailed to %@.", nil), detail]
+                                      : NSLocalizedString(@"Enter the code Steam emailed to you.", nil);
+        text = retry ? [NSString stringWithFormat:@"%@ %@", NSLocalizedString(@"That code was not accepted.", nil), ask] : ask;
+        if (retry) color = [UIColor colorWithRed:1 green:0.55 blue:0.5 alpha:1];
+        primary.title = NSLocalizedString(@"Continue", nil);
+    } else {
+        NSString *failure = skSignInFailureText(detail);
+        text = failure ?: NSLocalizedString(@"Sign in with your Steam account name and password. The password is only used to sign in and is never saved.", nil);
+        if (failure) color = [UIColor colorWithRed:1 green:0.55 blue:0.5 alpha:1];
+        primary.title = NSLocalizedString(@"Sign in", nil);
+    }
+    self.signInFormMessage.text = text;
+    self.signInFormMessage.textColor = color;
+    self.signInFormPrimary.configuration = primary;
+    [(guard ? self.signInCode : (self.signInUsername.text.length ? self.signInPassword : self.signInUsername)) becomeFirstResponder];
+}
+
+- (void)onSignInUsePassword {
+    [SKNativeBridge setPasswordSignInRequested:YES];
+    [self presentSignInFormKind:@"credentials" detail:nil retry:NO];
+}
+
+- (void)onSignInUseQR {
+    [SKNativeBridge setPasswordSignInRequested:NO];
+    self.signInPassword.text = nil;
+    self.signInCode.text = nil;
+    // The old code belongs to a sign-in that was dropped; frenchpress shows a new one in a moment.
+    self.signInQR.image = nil;
+    [self showSignInQRRow];
+}
+
+- (void)onSignInFormSubmit {
+    BOOL guard = [self.signInFormKind hasPrefix:@"guard"];
+    NSString *waiting;
+    if (guard) {
+        NSString *code = [self.signInCode.text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+        if (code.length == 0) return;
+        [SKNativeBridge submitSignInGuardCode:code];
+        waiting = NSLocalizedString(@"Checking the code…", nil);
+    } else {
+        NSString *username = [self.signInUsername.text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+        NSString *password = self.signInPassword.text ?: @"";
+        if (username.length == 0 || password.length == 0) {
+            self.signInFormMessage.text = NSLocalizedString(@"Enter your Steam account name and password.", nil);
+            return;
+        }
+        [SKNativeBridge submitSignInUsername:username password:password];
+        // Not kept past the hand-over: a failed attempt asks for it again.
+        self.signInPassword.text = nil;
+        waiting = NSLocalizedString(@"Signing in…", nil);
+    }
+    self.signInFormMessage.text = waiting;
+    self.signInFormMessage.textColor = [UIColor colorWithWhite:0.8 alpha:1];
+    for (UIControl *control in @[ self.signInUsername, self.signInPassword, self.signInCode, self.signInFormPrimary ]) {
+        control.enabled = NO;
+    }
+    [self.signInOverlay endEditing:YES];
+}
+
+- (BOOL)textFieldShouldReturn:(UITextField *)field {
+    if (field == self.signInUsername) {
+        [self.signInPassword becomeFirstResponder];
+    } else {
+        [self onSignInFormSubmit];
+    }
+    return NO;
 }
 
 - (void)hideSignIn {
+    [self.signInOverlay endEditing:YES];
+    self.signInPassword.text = nil;
+    self.signInCode.text = nil;
+    self.signInFormKind = nil;
+    self.signInForm.hidden = YES;
+    self.signInRow.hidden = NO;
     [self.signInOverlay removeFromSuperview];
     self.signInURL = nil;
     [self endSignInBackgroundTask];

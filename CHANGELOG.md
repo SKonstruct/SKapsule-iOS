@@ -62,6 +62,7 @@ version: the Release workflow publishes that section as the release notes.
 
 ### Fixed
 
+- **The JIT Setup sheet no longer leaves a gap under its buttons** where the home indicator's safe area was reserved.
 - **Typing in the game's text boxes works as you type.** The text showed up but did nothing (a search or filter did not
   update, a form did not enable) until Enter or Backspace was pressed. The on-screen keyboard now sends each
   character the way a desktop keyboard does, key press then the character then key release.
@@ -77,10 +78,13 @@ version: the Release workflow publishes that section as the release notes.
 
 ### Changed
 
-- **Steam sign-in is by QR code or the Steam app, with no username or password.** The first Steam launch
-  shows a QR code in portrait, before the game starts and the screen turns landscape: scan it with the Steam mobile app and approve, or tap **Open Steam app**. SKapsule
-  no longer asks for your Steam password or a Steam Guard code, and keeps only the sign-in token it
-  already stored. If you were signed in you stay signed in. **Cancel** carries on without Steam.
+- **Steam sign-in is by QR code, the Steam app, or your username and password.** The first Steam launch
+  shows a QR code in portrait, before the game starts and the screen turns landscape: scan it with the Steam mobile app and approve, or tap **Open Steam app**.
+  With no second device to show the code to, tap **Use username and password** instead and enter your Steam
+  Guard code when asked. The password is only used to sign in; SKapsule keeps just the sign-in token, as before. If you were signed
+  in you stay signed in. **Cancel** carries on without Steam.
+- **The events on the home screen slide.** Instead of fading from one to the next, the card slides every 8 seconds
+  and you can swipe between events; dots show how many there are and which one you are on.
 - **A new default touch layout.** The buttons are laid out on a grid (the sticks mirror each other, the right cluster
   is two columns, the bottom row has one even spacing), **Show Buttons** is on, the sticks float, and opacity starts at
   full (it was 40%). Every button, ESC included, is a fifth smaller. **Reset Layout** and new installs get it; layouts

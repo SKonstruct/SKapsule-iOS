@@ -10,7 +10,7 @@ Resolved sagas are condensed to their conclusions. Full detail is in git history
 ## Current State
 
 The app boots the bundled JRE 25, runs the real Spiral Knights desktop client through
-gl4es, plays audio and logs in (Web, or Steam by QR code). The runtime is the
+gl4es, plays audio and logs in (Web, or Steam by QR code or username and password). The runtime is the
 AngelAuraMC JDK-25 **JIT** build, so on-device runs need JIT: built-in (StikJIT) or the
 StikDebug app, both running `skapsule-jit.js` passed inline.
 
@@ -499,9 +499,16 @@ usually belongs in the other.
 - **AWT / Java2D.** `awt_stubs.c` replaces `libawt_headless.dylib`; its exported symbol set
   had to be exact: over-stubbing shadowed real rendering-loop registration, under-stubbing
   produced `UnsatisfiedLinkError` on platform-backend `initIDs`.
-- **Steam login.** No username or password reaches the app: frenchpress starts a QR sign-in and the
-  user approves it in the Steam mobile app; only the resulting refresh token is stored. The JVM talks
-  to the UI through three `SkBootstrap` natives (`JavaLauncher.m`, `NativeBridge.m`). The sign-in runs
+- **Steam login.** frenchpress starts a QR sign-in that the user approves in the Steam mobile app, or,
+  when they tap **Use username and password** (no second device), `SteamSession.signInWithPassword`
+  collects credentials before connecting and signs in with `beginAuthSessionViaCredentials`; its
+  authenticator always asks for a typed Steam Guard code. The password lives in memory only (`SKNativeBridge`
+  hands it over once); only the refresh token is stored. Switching QR/form is a flag
+  (`nativeSignInPasswordRequested`), separate from cancel (which means web account). Four more natives
+  (`nativeShowSignInForm`, `nativeSignInPasswordRequested`, `nativeTakeSignInCredentials`,
+  `nativeTakeSignInGuardCode`) are looked up one by one by `NativeBridgePrompt`, so QR works without them.
+  Untested on a device: a real credentials/Guard login. The JVM talks
+  to the UI through the `SkBootstrap` natives (`JavaLauncher.m`, `NativeBridge.m`). The sign-in runs
   first, in `SkBootstrap.signInToSteam`, before the updater and the game: it uses a loader of its own,
   stores the token and disconnects, and the game's frenchpress then signs in from the token. It is
   skipped when a token file exists, and a cancel sets `frenchpress.signInDeclined` so the game does not

@@ -2,7 +2,7 @@
 
 Play **Spiral Knights** on iPhone and iPad. SKapsule runs the real desktop game client on
 your device: a bundled Java 25 runtime, the game's OpenGL renderer translated to OpenGL ES,
-OpenAL audio, touch and controller support, and Web or Steam login (Steam by QR code or the Steam app).
+OpenAL audio, touch and controller support, and Web or Steam login (Steam by QR code, the Steam app, or username and password).
 
 SKapsule is an unofficial fan project, not affiliated with or endorsed by
 Grey Havens. It doesn't include the game: the client is downloaded from the official servers
@@ -14,7 +14,7 @@ The Android version is [SKapsule](https://github.com/SKonstruct/SKapsule).
 
 | | |
 | --- | --- |
-| **Play** | The real desktop client on iPhone and iPad, on iOS or iPadOS 17.4 and later. Sign in with **Web**, or with **Steam** by QR code or the Steam app: there is no Steam password to type. |
+| **Play** | The real desktop client on iPhone and iPad, on iOS or iPadOS 17.4 and later. Sign in with **Web**, or with **Steam** by QR code, the Steam app, or your username and password. |
 | **Controls** | On-screen touch controls, Bluetooth controllers and keyboards, and mice and trackpads on iPad. **Edit Controls** moves, resizes and hides every control. Keep named presets, or export and import a layout as a file that also works on [SKapsule for Android](https://github.com/SKonstruct/SKapsule). |
 | **JIT** | Required for a playable speed. SKapsule can enable it itself, or through StikDebug (see [Enabling JIT](#enabling-jit)). |
 | **Graphics** | A resolution slider, **Sharpening**, **Sharp HUD** (experimental) and an FPS counter, in the in-game settings panel; the last three are also in the sidebar. |
@@ -121,10 +121,11 @@ stays attached, so neither is offered there.
 If you tap **Launch** first, SKapsule asks for JIT itself and starts as soon as it is
 granted. The first launch downloads the game, so give it a few minutes.
 
-**Steam login.** SKapsule never asks for your Steam username or password. The first Steam launch
-shows a QR code in portrait, before the screen turns landscape for the game: scan it with the Steam mobile app on another device and approve, or tap **Open Steam
-app** to approve on this one. The sign-in is then remembered (encrypted on this device) until you
-tap **Logout**. Cancel the QR code to go on without Steam.
+**Steam login.** The first Steam launch shows a QR code in portrait, before the screen turns
+landscape for the game: scan it with the Steam mobile app on another device and approve, or tap **Open Steam
+app** to approve on this one. With no second device, tap **Use username and password** and enter your Steam
+Guard code when asked; the password is only used to sign in and is never saved. The sign-in is then remembered
+(encrypted on this device) until you tap **Logout**. Cancel to go on without Steam.
 
 **Controls.** On-screen touch controls appear in game. To rearrange them, tap ⚙ in game or
 **Edit Controls** in the sidebar: drag controls around, show or hide each one, and change

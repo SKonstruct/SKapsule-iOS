@@ -65,7 +65,7 @@ Natives/               iOS app (Objective-C) + CMake build
   SKNewsFeed.*         home-screen news card feed (KnightLauncher's Flamingo service)
   SKReporter.*         Sentry failure/crash reports, log scrubbing
   glfw_ios.m           GLFW natives for the JVM: input queue, buffer swap, gamepad
-  NativeBridge.*       JVM ↔ UI bridge (boot status, Steam QR sign-in show/hide/cancel)
+  NativeBridge.*       JVM ↔ UI bridge (boot status, Steam sign-in: QR and username/password forms)
   utils.*              JIT detection, entitlements, file helpers
   SKBuiltinJIT.*       JIT method choice, pairing file, starts the JIT helper extension
   SKJITAdvice.h        built-in JIT failure advice (header-only, tested by `make test`)
@@ -80,7 +80,7 @@ Natives/               iOS app (Objective-C) + CMake build
 external/bootstrap/    Java bootstrap module (shared with Android)
   SkBootstrap.java     runs HeadlessGetdown → launches ProjectXApp
   HeadlessGetdown.java headless getdown driver
-  NativeBridgePrompt.java   frenchpress Steam QR sign-in prompt
+  NativeBridgePrompt.java   frenchpress Steam sign-in prompt (QR, username/password)
   GLFW.java            GLFW shim routing to native implementations
 scripts/               build-*-ios.sh per native component + stage-app-assets.sh; patches/ for StikJIT
   sim/                 iOS Simulator build and run loop (build-libs.sh, build.sh, run.sh)

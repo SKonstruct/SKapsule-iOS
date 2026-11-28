@@ -11,6 +11,13 @@ static SKHideSignInBlock _hideSignInHandler;
 static BOOL _signInActive;
 static BOOL _signInCancelled;
 
+// The username/password sign-in: whether the user chose it over the QR code, and what they submitted
+// that the JVM has not taken yet. In memory only, dropped when taken, shown anew or the sign-in ends.
+static SKShowSignInFormBlock _showSignInFormHandler;
+static BOOL _passwordRequested;
+static NSString *_pendingCredentials;
+static NSString *_pendingGuardCode;
+
 @implementation SKNativeBridge
 
 + (void)setBootStatusHandler:(SKBootStatusBlock)handler {
@@ -34,6 +41,12 @@ static BOOL _signInCancelled;
 + (void)setHideSignInHandler:(SKHideSignInBlock)handler {
     @synchronized(self) {
         _hideSignInHandler = [handler copy];
+    }
+}
+
++ (void)setShowSignInFormHandler:(SKShowSignInFormBlock)handler {
+    @synchronized(self) {
+        _showSignInFormHandler = [handler copy];
     }
 }
 
@@ -70,6 +83,9 @@ static BOOL _signInCancelled;
         if (!_signInActive) {
             _signInActive = YES;
             _signInCancelled = NO;
+            _passwordRequested = NO;
+            _pendingCredentials = nil;
+            _pendingGuardCode = nil;
         }
         // Nothing to show it with: report it as cancelled so the login falls back at once
         // rather than waiting out the whole approval window.
@@ -88,6 +104,9 @@ static BOOL _signInCancelled;
     SKHideSignInBlock handler;
     @synchronized(self) {
         _signInActive = NO;
+        _passwordRequested = NO;
+        _pendingCredentials = nil;
+        _pendingGuardCode = nil;
         handler = _hideSignInHandler;
     }
     if (handler) {
@@ -106,6 +125,71 @@ static BOOL _signInCancelled;
 + (void)cancelSignIn {
     @synchronized(self) {
         _signInCancelled = YES;
+        _pendingCredentials = nil;
+        _pendingGuardCode = nil;
+    }
+}
+
+#pragma mark - Username and password
+
++ (void)onShowSignInForm:(NSString *)kind detail:(NSString *)detail retry:(BOOL)retry {
+    SKShowSignInFormBlock handler;
+    @synchronized(self) {
+        handler = _showSignInFormHandler;
+        // A new form asks for new input; whatever was typed for the last one is stale.
+        _pendingCredentials = nil;
+        _pendingGuardCode = nil;
+        if (!_signInActive) {
+            _signInActive = YES;
+            _signInCancelled = NO;
+        }
+        if (!handler) _signInCancelled = YES;
+    }
+    if (!handler) return;
+    dispatch_async(dispatch_get_main_queue(), ^{
+      handler(kind, detail, retry);
+    });
+}
+
++ (BOOL)signInPasswordRequested {
+    @synchronized(self) {
+        return _passwordRequested;
+    }
+}
+
++ (NSString *)takeSignInCredentials {
+    @synchronized(self) {
+        NSString *taken = _pendingCredentials;
+        _pendingCredentials = nil;
+        return taken;
+    }
+}
+
++ (NSString *)takeSignInGuardCode {
+    @synchronized(self) {
+        NSString *taken = _pendingGuardCode;
+        _pendingGuardCode = nil;
+        return taken;
+    }
+}
+
++ (void)setPasswordSignInRequested:(BOOL)requested {
+    @synchronized(self) {
+        _passwordRequested = requested;
+        _pendingCredentials = nil;
+        _pendingGuardCode = nil;
+    }
+}
+
++ (void)submitSignInUsername:(NSString *)username password:(NSString *)password {
+    @synchronized(self) {
+        _pendingCredentials = [NSString stringWithFormat:@"%@\n%@", username, password];
+    }
+}
+
++ (void)submitSignInGuardCode:(NSString *)code {
+    @synchronized(self) {
+        _pendingGuardCode = [code copy];
     }
 }
 

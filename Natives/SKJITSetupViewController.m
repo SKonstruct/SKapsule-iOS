@@ -225,7 +225,7 @@ static NSAttributedString *SKStepText(NSString *text, UIColor *color) {
         [self.actions.topAnchor constraintEqualToAnchor:self.actionBar.topAnchor constant:12],
         [self.actions.leadingAnchor constraintEqualToAnchor:self.actionBar.leadingAnchor constant:22],
         [self.actions.trailingAnchor constraintEqualToAnchor:self.actionBar.trailingAnchor constant:-22],
-        [self.actions.bottomAnchor constraintEqualToAnchor:safe.bottomAnchor constant:-8],
+        [self.actions.bottomAnchor constraintEqualToAnchor:self.actionBar.bottomAnchor constant:-12],
     ]];
 }
 

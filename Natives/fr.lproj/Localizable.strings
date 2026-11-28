@@ -298,3 +298,39 @@
 "Mods applied with warnings" = "Mods applied with warnings";
 
 "Show mouse cursor" = "Show mouse cursor";
+
+"Use username and password" = "Use username and password";
+
+"Use QR code instead" = "Use QR code instead";
+
+"Steam account name" = "Steam account name";
+
+"Password" = "Password";
+
+"Steam Guard code" = "Steam Guard code";
+
+"Sign in" = "Sign in";
+
+"Continue" = "Continue";
+
+"Signing in…" = "Signing in…";
+
+"Checking the code…" = "Checking the code…";
+
+"Sign in with your Steam account name and password. The password is only used to sign in and is never saved." = "Sign in with your Steam account name and password. The password is only used to sign in and is never saved.";
+
+"Enter your Steam account name and password." = "Enter your Steam account name and password.";
+
+"Wrong account name or password." = "Wrong account name or password.";
+
+"Steam is limiting sign-in attempts. Wait a few minutes and try again." = "Steam is limiting sign-in attempts. Wait a few minutes and try again.";
+
+"Steam did not accept the sign-in. Check your connection and try again." = "Steam did not accept the sign-in. Check your connection and try again.";
+
+"Enter the Steam Guard code from the Steam app." = "Enter the Steam Guard code from the Steam app.";
+
+"Enter the code Steam emailed to %@." = "Enter the code Steam emailed to %@.";
+
+"Enter the code Steam emailed to you." = "Enter the code Steam emailed to you.";
+
+"That code was not accepted." = "That code was not accepted.";
