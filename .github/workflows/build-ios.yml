@@ -14,6 +14,12 @@ on:
         type: string
         default: ''
 
+# A newer manual build replaces an older one still running (macOS minutes are the dear ones); a
+# release is never cancelled.
+concurrency:
+  group: build-ios-${{ github.ref }}-${{ inputs.version }}
+  cancel-in-progress: ${{ inputs.version == '' }}
+
 permissions:
   contents: write # creates the release and its tag
 
@@ -41,16 +47,29 @@ jobs:
           ! gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$VERSION" >/dev/null 2>&1 \
             || fail "Tag v$VERSION already exists without a release. Delete it (git push origin :refs/tags/v$VERSION) or pick a new version."
 
+      # LFS objects are fetched below, from a cache when the JRE zip has not changed.
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
-          lfs: true
+          lfs: false
 
       # The Makefile versions the app from `git describe`, which needs the tags; the shallow
       # checkout has none on branch builds, so they reported 1.0.0.
       - name: Fetch tags for versioning
         run: git fetch --force --tags --unshallow origin || git fetch --force --tags origin
+
+      - name: List LFS objects
+        run: git lfs ls-files -l | cut -d' ' -f1 | sort > .git/lfs-ids
+
+      - name: Cache LFS objects
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .git/lfs
+          key: lfs-${{ hashFiles('.git/lfs-ids') }}
+
+      - name: Fetch LFS objects
+        run: git lfs pull
 
       # The release notes are this version's CHANGELOG.md section, followed by GitHub's
       # generated notes.
@@ -60,54 +79,131 @@ jobs:
           awk -v h="## $VERSION" '$0==h{f=1;next} /^## /{f=0} f' CHANGELOG.md > "$RUNNER_TEMP/release-notes.md"
           grep -q '[^[:space:]]' "$RUNNER_TEMP/release-notes.md" || { echo "::error::CHANGELOG.md has no '## $VERSION' section"; exit 1; }
 
-      - name: Setup Java 8 (for LWJGL multi-release layer)
+      # Java 8 is for LWJGL's multi-release layer, 25 (the default) for the build tools.
+      - name: Setup Java 8 and 25
         uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: zulu
-          java-version: '8'
+          java-version: |
+            8
+            25
 
-      - name: Setup Java 25 (for build tools)
-        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
-        with:
-          distribution: zulu
-          java-version: '25'
-
-      - name: Install build dependencies
-        run: brew install ant maven ninja wget ldid xcodegen
-
+      # The Test workflow already runs these on every push; a release runs them again on the
+      # commit it ships.
       - name: Run unit tests
+        if: env.VERSION != ''
         run: make test
 
-      - name: Cache native build outputs
-        id: cache-out
+      # Each native component is cached on its own submodule commit and script, so changing one
+      # does not rebuild the others. frenchpress and the bootstrap are rebuilt every time: they
+      # are seconds, and the bootstrap also reads assets/shadow, which no submodule commit covers.
+      - name: Submodule commits
+        id: shas
+        run: |
+          {
+            echo "gl4es=$(git rev-parse HEAD:external/gl4es)"
+            echo "openal=$(git rev-parse HEAD:external/openal-soft)"
+            echo "lwjgl3=$(git rev-parse HEAD:external/lwjgl3)"
+            echo "cacio=$(git rev-parse HEAD:external/caciocavallo17)"
+            echo "stikjit=$(git rev-parse HEAD:external/StikJIT)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Cache gl4es
+        id: cache-gl4es
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: out
-          key: native-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('external/**') }}-${{ hashFiles('scripts/build-*.sh') }}-${{ hashFiles('Natives/RPPairing/**') }}
+          path: out/gl4es
+          key: native-gl4es-${{ runner.arch }}-${{ steps.shas.outputs.gl4es }}-${{ hashFiles('scripts/build-gl4es-ios.sh') }}
 
-      - name: Build native submodules
-        if: steps.cache-out.outputs.cache-hit != 'true'
+      - name: Cache openal-soft
+        id: cache-openal
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: out/openal
+          key: native-openal-${{ runner.arch }}-${{ steps.shas.outputs.openal }}-${{ hashFiles('scripts/build-openal-ios.sh') }}
+
+      - name: Cache lwjgl3
+        id: cache-lwjgl3
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: out/lwjgl3
+          key: native-lwjgl3-${{ runner.arch }}-${{ steps.shas.outputs.lwjgl3 }}-${{ hashFiles('scripts/build-lwjgl3-ios.sh') }}
+
+      - name: Cache cacio
+        id: cache-cacio
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: out/cacio
+          key: native-cacio-${{ steps.shas.outputs.cacio }}-${{ hashFiles('scripts/build-cacio-ios.sh') }}
+
+      - name: Cache StikJIT
+        id: cache-stikjit
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: out/stikjit
+          key: native-stikjit-${{ runner.arch }}-${{ steps.shas.outputs.stikjit }}-${{ hashFiles('scripts/build-stikjit-ios.sh', 'scripts/patches/**') }}
+
+      - name: Cache rppairing
+        id: cache-rppairing
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: out/rppairing
+          key: native-rppairing-${{ runner.arch }}-${{ hashFiles('Natives/RPPairing/**', 'scripts/build-rppairing-ios.sh') }}
+
+      # maven builds frenchpress, ldid signs and xcodegen is used by the app build, every run; the
+      # rest is for the native components.
+      - name: Install build dependencies
+        run: brew install maven ldid xcodegen
+
+      - name: Install native build dependencies
+        if: >-
+          steps.cache-gl4es.outputs.cache-hit != 'true' || steps.cache-openal.outputs.cache-hit != 'true' ||
+          steps.cache-lwjgl3.outputs.cache-hit != 'true' || steps.cache-cacio.outputs.cache-hit != 'true'
+        run: brew install ant ninja wget
+
+      - name: Build gl4es
+        if: steps.cache-gl4es.outputs.cache-hit != 'true'
+        run: ./scripts/build-gl4es-ios.sh
+
+      - name: Build openal-soft
+        if: steps.cache-openal.outputs.cache-hit != 'true'
+        run: ./scripts/build-openal-ios.sh
+
+      - name: Build lwjgl3
+        if: steps.cache-lwjgl3.outputs.cache-hit != 'true'
+        env:
+          JAVA8_HOME: ${{ env.JAVA_HOME_8_AARCH64 }}
+          JAVA_HOME: ${{ env.JAVA_HOME_25_AARCH64 }}
+        run: ./scripts/build-lwjgl3-ios.sh
+
+      - name: Build cacio
+        if: steps.cache-cacio.outputs.cache-hit != 'true'
+        env:
+          JAVA_HOME: ${{ env.JAVA_HOME_25_AARCH64 }}
+        run: ./scripts/build-cacio-ios.sh
+
+      - name: Build StikJIT
+        if: steps.cache-stikjit.outputs.cache-hit != 'true'
+        run: ./scripts/build-stikjit-ios.sh
+
+      - name: Build rppairing
+        if: steps.cache-rppairing.outputs.cache-hit != 'true'
+        run: ./scripts/build-rppairing-ios.sh
+
+      - name: Build frenchpress and the bootstrap
         env:
           JAVA8_HOME: ${{ env.JAVA_HOME_8_AARCH64 }}
           JAVA_HOME: ${{ env.JAVA_HOME_25_AARCH64 }}
         run: |
-          ./scripts/build-gl4es-ios.sh
-          ./scripts/build-openal-ios.sh
-          ./scripts/build-lwjgl3-ios.sh
-          ./scripts/build-cacio-ios.sh
           ./scripts/build-frenchpress-ios.sh
-          ./scripts/build-rppairing-ios.sh
           ./scripts/build-bootstrap.sh
 
-      # The JRE zip is an LFS object, which the checkout fetches. If it came back as a pointer
-      # file, pull it again rather than download an unchecked copy from somewhere else.
+      # The JRE zip is an LFS object, fetched above. If it is still a pointer file, fail rather
+      # than download an unchecked copy from somewhere else.
       - name: Ensure JRE zip is present
         run: |
           zip=assets/jre25-ios-aarch64.zip
-          if [ ! -f "$zip" ] || [ "$(wc -c < "$zip")" -lt 1000 ]; then
-            git lfs pull --include="$zip"
-          fi
-          [ "$(wc -c < "$zip")" -ge 1000 ] || { echo "::error::$zip is missing or still an LFS pointer"; exit 1; }
+          [ -f "$zip" ] && [ "$(wc -c < "$zip")" -ge 1000 ] || { echo "::error::$zip is missing or still an LFS pointer"; exit 1; }
           unzip -tq "$zip"
 
       - name: Stage app assets
@@ -118,13 +214,14 @@ jobs:
           make package RELEASE=1 SK_BUILD=${{ github.run_number }} ${VERSION:+SK_VERSION=$VERSION}
           mv out/artifacts/com.skonstruct.skapsule-*.ipa out/artifacts/SKapsule.ipa
 
+      # The same app with the TrollStore JIT entitlements: `make payload` differs only in the
+      # entitlements ldid puts on the main binary, so the built Payload is re-signed and zipped
+      # again instead of compiling the whole app a second time.
       - name: Build TrollStore IPA (JIT Entitlements)
         run: |
-          mv out/artifacts/SKapsule.ipa ./SKapsule.ipa
-          make clean
-          make package TROLLSTORE_JIT_ENT=1 RELEASE=1 SK_BUILD=${{ github.run_number }} ${VERSION:+SK_VERSION=$VERSION}
-          mv out/artifacts/com.skonstruct.skapsule-*-trollstore.tipa out/artifacts/SKapsule-TrollStore.tipa
-          mv ./SKapsule.ipa out/artifacts/SKapsule.ipa
+          ldid -S"$PWD/entitlements.trollstore.xml" out/artifacts/Payload/SKapsule.app/SKapsule
+          chmod -R 755 out/artifacts/Payload
+          (cd out/artifacts && zip -qr SKapsule-TrollStore.tipa Payload)
 
       # A staging step that silently skipped something would otherwise ship an app that cannot
       # launch; fail the build instead.
@@ -145,6 +242,17 @@ jobs:
               grep -qF "$need" <<<"$listing" || { echo "::error::$ipa is missing $need"; exit 1; }
             done
           done
+
+      # The two IPAs must differ only in the main binary's entitlements: the TrollStore one has to
+      # carry them, and the standard one must not.
+      - name: Verify the entitlements
+        run: |
+          std=$(mktemp -d); troll=$(mktemp -d)
+          unzip -q out/artifacts/SKapsule.ipa 'Payload/SKapsule.app/SKapsule' -d "$std"
+          unzip -q out/artifacts/SKapsule-TrollStore.tipa 'Payload/SKapsule.app/SKapsule' -d "$troll"
+          ldid -e "$std/Payload/SKapsule.app/SKapsule" > "$std/ent.xml"
+          ldid -e "$troll/Payload/SKapsule.app/SKapsule" > "$troll/ent.xml"
+          ! cmp -s "$std/ent.xml" "$troll/ent.xml" || { echo "::error::the TrollStore IPA has the standard entitlements"; exit 1; }
 
       - name: Verify the IPA carries the release version
         if: env.VERSION != ''
